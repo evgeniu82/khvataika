@@ -206,6 +206,9 @@ var remote_news_items: Array[Dictionary] = []
 var remote_leaderboard: Array[Dictionary] = []
 var remote_sync_status: String = "СЕРВЕР НЕ НАСТРОЕН"
 var remote_sync_timer: float = 5.0
+var remote_notification_timer: float = 12.0
+var remote_notification_cursor: int = 0
+var remote_device_registered: bool = false
 var remote_sync_retry_count: int = 0
 var remote_http: HTTPRequest
 var remote_request_kind: String = ""
@@ -1108,6 +1111,167 @@ func _normalized_server_url() -> String:
 func _server_ready() -> bool:
     return remote_http != null and _normalized_server_url() != ""
 
+func get_server_game_state() -> Dictionary:
+    return {
+        "coins": coins, "player_name": player_name, "player_avatar_index": player_avatar_index,
+        "bonus_keys": bonus_keys, "engineering_parts": engineering_parts, "chest_inventory": chest_inventory,
+        "chest_keys": chest_keys, "chest_exclusive_toys": chest_exclusive_toys, "chest_exclusive_skins": chest_exclusive_skins,
+        "chest_exclusive_reward_count": chest_exclusive_reward_count, "total_chests_opened": total_chests_opened,
+        "total_keys_earned": total_keys_earned, "workshop_parts": workshop_parts, "workshop_level": workshop_level,
+        "workshop_claw_power": workshop_claw_power, "workshop_speed": workshop_speed, "workshop_precision": workshop_precision,
+        "workshop_luck": workshop_luck, "workshop_motor": workshop_motor, "workshop_servo": workshop_servo,
+        "workshop_cable": workshop_cable, "workshop_damper": workshop_damper, "workshop_cooling": workshop_cooling,
+        "workshop_controller": workshop_controller, "workshop_blueprints": workshop_blueprints,
+        "workshop_calibration": workshop_calibration, "workshop_overclock": workshop_overclock,
+        "workshop_overclock_games": workshop_overclock_games, "workshop_job_end_unix": workshop_job_end_unix,
+        "workshop_job_active": workshop_job_active, "workshop_job_name": workshop_job_name, "workshop_job_reward": workshop_job_reward,
+        "level": player_level, "xp": player_xp, "xp_to_next": xp_to_next, "games": total_games,
+        "total_prizes_won": total_prizes_won, "rarity_wins": rarity_wins, "achievements": unlocked_achievements,
+        "last_daily_bonus_date": last_daily_bonus_date, "login_streak": login_streak, "last_login_claim_date": last_login_claim_date,
+        "best_result": best_result, "best_result_xp": best_result_xp, "current_win_streak": current_win_streak,
+        "best_win_streak": best_win_streak, "total_xp_earned": total_xp_earned, "highest_reward_rubles": highest_reward_rubles,
+        "perfect_grabs": perfect_grabs, "heavy_toy_wins": heavy_toy_wins, "lucky_toy_wins": lucky_toy_wins,
+        "daily_mission_progress": daily_mission_progress, "daily_mission_date": daily_mission_date,
+        "daily_mission_claimed": daily_mission_claimed, "weekly_mission_progress": weekly_mission_progress,
+        "weekly_mission_key": weekly_mission_key, "weekly_mission_claimed": weekly_mission_claimed,
+        "season_pass_xp": season_pass_xp, "season_pass_level": season_pass_level, "active_season_id": active_season_id,
+        "owned_claws": owned_claws, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
+        "owned_machine_skins": owned_machine_skins, "selected_claw_skin": selected_claw_skin,
+        "selected_toy_skin": selected_toy_skin, "selected_machine_skin": selected_machine_skin,
+        "vip_owned": vip_owned, "vip_selected": vip_selected, "collection": collection,
+        "toy_inventory_counts": toy_inventory_counts, "completed_collections": completed_collections,
+        "upgrades": upgrade_levels, "claw": selected_claw, "promo_codes_used": promo_codes_used,
+        "return_bonus_days": return_bonus_days, "return_bonus_available": return_bonus_available,
+        "return_bonus_claimed": return_bonus_claimed, "last_active_unix": last_active_unix,
+        "referral_code": referral_code, "referral_used": referral_used
+    }
+
+func apply_server_game_state(data: Dictionary) -> void:
+    if data.is_empty():
+        return
+    coins = maxi(0, int(data.get("coins", coins)))
+    player_name = String(data.get("player_name", player_name)).substr(0, 20)
+    player_avatar_index = clampi(int(data.get("player_avatar_index", player_avatar_index)), 0, AVATAR_OPTIONS.size() - 1)
+    bonus_keys = maxi(0, int(data.get("bonus_keys", bonus_keys)))
+    engineering_parts = maxi(0, int(data.get("engineering_parts", engineering_parts)))
+    var ci: Variant = data.get("chest_inventory", chest_inventory)
+    if ci is Dictionary:
+        for k in chest_inventory.keys():
+            chest_inventory[k] = maxi(0, int(ci.get(k, chest_inventory[k])))
+    chest_keys = maxi(0, int(data.get("chest_keys", chest_keys)))
+    var cet: Variant = data.get("chest_exclusive_toys", chest_exclusive_toys)
+    if cet is Dictionary: chest_exclusive_toys = cet
+    var ces: Variant = data.get("chest_exclusive_skins", chest_exclusive_skins)
+    if ces is Dictionary: chest_exclusive_skins = ces
+    chest_exclusive_reward_count = maxi(0, int(data.get("chest_exclusive_reward_count", chest_exclusive_reward_count)))
+    total_chests_opened = maxi(0, int(data.get("total_chests_opened", total_chests_opened)))
+    total_keys_earned = maxi(0, int(data.get("total_keys_earned", total_keys_earned)))
+    workshop_parts = maxi(0, int(data.get("workshop_parts", workshop_parts)))
+    workshop_level = maxi(1, int(data.get("workshop_level", workshop_level)))
+    workshop_claw_power = clampi(int(data.get("workshop_claw_power", workshop_claw_power)), 0, 10)
+    workshop_speed = clampi(int(data.get("workshop_speed", workshop_speed)), 0, 10)
+    workshop_precision = clampi(int(data.get("workshop_precision", workshop_precision)), 0, 10)
+    workshop_luck = clampi(int(data.get("workshop_luck", workshop_luck)), 0, 10)
+    workshop_motor = clampi(int(data.get("workshop_motor", workshop_motor)), 0, 15)
+    workshop_servo = clampi(int(data.get("workshop_servo", workshop_servo)), 0, 15)
+    workshop_cable = clampi(int(data.get("workshop_cable", workshop_cable)), 0, 15)
+    workshop_damper = clampi(int(data.get("workshop_damper", workshop_damper)), 0, 15)
+    workshop_cooling = clampi(int(data.get("workshop_cooling", workshop_cooling)), 0, 15)
+    workshop_controller = clampi(int(data.get("workshop_controller", workshop_controller)), 0, 15)
+    var wb: Variant = data.get("workshop_blueprints", workshop_blueprints)
+    if wb is Dictionary: workshop_blueprints = wb
+    workshop_calibration = clampi(int(data.get("workshop_calibration", workshop_calibration)), 0, 5)
+    workshop_overclock = bool(data.get("workshop_overclock", workshop_overclock))
+    workshop_overclock_games = maxi(0, int(data.get("workshop_overclock_games", workshop_overclock_games)))
+    workshop_job_end_unix = int(data.get("workshop_job_end_unix", workshop_job_end_unix))
+    workshop_job_active = bool(data.get("workshop_job_active", workshop_job_active))
+    workshop_job_name = String(data.get("workshop_job_name", workshop_job_name))
+    workshop_job_reward = maxi(0, int(data.get("workshop_job_reward", workshop_job_reward)))
+    player_level = maxi(1, int(data.get("level", player_level)))
+    player_xp = maxi(0, int(data.get("xp", player_xp)))
+    xp_to_next = maxi(xp_needed_for_level(player_level), int(data.get("xp_to_next", xp_to_next)))
+    total_games = maxi(0, int(data.get("games", total_games)))
+    total_prizes_won = maxi(0, int(data.get("total_prizes_won", total_prizes_won)))
+    var rw: Variant = data.get("rarity_wins", rarity_wins)
+    if rw is Dictionary: rarity_wins = rw
+    var ach: Variant = data.get("achievements", unlocked_achievements)
+    if ach is Dictionary: unlocked_achievements = ach
+    last_daily_bonus_date = String(data.get("last_daily_bonus_date", last_daily_bonus_date))
+    login_streak = maxi(0, int(data.get("login_streak", login_streak)))
+    last_login_claim_date = String(data.get("last_login_claim_date", last_login_claim_date))
+    best_result = String(data.get("best_result", best_result))
+    best_result_xp = maxi(0, int(data.get("best_result_xp", best_result_xp)))
+    current_win_streak = maxi(0, int(data.get("current_win_streak", current_win_streak)))
+    best_win_streak = maxi(0, int(data.get("best_win_streak", best_win_streak)))
+    total_xp_earned = maxi(0, int(data.get("total_xp_earned", total_xp_earned)))
+    highest_reward_rubles = maxi(0, int(data.get("highest_reward_rubles", highest_reward_rubles)))
+    perfect_grabs = maxi(0, int(data.get("perfect_grabs", perfect_grabs)))
+    heavy_toy_wins = maxi(0, int(data.get("heavy_toy_wins", heavy_toy_wins)))
+    lucky_toy_wins = maxi(0, int(data.get("lucky_toy_wins", lucky_toy_wins)))
+    daily_mission_progress = maxi(0, int(data.get("daily_mission_progress", daily_mission_progress)))
+    daily_mission_date = String(data.get("daily_mission_date", daily_mission_date))
+    daily_mission_claimed = bool(data.get("daily_mission_claimed", daily_mission_claimed))
+    weekly_mission_progress = maxi(0, int(data.get("weekly_mission_progress", weekly_mission_progress)))
+    weekly_mission_key = String(data.get("weekly_mission_key", weekly_mission_key))
+    weekly_mission_claimed = bool(data.get("weekly_mission_claimed", weekly_mission_claimed))
+    season_pass_xp = maxi(0, int(data.get("season_pass_xp", season_pass_xp)))
+    season_pass_level = clampi(int(data.get("season_pass_level", season_pass_level)), 1, SEASON_PASS_MAX_LEVEL)
+    active_season_id = String(data.get("active_season_id", active_season_id))
+    var arr: Variant = data.get("owned_claws", owned_claws)
+    if arr is Array: owned_claws = arr
+    arr = data.get("owned_claw_skins", owned_claw_skins)
+    if arr is Array: owned_claw_skins = arr
+    arr = data.get("owned_toy_skins", owned_toy_skins)
+    if arr is Array: owned_toy_skins = arr
+    arr = data.get("owned_machine_skins", owned_machine_skins)
+    if arr is Array: owned_machine_skins = arr
+    selected_claw_skin = clampi(int(data.get("selected_claw_skin", selected_claw_skin)), 0, maxi(0, claw_skin_specs.size() - 1))
+    selected_toy_skin = clampi(int(data.get("selected_toy_skin", selected_toy_skin)), 0, maxi(0, toy_skin_specs.size() - 1))
+    selected_machine_skin = clampi(int(data.get("selected_machine_skin", selected_machine_skin)), 0, maxi(0, machine_skin_specs.size() - 1))
+    arr = data.get("vip_owned", vip_owned)
+    if arr is Array: vip_owned = arr
+    vip_selected = clampi(int(data.get("vip_selected", vip_selected)), 0, maxi(0, vip_specs.size() - 1))
+    selected_claw = clampi(int(data.get("claw", selected_claw)), 0, maxi(0, claw_specs.size() - 1))
+    var d: Variant = data.get("collection", collection)
+    if d is Dictionary: collection = d
+    d = data.get("toy_inventory_counts", toy_inventory_counts)
+    if d is Dictionary: toy_inventory_counts = d
+    d = data.get("completed_collections", completed_collections)
+    if d is Dictionary: completed_collections = d
+    arr = data.get("upgrades", upgrade_levels)
+    if arr is Array: upgrade_levels = arr
+    d = data.get("promo_codes_used", promo_codes_used)
+    if d is Dictionary: promo_codes_used = d
+    return_bonus_days = maxi(0, int(data.get("return_bonus_days", return_bonus_days)))
+    return_bonus_available = bool(data.get("return_bonus_available", return_bonus_available))
+    return_bonus_claimed = bool(data.get("return_bonus_claimed", return_bonus_claimed))
+    last_active_unix = int(data.get("last_active_unix", last_active_unix))
+    update_ui()
+    refresh_chests_panel()
+    refresh_workshop_panel()
+    refresh_live_systems_panel()
+    save_game()
+
+func register_device_remote() -> void:
+    if not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
+        return
+    var receiver = _get_background_notification_receiver()
+    var context = Engine.get_singleton("AndroidRuntime").getApplicationContext()
+    if receiver != null and context != null:
+        receiver.registerServer(context, _normalized_server_url(), player_id)
+        var java_exception = JavaClassWrapper.get_exception()
+        if java_exception == null:
+            remote_device_registered = true
+
+func poll_server_notifications() -> void:
+    if not _server_ready() or player_id == "" or remote_request_kind != "":
+        return
+    remote_request_kind = "notifications"
+    var url := _normalized_server_url() + "/api/notifications/poll?player_id=" + player_id.uri_encode() + "&cursor=" + str(remote_notification_cursor)
+    var err := remote_http.request(url)
+    if err != OK:
+        remote_request_kind = ""
+
 func register_player_remote() -> void:
     if not _server_ready():
         remote_sync_status = "СЕРВЕР НЕ НАСТРОЕН"
@@ -1153,7 +1317,8 @@ func sync_player_to_server() -> void:
         "prizes": total_prizes_won,
         "best_streak": best_win_streak,
         "referral_code": referral_code,
-        "referral_invites": referral_invites
+        "referral_invites": referral_invites,
+        "game_state": get_server_game_state()
     }
     remote_request_kind = "sync"
     var headers := PackedStringArray(["Content-Type: application/json"])
@@ -1241,6 +1406,7 @@ func _apply_remote_config(config: Dictionary) -> void:
     cancel_background_notifications()
     if notifications_on:
         schedule_background_notifications()
+    register_device_remote()
     refresh_news_panel(news_panel)
     refresh_rating_panel()
     update_ui()
@@ -1291,6 +1457,19 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         else:
             referral_status_label.text = String(data.get("message", "Реферальный код не принят"))
         refresh_referral_panel()
+        return
+    if data.has("game_state") and data["game_state"] is Dictionary:
+        apply_server_game_state(data["game_state"])
+    if kind == "notifications":
+        var items: Variant = data.get("notifications", [])
+        if items is Array:
+            for item in items:
+                if item is Dictionary:
+                    var nid := int(item.get("id", 0))
+                    remote_notification_cursor = maxi(remote_notification_cursor, nid)
+                    if notifications_on:
+                        notify_phone(String(item.get("title", "Хватайка")), String(item.get("message", "Зайди в игру!")))
+        remote_sync_status = "ПОДКЛЮЧЕНО"
         return
     if data.has("player") and data["player"] is Dictionary:
         var server_player: Dictionary = data["player"]
@@ -6400,6 +6579,10 @@ func _process(delta: float) -> void:
     if remote_sync_timer <= 0.0 and _server_ready():
         remote_sync_timer = 10.0
         sync_player_to_server()
+    remote_notification_timer -= delta
+    if remote_notification_timer <= 0.0 and _server_ready():
+        remote_notification_timer = 30.0
+        poll_server_notifications()
     if rarity_flash_timer > 0.0:
         rarity_flash_timer -= delta
         if result_popup and result_popup.visible:
