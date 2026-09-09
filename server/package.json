@@ -1,6 +1,6 @@
 {
   "name": "khvataika-admin-server",
-  "version": "1.13.0",
+  "version": "1.13.6",
   "private": true,
   "description": "Backend and admin panel for Khvataika",
   "scripts": {"start": "node server.js"},
