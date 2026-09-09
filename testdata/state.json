@@ -1,1 +1,3046 @@
-
+{
+  "schema_version": 4,
+  "settings": {
+    "schema_version": 4,
+    "maintenance_mode": false,
+    "global_announcement": "",
+    "global_reward_multiplier": 1,
+    "play_cost": 0,
+    "daily_bonus_amount": 25,
+    "daily_mission_reward": 80,
+    "weekly_mission_reward": 350,
+    "return_bonus_base": 100,
+    "return_bonus_per_day": 25,
+    "return_bonus_max_days": 30,
+    "rating_success": 3,
+    "rating_level_up": 1,
+    "starting_rating": 0,
+    "notification_enabled": true,
+    "notification_hours": {
+      "rewards": 12,
+      "streak": 20,
+      "chests": 18
+    },
+    "default_language": "ru",
+    "default_quality": 2,
+    "default_fps": 60,
+    "capture_base_chance": 0.28,
+    "capture_upgrade_bonus": 0.012,
+    "capture_min_chance": 0.08,
+    "capture_max_chance": 0.9,
+    "workshop_parts_start": 0,
+    "workshop_job_cost": 60,
+    "workshop_job_base_reward": 110,
+    "workshop_job_duration_sec": 180,
+    "referral_invited_reward": 50,
+    "referral_inviter_reward": 100,
+    "chest_key_common": 1,
+    "chest_key_rare": 2,
+    "chest_key_epic": 3,
+    "chest_key_legendary": 5,
+    "chest_key_vip": 8,
+    "achievement_easy_reward": 25,
+    "achievement_medium_reward": 75,
+    "achievement_hard_reward": 150,
+    "achievement_epic_reward": 300,
+    "achievement_legendary_reward": 750
+  },
+  "promocodes": [
+    {
+      "id": "promo_khva2026",
+      "code": "KHVA2026",
+      "title": "Стартовый бонус",
+      "description": "Бонус нового сезона",
+      "reward": {
+        "type": "coins",
+        "amount": 250
+      },
+      "starts_at": "",
+      "expires_at": "",
+      "max_uses": 0,
+      "used": 0,
+      "active": true
+    },
+    {
+      "id": "promo_starter",
+      "code": "STARTER",
+      "title": "Старт",
+      "description": "Стартовый подарок",
+      "reward": {
+        "type": "coins",
+        "amount": 100
+      },
+      "starts_at": "",
+      "expires_at": "",
+      "max_uses": 0,
+      "used": 0,
+      "active": true
+    }
+  ],
+  "news": [],
+  "events": [],
+  "holidays": [],
+  "season": {
+    "id": "season_1",
+    "name": "Сезон 1",
+    "description": "Первый сезон",
+    "start_at": "",
+    "end_at": "",
+    "enabled": true,
+    "max_level": 30,
+    "levels": []
+  },
+  "chests": [],
+  "missions": {
+    "daily": [
+      {
+        "id": "daily_grab_3",
+        "name": "Три игрушки",
+        "description": "Получите 3 игрушки",
+        "kind": "prizes",
+        "target": 3,
+        "reward": {
+          "type": "coins",
+          "amount": 80
+        },
+        "enabled": true,
+        "reset": "daily"
+      }
+    ],
+    "weekly": [
+      {
+        "id": "weekly_grab_12",
+        "name": "Недельная охота",
+        "description": "Получите 12 игрушек",
+        "kind": "prizes",
+        "target": 12,
+        "reward": {
+          "type": "coins",
+          "amount": 350
+        },
+        "enabled": true,
+        "reset": "weekly"
+      }
+    ]
+  },
+  "catalog": {
+    "toys": [
+      {
+        "id": "toy_001",
+        "name": "Мишка Байт",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 42,
+        "collection": "ЛЕСНЫЕ ДРУЗЬЯ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_002",
+        "name": "Лисёнок Флэш",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 38,
+        "collection": "ЛЕСНЫЕ ДРУЗЬЯ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_003",
+        "name": "Заяц Сноу",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 36,
+        "collection": "ЛЕСНЫЕ ДРУЗЬЯ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_004",
+        "name": "Панда Пульс",
+        "rarity": "РЕДКАЯ",
+        "weight": 14,
+        "collection": "ЛЕСНЫЕ ДРУЗЬЯ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_005",
+        "name": "Утёнок Дак",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 41,
+        "collection": "МИЛЫЕ МАЛЫШИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_006",
+        "name": "Кот Пиксель",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 37,
+        "collection": "МИЛЫЕ МАЛЫШИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_007",
+        "name": "Щенок Бруно",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 35,
+        "collection": "МИЛЫЕ МАЛЫШИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_008",
+        "name": "Коала Коди",
+        "rarity": "РЕДКАЯ",
+        "weight": 12,
+        "collection": "МИЛЫЕ МАЛЫШИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_009",
+        "name": "Лягушка Блип",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 34,
+        "collection": "ДЖУНГЛИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_010",
+        "name": "Черепашка Тото",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 31,
+        "collection": "ДЖУНГЛИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_011",
+        "name": "Обезьянка Джо",
+        "rarity": "РЕДКАЯ",
+        "weight": 13,
+        "collection": "ДЖУНГЛИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_012",
+        "name": "Тигр Неон",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.8,
+        "collection": "ДЖУНГЛИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_013",
+        "name": "Акула Спарк",
+        "rarity": "РЕДКАЯ",
+        "weight": 11,
+        "collection": "ОКЕАН",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_014",
+        "name": "Пингвин Айс",
+        "rarity": "РЕДКАЯ",
+        "weight": 10,
+        "collection": "ОКЕАН",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_015",
+        "name": "Морской Кот",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 29,
+        "collection": "ОКЕАН",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_016",
+        "name": "Кит Блу",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.5,
+        "collection": "ОКЕАН",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_017",
+        "name": "Космо-Акула",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 3,
+        "collection": "КОСМОС",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_018",
+        "name": "Галакси-Кот",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.1,
+        "collection": "КОСМОС",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_019",
+        "name": "Астро-Кот",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.12,
+        "collection": "КОСМОС",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_020",
+        "name": "Звёздный Панда",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.06,
+        "collection": "КОСМОС",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_021",
+        "name": "Дракон Вольт",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 3.5,
+        "collection": "ДРАКОНЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_022",
+        "name": "Золотой Дракон",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.28,
+        "collection": "ДРАКОНЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_023",
+        "name": "Радужный Дракон",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.1,
+        "collection": "ДРАКОНЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_024",
+        "name": "Неон-Мантикора",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.08,
+        "collection": "ДРАКОНЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_025",
+        "name": "Единорог Луна",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 4,
+        "collection": "ВОЛШЕБСТВО",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_026",
+        "name": "Король Единорог",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.2,
+        "collection": "ВОЛШЕБСТВО",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_027",
+        "name": "Фея Старлайт",
+        "rarity": "РЕДКАЯ",
+        "weight": 7,
+        "collection": "ВОЛШЕБСТВО",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_028",
+        "name": "Розовый Грифон",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 1.8,
+        "collection": "ВОЛШЕБСТВО",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_029",
+        "name": "Робо-Панда",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.4,
+        "collection": "КИБЕР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_030",
+        "name": "Кибер-Кот",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.6,
+        "collection": "КИБЕР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_031",
+        "name": "Меха-Мишка",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.16,
+        "collection": "КИБЕР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_032",
+        "name": "CLAW MASTER",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.025,
+        "collection": "КИБЕР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_033",
+        "name": "Рекс Рокки",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 30,
+        "collection": "ДИНОЗАВРЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_034",
+        "name": "Трицератопс Три",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 28,
+        "collection": "ДИНОЗАВРЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_035",
+        "name": "Раптор Рэй",
+        "rarity": "РЕДКАЯ",
+        "weight": 15,
+        "collection": "ДИНОЗАВРЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_036",
+        "name": "Бронто Бум",
+        "rarity": "РЕДКАЯ",
+        "weight": 11,
+        "collection": "ДИНОЗАВРЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_037",
+        "name": "Мега-Тиран",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.2,
+        "collection": "ДИНОЗАВРЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_038",
+        "name": "Капитан Плюш",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 29,
+        "collection": "СУПЕРГЕРОИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_039",
+        "name": "Молния Макс",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 27,
+        "collection": "СУПЕРГЕРОИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_040",
+        "name": "Ночной Ниндзя",
+        "rarity": "РЕДКАЯ",
+        "weight": 13,
+        "collection": "СУПЕРГЕРОИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_041",
+        "name": "Робо-Герой",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 3,
+        "collection": "СУПЕРГЕРОИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_042",
+        "name": "Золотой Герой",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.22,
+        "collection": "СУПЕРГЕРОИ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_043",
+        "name": "Пончик Пинки",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 32,
+        "collection": "СЛАДКИЙ МИР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_044",
+        "name": "Маршмеллоу Мими",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 30,
+        "collection": "СЛАДКИЙ МИР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_045",
+        "name": "Кекс Куки",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 28,
+        "collection": "СЛАДКИЙ МИР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_046",
+        "name": "Леденец Лаки",
+        "rarity": "РЕДКАЯ",
+        "weight": 12,
+        "collection": "СЛАДКИЙ МИР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_047",
+        "name": "Шоколадный Король",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2,
+        "collection": "СЛАДКИЙ МИР",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_048",
+        "name": "Капитан Бакс",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 30,
+        "collection": "ПИРАТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_049",
+        "name": "Попугай Пират",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 27,
+        "collection": "ПИРАТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_050",
+        "name": "Кракен Крош",
+        "rarity": "РЕДКАЯ",
+        "weight": 14,
+        "collection": "ПИРАТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_051",
+        "name": "Призрак Палубы",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.5,
+        "collection": "ПИРАТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_052",
+        "name": "Золотой Капитан",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.18,
+        "collection": "ПИРАТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_053",
+        "name": "Бот Биби",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 31,
+        "collection": "РОБОТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_054",
+        "name": "Дроид Дэн",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 28,
+        "collection": "РОБОТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_055",
+        "name": "Меха-Лис",
+        "rarity": "РЕДКАЯ",
+        "weight": 13,
+        "collection": "РОБОТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_056",
+        "name": "Кибер-Гигант",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.7,
+        "collection": "РОБОТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_057",
+        "name": "Омега-9000",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.14,
+        "collection": "РОБОТЫ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_058",
+        "name": "Дракончик Эмбер",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 25,
+        "collection": "ФАНТАСТИКА",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_059",
+        "name": "Грифон Грей",
+        "rarity": "РЕДКАЯ",
+        "weight": 12,
+        "collection": "ФАНТАСТИКА",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_060",
+        "name": "Феникс Файр",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 3,
+        "collection": "ФАНТАСТИКА",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_061",
+        "name": "Лунный Дух",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 1.8,
+        "collection": "ФАНТАСТИКА",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_062",
+        "name": "Древний Дракон",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.08,
+        "collection": "ФАНТАСТИКА",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_063",
+        "name": "Футбольный Боб",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 33,
+        "collection": "СПОРТ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_064",
+        "name": "Баскет-Би",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 31,
+        "collection": "СПОРТ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_065",
+        "name": "Хоккейный Хаски",
+        "rarity": "РЕДКАЯ",
+        "weight": 13,
+        "collection": "СПОРТ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_066",
+        "name": "Чемпион",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.4,
+        "collection": "СПОРТ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_067",
+        "name": "Олимпийский Легендар",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.1,
+        "collection": "СПОРТ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_068",
+        "name": "Монстрик Мио",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 30,
+        "collection": "МИР МОНСТРОВ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_069",
+        "name": "Пухлый Буба",
+        "rarity": "ОБЫЧНАЯ",
+        "weight": 28,
+        "collection": "МИР МОНСТРОВ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_070",
+        "name": "Зубастик Зик",
+        "rarity": "РЕДКАЯ",
+        "weight": 13,
+        "collection": "МИР МОНСТРОВ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_071",
+        "name": "Теневой Монстр",
+        "rarity": "ЭПИЧЕСКАЯ",
+        "weight": 2.3,
+        "collection": "МИР МОНСТРОВ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      },
+      {
+        "id": "toy_072",
+        "name": "Король Монстров",
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "weight": 0.07,
+        "collection": "МИР МОНСТРОВ",
+        "enabled": true,
+        "description": "Игрушка для коллекции"
+      }
+    ],
+    "collections": [
+      {
+        "id": "collection_",
+        "name": "ВОЛШЕБСТВО",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_025",
+          "toy_026",
+          "toy_027",
+          "toy_028"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ДЖУНГЛИ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_009",
+          "toy_010",
+          "toy_011",
+          "toy_012"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ДИНОЗАВРЫ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_033",
+          "toy_034",
+          "toy_035",
+          "toy_036",
+          "toy_037"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ДРАКОНЫ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_021",
+          "toy_022",
+          "toy_023",
+          "toy_024"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "КИБЕР",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_029",
+          "toy_030",
+          "toy_031",
+          "toy_032"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "КОСМОС",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_017",
+          "toy_018",
+          "toy_019",
+          "toy_020"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ЛЕСНЫЕ ДРУЗЬЯ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_001",
+          "toy_002",
+          "toy_003",
+          "toy_004"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "МИЛЫЕ МАЛЫШИ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_005",
+          "toy_006",
+          "toy_007",
+          "toy_008"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "МИР МОНСТРОВ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_068",
+          "toy_069",
+          "toy_070",
+          "toy_071",
+          "toy_072"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ОКЕАН",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_013",
+          "toy_014",
+          "toy_015",
+          "toy_016"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ПИРАТЫ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_048",
+          "toy_049",
+          "toy_050",
+          "toy_051",
+          "toy_052"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "РОБОТЫ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_053",
+          "toy_054",
+          "toy_055",
+          "toy_056",
+          "toy_057"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "СЛАДКИЙ МИР",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_043",
+          "toy_044",
+          "toy_045",
+          "toy_046",
+          "toy_047"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "СПОРТ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_063",
+          "toy_064",
+          "toy_065",
+          "toy_066",
+          "toy_067"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "СУПЕРГЕРОИ",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_038",
+          "toy_039",
+          "toy_040",
+          "toy_041",
+          "toy_042"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      },
+      {
+        "id": "collection_",
+        "name": "ФАНТАСТИКА",
+        "description": "Коллекция игрушек",
+        "difficulty": "Обычная",
+        "toy_ids": [
+          "toy_058",
+          "toy_059",
+          "toy_060",
+          "toy_061",
+          "toy_062"
+        ],
+        "reward": {
+          "type": "coins",
+          "amount": 110
+        },
+        "enabled": true
+      }
+    ],
+    "shop": [
+      {
+        "id": "claw_1",
+        "category": "claws",
+        "name": "WOOD BASIC",
+        "description": "Улучшенная клешня",
+        "price": 0,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "capture_bonus": 0,
+          "claw_index": 0
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_2",
+        "category": "claws",
+        "name": "STEEL GRIP",
+        "description": "Улучшенная клешня",
+        "price": 120,
+        "currency": "coins",
+        "level": 2,
+        "effect": {
+          "capture_bonus": 0.05,
+          "claw_index": 1
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_3",
+        "category": "claws",
+        "name": "MAGNET PRO",
+        "description": "Улучшенная клешня",
+        "price": 240,
+        "currency": "coins",
+        "level": 3,
+        "effect": {
+          "capture_bonus": 0.1,
+          "claw_index": 2
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_4",
+        "category": "claws",
+        "name": "ICE GRIP",
+        "description": "Улучшенная клешня",
+        "price": 420,
+        "currency": "coins",
+        "level": 4,
+        "effect": {
+          "capture_bonus": 0.15,
+          "claw_index": 3
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_5",
+        "category": "claws",
+        "name": "RUBY CLAW",
+        "description": "Улучшенная клешня",
+        "price": 650,
+        "currency": "coins",
+        "level": 5,
+        "effect": {
+          "capture_bonus": 0.2,
+          "claw_index": 4
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_6",
+        "category": "claws",
+        "name": "GOLDEN GRIP",
+        "description": "Улучшенная клешня",
+        "price": 900,
+        "currency": "coins",
+        "level": 6,
+        "effect": {
+          "capture_bonus": 0.25,
+          "claw_index": 5
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_7",
+        "category": "claws",
+        "name": "PLASMA",
+        "description": "Улучшенная клешня",
+        "price": 1250,
+        "currency": "coins",
+        "level": 7,
+        "effect": {
+          "capture_bonus": 0.3,
+          "claw_index": 6
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_8",
+        "category": "claws",
+        "name": "CYBER TITAN",
+        "description": "Улучшенная клешня",
+        "price": 1700,
+        "currency": "coins",
+        "level": 8,
+        "effect": {
+          "capture_bonus": 0.35,
+          "claw_index": 7
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_9",
+        "category": "claws",
+        "name": "VOID HUNTER",
+        "description": "Улучшенная клешня",
+        "price": 2400,
+        "currency": "coins",
+        "level": 9,
+        "effect": {
+          "capture_bonus": 0.42,
+          "claw_index": 8
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_10",
+        "category": "claws",
+        "name": "LEGEND X",
+        "description": "Улучшенная клешня",
+        "price": 3500,
+        "currency": "coins",
+        "level": 10,
+        "effect": {
+          "capture_bonus": 0.5,
+          "claw_index": 9
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_1",
+        "category": "upgrades",
+        "name": "СИЛА ЗАХВАТА",
+        "description": "Уровень улучшения",
+        "price": 180,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 0,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_2",
+        "category": "upgrades",
+        "name": "СТАБИЛИЗАТОР",
+        "description": "Уровень улучшения",
+        "price": 220,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 1,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_3",
+        "category": "upgrades",
+        "name": "ТОЧНОСТЬ",
+        "description": "Уровень улучшения",
+        "price": 260,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 2,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_4",
+        "category": "upgrades",
+        "name": "УДАЧА",
+        "description": "Уровень улучшения",
+        "price": 300,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 3,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_5",
+        "category": "upgrades",
+        "name": "БЫСТРЫЙ ПРИВОД",
+        "description": "Уровень улучшения",
+        "price": 340,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 4,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_6",
+        "category": "upgrades",
+        "name": "УСИЛЕННЫЙ ТРОС",
+        "description": "Уровень улучшения",
+        "price": 380,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 5,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_7",
+        "category": "upgrades",
+        "name": "АМОРТИЗАТОР",
+        "description": "Уровень улучшения",
+        "price": 420,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 6,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_8",
+        "category": "upgrades",
+        "name": "СЕРВОМОТОР",
+        "description": "Уровень улучшения",
+        "price": 470,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 7,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_9",
+        "category": "upgrades",
+        "name": "ПОДСВЕТКА ПРИЗА",
+        "description": "Уровень улучшения",
+        "price": 520,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 8,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "upgrade_10",
+        "category": "upgrades",
+        "name": "МАСТЕР-МОДУЛЬ",
+        "description": "Уровень улучшения",
+        "price": 700,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "upgrade_index": 9,
+          "upgrade_delta": 1
+        },
+        "one_time": false,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_0",
+        "category": "claw_skins",
+        "name": "КЛАССИК",
+        "description": "Косметический предмет",
+        "price": 0,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 0
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_1",
+        "category": "claw_skins",
+        "name": "ЛАЗУРЬ",
+        "description": "Косметический предмет",
+        "price": 180,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 1
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_2",
+        "category": "claw_skins",
+        "name": "НЕОН",
+        "description": "Косметический предмет",
+        "price": 320,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 2
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_3",
+        "category": "claw_skins",
+        "name": "РОЗОВЫЙ КРИСТАЛЛ",
+        "description": "Косметический предмет",
+        "price": 450,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 3
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_4",
+        "category": "claw_skins",
+        "name": "РУБИН",
+        "description": "Косметический предмет",
+        "price": 650,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 4
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_5",
+        "category": "claw_skins",
+        "name": "ЗОЛОТО",
+        "description": "Косметический предмет",
+        "price": 900,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 5
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_6",
+        "category": "claw_skins",
+        "name": "МЯТНЫЙ",
+        "description": "Косметический предмет",
+        "price": 1100,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 6
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_7",
+        "category": "claw_skins",
+        "name": "ЛЕД",
+        "description": "Косметический предмет",
+        "price": 1350,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 7
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_8",
+        "category": "claw_skins",
+        "name": "КИБЕР",
+        "description": "Косметический предмет",
+        "price": 1650,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 8
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_9",
+        "category": "claw_skins",
+        "name": "КОСМОС",
+        "description": "Косметический предмет",
+        "price": 2100,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 9
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_10",
+        "category": "claw_skins",
+        "name": "ВУЛКАН",
+        "description": "Косметический предмет",
+        "price": 2600,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 10
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "claw_skin_11",
+        "category": "claw_skins",
+        "name": "LEGEND",
+        "description": "Косметический предмет",
+        "price": 3500,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "claw_skin",
+          "skin_index": 11
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_0",
+        "category": "toy_skins",
+        "name": "ОРИГИНАЛ",
+        "description": "Косметический предмет",
+        "price": 0,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 0
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_1",
+        "category": "toy_skins",
+        "name": "ПАСТЕЛЬ",
+        "description": "Косметический предмет",
+        "price": 220,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 1
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_2",
+        "category": "toy_skins",
+        "name": "НЕОН",
+        "description": "Косметический предмет",
+        "price": 380,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 2
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_3",
+        "category": "toy_skins",
+        "name": "ЗОЛОТОЙ",
+        "description": "Косметический предмет",
+        "price": 650,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 3
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_4",
+        "category": "toy_skins",
+        "name": "СЕРЕБРО",
+        "description": "Косметический предмет",
+        "price": 800,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 4
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_5",
+        "category": "toy_skins",
+        "name": "КОСМОС",
+        "description": "Косметический предмет",
+        "price": 1050,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 5
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_6",
+        "category": "toy_skins",
+        "name": "ОГОНЬ",
+        "description": "Косметический предмет",
+        "price": 1300,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 6
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_7",
+        "category": "toy_skins",
+        "name": "ЛЕДЯНОЙ",
+        "description": "Косметический предмет",
+        "price": 1500,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 7
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_8",
+        "category": "toy_skins",
+        "name": "РАДУГА",
+        "description": "Косметический предмет",
+        "price": 1900,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 8
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_9",
+        "category": "toy_skins",
+        "name": "КИБЕР",
+        "description": "Косметический предмет",
+        "price": 2300,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 9
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_10",
+        "category": "toy_skins",
+        "name": "ТЁМНАЯ СЕРИЯ",
+        "description": "Косметический предмет",
+        "price": 2800,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 10
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "toy_skin_11",
+        "category": "toy_skins",
+        "name": "МИФИЧЕСКАЯ",
+        "description": "Косметический предмет",
+        "price": 3800,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "toy_skin",
+          "skin_index": 11
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_0",
+        "category": "machine_skins",
+        "name": "КЛАССИКА",
+        "description": "Косметический предмет",
+        "price": 0,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 0
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_1",
+        "category": "machine_skins",
+        "name": "НЕОН СИТИ",
+        "description": "Косметический предмет",
+        "price": 500,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 1
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_2",
+        "category": "machine_skins",
+        "name": "РОЗОВЫЙ CLUB",
+        "description": "Косметический предмет",
+        "price": 750,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 2
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_3",
+        "category": "machine_skins",
+        "name": "ICE MACHINE",
+        "description": "Косметический предмет",
+        "price": 1000,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 3
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_4",
+        "category": "machine_skins",
+        "name": "GOLD MACHINE",
+        "description": "Косметический предмет",
+        "price": 1400,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 4
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_5",
+        "category": "machine_skins",
+        "name": "CYBER GRID",
+        "description": "Косметический предмет",
+        "price": 1750,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 5
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_6",
+        "category": "machine_skins",
+        "name": "SPACE PORT",
+        "description": "Косметический предмет",
+        "price": 2100,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 6
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_7",
+        "category": "machine_skins",
+        "name": "FIRE BOX",
+        "description": "Косметический предмет",
+        "price": 2450,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 7
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_8",
+        "category": "machine_skins",
+        "name": "MIDNIGHT",
+        "description": "Косметический предмет",
+        "price": 2800,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 8
+        },
+        "one_time": true,
+        "enabled": true
+      },
+      {
+        "id": "machine_skin_9",
+        "category": "machine_skins",
+        "name": "LEGENDARY",
+        "description": "Косметический предмет",
+        "price": 3600,
+        "currency": "coins",
+        "level": 1,
+        "effect": {
+          "skin": "machine_skin",
+          "skin_index": 9
+        },
+        "one_time": true,
+        "enabled": true
+      }
+    ],
+    "achievements": [
+      {
+        "id": "first_win",
+        "name": "ПЕРВАЯ ИГРУШКА",
+        "description": "Достаньте первую игрушку.",
+        "kind": "toys",
+        "value": 1,
+        "difficulty": "Лёгкое",
+        "reward": {
+          "type": "coins",
+          "amount": 50
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_5",
+        "name": "НАЧАЛО КОЛЛЕКЦИИ",
+        "description": "Достаньте 5 игрушек.",
+        "kind": "toys",
+        "value": 5,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_10",
+        "name": "ОХОТНИК ЗА ПРИЗАМИ",
+        "description": "Достаньте 10 игрушек.",
+        "kind": "toys",
+        "value": 10,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 200
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_25",
+        "name": "ЗАВОДНОЙ ИГРОК",
+        "description": "Достаньте 25 игрушек.",
+        "kind": "toys",
+        "value": 25,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_50",
+        "name": "ОПЫТНЫЙ ОПЕРАТОР",
+        "description": "Достаньте 50 игрушек.",
+        "kind": "toys",
+        "value": 50,
+        "difficulty": "Сложное",
+        "reward": {
+          "type": "coins",
+          "amount": 700
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_100",
+        "name": "МАСТЕР ХВАТАЙКИ",
+        "description": "Достаньте 100 игрушек.",
+        "kind": "toys",
+        "value": 100,
+        "difficulty": "Очень сложное",
+        "reward": {
+          "type": "coins",
+          "amount": 1500
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_250",
+        "name": "ПРОФЕССИОНАЛ",
+        "description": "Достаньте 250 игрушек.",
+        "kind": "toys",
+        "value": 250,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "toys_500",
+        "name": "ЛЕГЕНДА АППАРАТА",
+        "description": "Достаньте 500 игрушек.",
+        "kind": "toys",
+        "value": 500,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "games_10",
+        "name": "ПЕРВЫЕ 10 ИГР",
+        "description": "Сыграйте 10 раз.",
+        "kind": "games",
+        "value": 10,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "games_50",
+        "name": "НЕ ОСТАНОВИТЬ",
+        "description": "Сыграйте 50 раз.",
+        "kind": "games",
+        "value": 50,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "games_100",
+        "name": "СТО ПОПЫТОК",
+        "description": "Сыграйте 100 раз.",
+        "kind": "games",
+        "value": 100,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "games_500",
+        "name": "МАРАФОН",
+        "description": "Сыграйте 500 раз.",
+        "kind": "games",
+        "value": 500,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "common_25",
+        "name": "ПРОСТЫЕ ПРИЗЫ",
+        "description": "Получите 25 обычных игрушек.",
+        "kind": "rarity",
+        "value": 25,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true,
+        "rarity": "ОБЫЧНАЯ"
+      },
+      {
+        "id": "rare_10",
+        "name": "ОХОТА НА РЕДКИХ",
+        "description": "Получите 10 редких игрушек.",
+        "kind": "rarity",
+        "value": 10,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true,
+        "rarity": "РЕДКАЯ"
+      },
+      {
+        "id": "epic_5",
+        "name": "ЭПИЧЕСКИЙ УСПЕХ",
+        "description": "Получите 5 эпических игрушек.",
+        "kind": "rarity",
+        "value": 5,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true,
+        "rarity": "ЭПИЧЕСКАЯ"
+      },
+      {
+        "id": "legend_1",
+        "name": "ЛЕГЕНДАРНЫЙ ПРИЗ",
+        "description": "Получите легендарную игрушку.",
+        "kind": "rarity",
+        "value": 1,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true,
+        "rarity": "ЛЕГЕНДАРНАЯ"
+      },
+      {
+        "id": "legend_5",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК",
+        "description": "Получите 5 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 5,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true,
+        "rarity": "ЛЕГЕНДАРНАЯ"
+      },
+      {
+        "id": "collections_1",
+        "name": "СОБРАНО!",
+        "description": "Завершите 1 коллекцию.",
+        "kind": "collections",
+        "value": 1,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collections_2",
+        "name": "ДВА НАБОРА",
+        "description": "Завершите 2 коллекции.",
+        "kind": "collections",
+        "value": 2,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collections_4",
+        "name": "ПОЛОВИНА ПУТИ",
+        "description": "Завершите 4 коллекции.",
+        "kind": "collections",
+        "value": 4,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "collections_8",
+        "name": "ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ",
+        "description": "Завершите все 8 коллекций.",
+        "kind": "collections",
+        "value": 8,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_5",
+        "name": "НОВИЧОК",
+        "description": "Достигните 5 уровня.",
+        "kind": "level",
+        "value": 5,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_10",
+        "name": "УВЕРЕННЫЙ ИГРОК",
+        "description": "Достигните 10 уровня.",
+        "kind": "level",
+        "value": 10,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_25",
+        "name": "ПРОДВИНУТЫЙ",
+        "description": "Достигните 25 уровня.",
+        "kind": "level",
+        "value": 25,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_50",
+        "name": "ВЫСШАЯ ЛИГА",
+        "description": "Достигните 50 уровня.",
+        "kind": "level",
+        "value": 50,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_100",
+        "name": "СОТЫЙ УРОВЕНЬ",
+        "description": "Достигните 100 уровня.",
+        "kind": "level",
+        "value": 100,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_250",
+        "name": "МАСТЕР 250",
+        "description": "Достигните 250 уровня.",
+        "kind": "level",
+        "value": 250,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_500",
+        "name": "МАСТЕР 500",
+        "description": "Достигните 500 уровня.",
+        "kind": "level",
+        "value": 500,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "level_1000",
+        "name": "ВЕРШИНА",
+        "description": "Достигните максимального 1000 уровня.",
+        "kind": "level",
+        "value": 1000,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "rubles_500",
+        "name": "ПЕРВЫЕ НАКОПЛЕНИЯ",
+        "description": "Накопите 500 ₽.",
+        "kind": "rubles",
+        "value": 500,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "rubles_1000",
+        "name": "КАПИТАЛ",
+        "description": "Накопите 1000 ₽.",
+        "kind": "rubles",
+        "value": 1000,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "rubles_5000",
+        "name": "БОЛЬШОЙ БАЛАНС",
+        "description": "Накопите 5000 ₽.",
+        "kind": "rubles",
+        "value": 5000,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "claws_3",
+        "name": "АРСЕНАЛ",
+        "description": "Откройте 3 разные клешни.",
+        "kind": "claws",
+        "value": 3,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "claws_6",
+        "name": "КОЛЛЕКЦИЯ КЛЕШНЕЙ",
+        "description": "Откройте 6 разных клешней.",
+        "kind": "claws",
+        "value": 6,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "claws_10",
+        "name": "ПОЛНЫЙ АРСЕНАЛ",
+        "description": "Откройте все 10 клешней.",
+        "kind": "claws",
+        "value": 10,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "upgrades_5",
+        "name": "ПЕРВАЯ НАСТРОЙКА",
+        "description": "Купите 5 уровней улучшений.",
+        "kind": "upgrades",
+        "value": 5,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "upgrades_15",
+        "name": "ТЕХНИК",
+        "description": "Купите 15 уровней улучшений.",
+        "kind": "upgrades",
+        "value": 15,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "upgrades_30",
+        "name": "ИНЖЕНЕР",
+        "description": "Купите 30 уровней улучшений.",
+        "kind": "upgrades",
+        "value": 30,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "upgrades_50",
+        "name": "МАКСИМАЛЬНАЯ НАСТРОЙКА",
+        "description": "Купите 50 уровней улучшений.",
+        "kind": "upgrades",
+        "value": 50,
+        "difficulty": "Обычное",
+        "reward": {
+          "type": "coins",
+          "amount": 100
+        },
+        "enabled": true
+      },
+      {
+        "id": "chests_10",
+        "name": "ОТКРЫВАТЕЛЬ",
+        "description": "Откройте 10 сундуков",
+        "kind": "chests_opened",
+        "value": 10,
+        "difficulty": "Сложное",
+        "reward": {
+          "type": "parts",
+          "amount": 10
+        },
+        "enabled": true
+      },
+      {
+        "id": "chests_50",
+        "name": "ХРАНИТЕЛЬ СУНДУКОВ",
+        "description": "Откройте 50 сундуков",
+        "kind": "chests_opened",
+        "value": 50,
+        "difficulty": "Очень сложное",
+        "reward": {
+          "type": "keys",
+          "amount": 3
+        },
+        "enabled": true
+      },
+      {
+        "id": "referrals_10",
+        "name": "КОМАНДА ОХОТНИКОВ",
+        "description": "Пригласите 10 друзей",
+        "kind": "referrals",
+        "value": 10,
+        "difficulty": "Легендарное",
+        "reward": {
+          "type": "keys",
+          "amount": 5
+        },
+        "enabled": true
+      }
+    ],
+    "vip": [
+      {
+        "id": "vip_0",
+        "name": "GOLDEN GRIP ELITE",
+        "price": 2500,
+        "desc": "+8% к силе захвата",
+        "enabled": true,
+        "bonus": 0.08
+      },
+      {
+        "id": "vip_1",
+        "name": "VIP BOOST",
+        "price": 3200,
+        "desc": "+25% к наградам",
+        "enabled": true,
+        "reward": 0.25
+      },
+      {
+        "id": "vip_2",
+        "name": "LUCKY PASS",
+        "price": 3800,
+        "desc": "+10% к шансу редкого приза",
+        "enabled": true,
+        "luck": 0.1
+      },
+      {
+        "id": "vip_3",
+        "name": "FREE PLAY",
+        "price": 4500,
+        "desc": "Одна бесплатная игра каждый день",
+        "enabled": true,
+        "daily": 1
+      },
+      {
+        "id": "vip_4",
+        "name": "ROYAL CLAW",
+        "price": 5500,
+        "desc": "Эксклюзивная золотая клешня",
+        "enabled": true,
+        "skin": 5
+      },
+      {
+        "id": "vip_5",
+        "name": "VIP MACHINE",
+        "price": 7000,
+        "desc": "Эксклюзивный корпус аппарата",
+        "enabled": true,
+        "machine": 9
+      },
+      {
+        "id": "vip_6",
+        "name": "MYTHIC TOYS",
+        "price": 8500,
+        "desc": "Открывает мифическую серию игрушек",
+        "enabled": true,
+        "toy": 11
+      },
+      {
+        "id": "vip_7",
+        "name": "VIP MASTER",
+        "price": 12000,
+        "desc": "+15% к силе и +15% к наградам",
+        "enabled": true,
+        "bonus": 0.15,
+        "reward": 0.15
+      }
+    ]
+  },
+  "notifications": [
+    {
+      "id": "notification_fd0cb6ef13104934bc5d",
+      "id_num": 1788977692873,
+      "target": "all",
+      "title": "🎯 Новые ежедневные миссии",
+      "message": "Доступны новые ежедневные миссии. Проверь задания!",
+      "kind": "mission",
+      "icon": "assets/1000088915.png",
+      "deliver_at": "",
+      "enabled": true,
+      "created_at": "2026-09-09T18:14:52.007Z",
+      "created_by": "server"
+    },
+    {
+      "id": "notification_e9d97dfd1bc3496aa27b",
+      "id_num": 1788977692503,
+      "target": "all",
+      "title": "🏆 Новое недельное задание",
+      "message": "Началась новая неделя — доступно новое задание!",
+      "kind": "mission",
+      "icon": "assets/1000088915.png",
+      "deliver_at": "",
+      "enabled": true,
+      "created_at": "2026-09-09T18:14:52.007Z",
+      "created_by": "server"
+    }
+  ],
+  "notification_history": [],
+  "system_marks": {
+    "daily_mission_day": "2026-09-09",
+    "weekly_mission_week": "2026-W37"
+  },
+  "season_definitions": [
+    {
+      "id": "winter",
+      "name": "❄️ ЗИМНИЙ СЕЗОН",
+      "months": [
+        12,
+        1,
+        2
+      ],
+      "theme": "Снег, лёд, Новый год и зимние праздники",
+      "enabled": true
+    },
+    {
+      "id": "spring",
+      "name": "🌸 ВЕСЕННИЙ СЕЗОН",
+      "months": [
+        3,
+        4,
+        5
+      ],
+      "theme": "Весна, цветы, Пасха и майские праздники",
+      "enabled": true
+    },
+    {
+      "id": "summer",
+      "name": "☀️ ЛЕТНИЙ СЕЗОН",
+      "months": [
+        6,
+        7,
+        8
+      ],
+      "theme": "Лето, каникулы, море и приключения",
+      "enabled": true
+    },
+    {
+      "id": "autumn",
+      "name": "🍂 ОСЕННИЙ СЕЗОН",
+      "months": [
+        9,
+        10,
+        11
+      ],
+      "theme": "Осень, школа, Хэллоуин и осенние события",
+      "enabled": true
+    }
+  ],
+  "holiday_calendar": [
+    {
+      "date": "01-01",
+      "name": "🎆 Новый год",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "01-04",
+      "name": "⠿ Всемирный день Брайля",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "01-07",
+      "name": "🎄 Рождество",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "01-24",
+      "name": "📚 Международный день образования",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "01-26",
+      "name": "⚡ Международный день чистой энергии",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "01-27",
+      "name": "🕊️ Международный день памяти жертв Холокоста",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-02",
+      "name": "🌿 Всемирный день водно-болотных угодий",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-04",
+      "name": "🤝 Международный день человеческого братства",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-10",
+      "name": "🌾 Всемирный день зернобобовых",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-11",
+      "name": "🔬 Женщины и девочки в науке",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-13",
+      "name": "📻 Всемирный день радио",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-14",
+      "name": "❤️ День святого Валентина",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-21",
+      "name": "🗣️ Международный день родного языка",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "02-23",
+      "name": "⭐ День защитника Отечества",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "03-01",
+      "name": "🌈 День нулевой дискриминации",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-03",
+      "name": "🐾 Всемирный день дикой природы",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-08",
+      "name": "🌷 Международный женский день",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-14",
+      "name": "🥧 День числа Пи",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-20",
+      "name": "😊 Международный день счастья",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-21",
+      "name": "🌳 Международный день лесов",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-22",
+      "name": "💧 Всемирный день воды",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "03-27",
+      "name": "🎭 Всемирный день театра",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-01",
+      "name": "😂 День смеха",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-02",
+      "name": "🧩 Всемирный день распространения информации об аутизме",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-07",
+      "name": "🌍 Всемирный день здоровья",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-12",
+      "name": "🚀 Международный день полёта человека в космос",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-22",
+      "name": "🌎 День Земли",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-23",
+      "name": "📖 Всемирный день книги",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "04-30",
+      "name": "🎷 Международный день джаза",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-01",
+      "name": "🛠️ Праздник труда",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-03",
+      "name": "📰 Всемирный день свободы печати",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-09",
+      "name": "🎖️ День Победы",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-15",
+      "name": "👨‍👩‍👧 Международный день семей",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-20",
+      "name": "🐝 Всемирный день пчёл",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-21",
+      "name": "☕ Международный день чая",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "05-24",
+      "name": "📜 День славянской письменности и культуры",
+      "season": "spring",
+      "enabled": true
+    },
+    {
+      "date": "06-01",
+      "name": "🧸 День защиты детей",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "06-03",
+      "name": "🚲 Всемирный день велосипеда",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "06-05",
+      "name": "🌱 Всемирный день окружающей среды",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "06-08",
+      "name": "🌊 Всемирный день океанов",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "06-12",
+      "name": "🌟 День России",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "06-21",
+      "name": "🧘 Международный день йоги",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "06-30",
+      "name": "☄️ Международный день астероида",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "07-03",
+      "name": "🤝 Международный день кооперативов",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "07-20",
+      "name": "♟️ Международный день шахмат",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "07-30",
+      "name": "🤗 Международный день дружбы",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "08-09",
+      "name": "🌎 День коренных народов мира",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "08-12",
+      "name": "🎮 Международный день молодёжи",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "08-19",
+      "name": "❤️ Всемирный гуманитарный день",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "08-22",
+      "name": "🍑 День арбуза",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "08-31",
+      "name": "💻 День блога",
+      "season": "summer",
+      "enabled": true
+    },
+    {
+      "date": "09-01",
+      "name": "🎒 День знаний",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "09-05",
+      "name": "❤️ Международный день благотворительности",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "09-08",
+      "name": "📚 Международный день грамотности",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "09-21",
+      "name": "🕊️ Международный день мира",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "09-27",
+      "name": "✈️ Всемирный день туризма",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "10-01",
+      "name": "🎵 Международный день музыки",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "10-04",
+      "name": "🚀 Всемирная неделя космоса",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "10-05",
+      "name": "🍎 Всемирный день учителя",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "10-16",
+      "name": "🍎 Всемирный день продовольствия",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "10-24",
+      "name": "🌐 День Организации Объединённых Наций",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "10-31",
+      "name": "🎃 Хэллоуин",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-01",
+      "name": "🌱 Всемирный день вегана",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-04",
+      "name": "🇷🇺 День народного единства",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-11",
+      "name": "🛍️ День холостяков",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-17",
+      "name": "👶 Всемирный день недоношенных детей",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-19",
+      "name": "👨 Международный мужской день",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-20",
+      "name": "🧸 Всемирный день ребёнка",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-26",
+      "name": "🦃 День благодарения",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "11-30",
+      "name": "🎁 Giving Tuesday",
+      "season": "autumn",
+      "enabled": true
+    },
+    {
+      "date": "12-03",
+      "name": "♿ Международный день инвалидов",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-05",
+      "name": "🤝 Международный день добровольцев",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-10",
+      "name": "⚖️ День прав человека",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-11",
+      "name": "🏔️ Международный день гор",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-18",
+      "name": "🌍 Международный день мигрантов",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-20",
+      "name": "🤝 Международный день человеческой солидарности",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-25",
+      "name": "🎄 Рождество",
+      "season": "winter",
+      "enabled": true
+    },
+    {
+      "date": "12-31",
+      "name": "🎇 Канун Нового года",
+      "season": "winter",
+      "enabled": true
+    }
+  ],
+  "players": {},
+  "actions": {},
+  "transactions": [],
+  "audit": [],
+  "admins": []
+}
