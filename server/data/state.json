@@ -2,7 +2,7 @@
   "settings": {
     "maintenance_mode": false,
     "global_announcement": "",
-    "global_reward_multiplier": 1.0,
+    "global_reward_multiplier": 1,
     "daily_bonus_amount": 25,
     "daily_mission_reward": 80,
     "weekly_mission_reward": 350,
@@ -50,8 +50,39 @@
     }
   ],
   "events": [],
-  "players": {},
-  "audit": [],
+  "players": {
+    "test123": {
+      "player_id": "test123",
+      "name": "TEST",
+      "score": 0,
+      "level": 1,
+      "coins": 120,
+      "games": 0,
+      "prizes": 0,
+      "best_streak": 0,
+      "last_seen": "2026-09-09T08:43:08.014Z",
+      "banned": false,
+      "referral_code": "KHVAECD71870",
+      "referral_invites": 0,
+      "referral_used": false,
+      "referrals": [],
+      "redeemed": {},
+      "device_ids": [
+        "dev1"
+      ],
+      "notification_cursor": 0,
+      "game_state": {}
+    }
+  },
+  "audit": [
+    {
+      "at": "2026-09-09T08:43:08.004Z",
+      "action": "player_register",
+      "meta": {
+        "player_id": "test123"
+      }
+    }
+  ],
   "season": {
     "name": "Сезон 1",
     "max_level": 30,
@@ -221,5 +252,6 @@
       "key_cost": 3,
       "rewards": "150 ₽ — 35%\n300 ₽ — 30%\n2 ключа — 20%\nРедкая деталь — 15%"
     }
-  ]
+  ],
+  "notifications": []
 }
