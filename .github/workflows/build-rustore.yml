@@ -57,53 +57,122 @@ jobs:
           chmod +x "$HOME/godot/godot"
 
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+
           wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
+
           rm -rf /tmp/godot_templates
           mkdir -p /tmp/godot_templates
           unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+
           cp -R /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
 
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_release.apk"
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_debug.apk"
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip"
+
           echo "Godot and export templates ready"
 
       - name: Install project Gradle template
         shell: bash
         run: |
           set -euo pipefail
+
           rm -rf android
           mkdir -p android/build
+
           unzip -q "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip" -d android/build
+
           test -f android/build/gradlew
-          echo "Project Gradle template ready"
+
+          # Important:
+          # Godot requires res://android/.build_version
+          # when exporting with the Gradle Android template.
+          printf '%s\n' "${GODOT_VERSION}.stable" > android/.build_version
+
+          test -s android/.build_version
+
+          echo "Project Gradle template ready:"
+          cat android/.build_version
 
       - name: Patch Android server notifications safely
         shell: bash
         run: |
           set -euo pipefail
+
           MANIFEST="$(find android/build -path '*/src/main/AndroidManifest.xml' -print -quit)"
           JAVA_SOURCE="addons/khvataika_background_notifications/KhvataikaAlarmReceiver.java"
+
           test -n "$MANIFEST"
           test -f "$JAVA_SOURCE"
+
           JAVA_TARGET="$(dirname "$MANIFEST")/java/com/clawneon/khvataika/KhvataikaAlarmReceiver.java"
+
           mkdir -p "$(dirname "$JAVA_TARGET")"
           cp "$JAVA_SOURCE" "$JAVA_TARGET"
-          python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s=p.read_text(); pos=s.find("<application"); end=s.find(">",pos); assert pos>=0 and end>=0; s=s if "android:usesCleartextTraffic=\"true\"" in s else s[:end]+" android:usesCleartextTraffic=\"true\""+s[end:]; r="\n".join(["","        <receiver","            android:name=\"com.clawneon.khvataika.KhvataikaAlarmReceiver\"","            android:enabled=\"true\"","            android:exported=\"false\">","            <intent-filter>","                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />","                <action android:name=\"android.intent.action.MY_PACKAGE_REPLACED\" />","            </intent-filter>","        </receiver>",""]); close=s.rfind("</application>"); assert close>=0; s=s if "com.clawneon.khvataika.KhvataikaAlarmReceiver" in s else s[:close]+r+s[close:]; p.write_text(s)' "$MANIFEST"
-          python3 -c 'import sys,xml.etree.ElementTree as ET; ET.parse(sys.argv[1]); print("AndroidManifest.xml valid")' "$MANIFEST"
+
+          python3 -c '
+          from pathlib import Path
+          import sys
+
+          p = Path(sys.argv[1])
+          s = p.read_text()
+
+          pos = s.find("<application")
+          end = s.find(">", pos)
+
+          assert pos >= 0 and end >= 0
+
+          if "android:usesCleartextTraffic=\"true\"" not in s:
+              s = s[:end] + " android:usesCleartextTraffic=\"true\"" + s[end:]
+
+          receiver = """
+                  <receiver
+                      android:name="com.clawneon.khvataika.KhvataikaAlarmReceiver"
+                      android:enabled="true"
+                      android:exported="false">
+                      <intent-filter>
+                          <action android:name="android.intent.action.BOOT_COMPLETED" />
+                          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                      </intent-filter>
+                  </receiver>
+          """
+
+          close = s.rfind("</application>")
+
+          assert close >= 0
+
+          if "com.clawneon.khvataika.KhvataikaAlarmReceiver" not in s:
+              s = s[:close] + receiver + s[close:]
+
+          p.write_text(s)
+          ' "$MANIFEST"
+
+          python3 -c '
+          import sys
+          import xml.etree.ElementTree as ET
+
+          ET.parse(sys.argv[1])
+          print("AndroidManifest.xml valid")
+          ' "$MANIFEST"
+
           test -f "$JAVA_TARGET"
+
           echo "Android server notification receiver patched"
 
       - name: Check project configuration
         shell: bash
         run: |
           set -euo pipefail
+
           test -f project.godot
           test -f export_presets.cfg
+
           grep -q 'name="Android RuStore AAB"' export_presets.cfg
           grep -q 'textures/vram_compression/import_etc2_astc=true' project.godot
+
           test -f audio/claw_move.wav
           test -s audio/claw_move.wav
+
           echo "Project configuration OK"
 
       - name: Restore release keystore
@@ -114,12 +183,20 @@ jobs:
           KEY_ALIAS: ${{ secrets.RUSTORE_KEY_ALIAS }}
         run: |
           set -euo pipefail
+
           test -n "$KEYSTORE_B64"
           test -n "$KEYSTORE_PASSWORD"
           test -n "$KEY_ALIAS"
+
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+
           test -s "$KEYSTORE_PATH"
-          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+
+          keytool -list \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
           echo "Release keystore verified"
 
       - name: Export signed RuStore AAB
@@ -130,10 +207,20 @@ jobs:
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
+
           mkdir -p build/rustore
-          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.13.3.aab
+
+          "$HOME/godot/godot" \
+            --headless \
+            --path . \
+            --export-release \
+            "Android RuStore AAB" \
+            build/rustore/khvataika-1.13.3.aab
+
           test -s build/rustore/khvataika-1.13.3.aab
+
           file build/rustore/khvataika-1.13.3.aab
+
           echo "AAB export completed"
 
       - name: Upload AAB artifact
