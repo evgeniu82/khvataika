@@ -1,6 +1,7 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "settings": {
+    "schema_version": 4,
     "maintenance_mode": false,
     "global_announcement": "",
     "global_reward_multiplier": 1,
@@ -22,7 +23,27 @@
     },
     "default_language": "ru",
     "default_quality": 2,
-    "default_fps": 60
+    "default_fps": 60,
+    "capture_base_chance": 0.28,
+    "capture_upgrade_bonus": 0.012,
+    "capture_min_chance": 0.08,
+    "capture_max_chance": 0.9,
+    "workshop_parts_start": 0,
+    "workshop_job_cost": 60,
+    "workshop_job_base_reward": 110,
+    "workshop_job_duration_sec": 180,
+    "referral_invited_reward": 50,
+    "referral_inviter_reward": 100,
+    "chest_key_common": 1,
+    "chest_key_rare": 2,
+    "chest_key_epic": 3,
+    "chest_key_legendary": 5,
+    "chest_key_vip": 8,
+    "achievement_easy_reward": 25,
+    "achievement_medium_reward": 75,
+    "achievement_hard_reward": 150,
+    "achievement_epic_reward": 300,
+    "achievement_legendary_reward": 750
   },
   "promocodes": [
     {
