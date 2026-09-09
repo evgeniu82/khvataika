@@ -1,0 +1,220 @@
+extends Node3D
+
+# ХВАТАЙКА — REALISTIC WOOD / METAL / GLASS EDITION
+# Godot 4.7+
+# Procedural commercial-style arcade scene: wood, metal, glass, realistic lighting,
+# physics-based plush prizes, animated cable/claw, smooth camera and menus.
+
+const SAVE_PATH: String = "user://claw_save.json"
+const PLAY_COST: int = 0
+const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
+const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
+# Стартовая/парковочная точка клешни — строго сверху над отверстием.
+const CLAW_HOME := Vector3(PRIZE_HOLE.x, 8.20, PRIZE_HOLE.z)
+const CLAW_MIN := Vector3(-2.55, 2.70, -1.55)
+const CLAW_MAX := Vector3(2.55, 8.20, 1.55)
+const TOY_SCALE := 0.04968
+const TARGET_PRIZE_COUNT: int = 60
+const MAX_PRIZE_CENTER_Y: float = 5.12
+const GRAB_SLIP_CHANCE: float = 0.22
+const CAPSULE_CHANCE: float = 0.055
+
+const CYAN := Color("#28E8FF")
+const BLUE := Color("#146BFF")
+const PURPLE := Color("#8A4DFF")
+const PINK := Color("#FF4FCB")
+const GOLD := Color("#FFD65A")
+const DARK := Color("#050A17")
+const NAVY := Color("#081630")
+const STEEL := Color("#34435B")
+
+var coins: int = 120
+var selected_claw: int = 0
+var owned_claws: Array[bool] = [true, false, false, false, false, false, false, false, false, false]
+var music_on: bool = true
+var sfx_on: bool = true
+var collection: Dictionary = {}
+var toy_inventory_counts: Dictionary = {}
+var completed_collections: Dictionary = {}
+var upgrade_levels: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+var player_level: int = 1
+var player_xp: int = 0
+var xp_to_next: int = 80
+const MAX_PLAYER_LEVEL: int = 1000
+const REFILL_THRESHOLD: int = 12
+const REFILL_AMOUNT: int = 15
+const INITIAL_PRIZE_COUNT: int = 60
+var total_games: int = 0
+var total_prizes_won: int = 0
+var rarity_wins: Dictionary = {}
+var unlocked_achievements: Dictionary = {}
+var pending_new_achievements: Array[String] = []
+var last_daily_bonus_date: String = ""
+var daily_bonus_amount: int = 25
+var best_result: String = "—"
+var best_result_xp: int = 0
+var current_win_streak: int = 0
+var best_win_streak: int = 0
+var total_xp_earned: int = 0
+var highest_reward_rubles: int = 0
+var perfect_grabs: int = 0
+var heavy_toy_wins: int = 0
+var lucky_toy_wins: int = 0
+var total_chests_opened: int = 0
+var total_keys_earned: int = 0
+var total_daily_claims: int = 0
+var total_weekly_claims: int = 0
+
+# Дополнительные системы: повторные призы, ежедневная серия, события и партии.
+var login_streak: int = 0
+var last_login_claim_date: String = ""
+var daily_claim_available: bool = false
+var daily_claim_button: Button
+var daily_login_panel: PanelContainer
+var daily_days_container: GridContainer
+var daily_day_buttons: Array[Button] = []
+var event_button: Button
+var event_panel: PanelContainer
+var active_event_id: String = ""
+var active_event_name: String = ""
+var active_event_end_unix: int = 0
+var active_event_bonus: float = 0.0
+var active_event_reward_mult: float = 1.0
+var next_event_check: float = 0.0
+var weekly_event_id: int = 0
+var weekly_event_name: String = ""
+var weekly_event_desc: String = ""
+var weekly_event_capture: float = 0.0
+var weekly_event_reward: float = 1.0
+var weekly_event_rare: float = 0.0
+var weekly_event_end_unix: int = 0
+var batch_type: String = "ОБЫЧНАЯ ПАРТИЯ"
+var batch_index: int = 0
+var sale_panel: PanelContainer
+var sale_price: int = 0
+var sale_name: String = ""
+var sale_rarity: String = ""
+var sale_available: bool = false
+var language: String = "ru"
+var language_option: OptionButton
+
+# Реферальная система. Для кросс-устройственного учёта нужен сервер;
+# локальная часть хранит код, обработку приглашения и награды.
+var referral_code: String = ""
+var referral_invites: int = 0
+var referral_reward_per_friend: int = 100
+var referral_welcome_reward: int = 50
+var referral_used: bool = false
+var referral_panel: PanelContainer
+var referral_link_label: Label
+var referral_invites_label: Label
+var referral_status_label: Label
+var referral_code_input: LineEdit
+
+# Дополнительные игровые системы
+var daily_mission_progress: int = 0
+var daily_mission_target: int = 3
+var daily_mission_date: String = ""
+var daily_mission_claimed: bool = false
+var weekly_mission_progress: int = 0
+var weekly_mission_target: int = 12
+var weekly_mission_key: String = ""
+var weekly_mission_claimed: bool = false
+var lucky_toy_index: int = 0
+var lucky_toy_date: String = ""
+var refill_animation_timer: float = 0.0
+var waiting_idle_time: float = 0.0
+var start_button: Button
+var waiting_overlay: PanelContainer
+var waiting_tip_label: Label
+var mission_label: Label
+var weekly_label: Label
+var lucky_label: Label
+var last_game_activity: float = 0.0
+var player_name: String = "ИГРОК"
+var player_avatar_index: int = 0
+const AVATAR_OPTIONS: Array[String] = ["👤", "😎", "🧸", "🐼", "🐱", "🐶", "🦊", "🐸", "🤖", "👑", "⭐", "🎮"]
+var bonus_keys: int = 0
+var engineering_parts: int = 0
+var menu_notice_count: int = 0
+var daily_mission_reward: int = 80
+var weekly_mission_reward: int = 350
+var sound_players: Dictionary = {}
+var rarity_flash_timer: float = 0.0
+var rarity_flash_color: Color = Color.WHITE
+var machine_upgrade_visual: float = 0.0
+var collection_filter: String = "ВСЕ"
+
+# Оставлен только звук движения клешни.
+var sfx_move: AudioStreamPlayer
+var sfx_volume_db: float = -4.0
+var music_volume_db: float = -8.0
+var vibration_on: bool = true
+var auto_tips_on: bool = true
+var energy_saving_on: bool = false
+var confirm_purchases_on: bool = true
+var confirm_rare_chests_on: bool = true
+var fps_limit: int = 60
+var joystick_sensitivity: float = 1.0
+var grab_button_scale: float = 1.0
+var aim_marker: MeshInstance3D
+var machine_status_label: Label
+var help_panel: PanelContainer
+
+var claw: Node3D
+var claw_arms: Array[Node3D] = []
+var cable: MeshInstance3D
+var cable_glow: MeshInstance3D
+var rail_carriage: Node3D
+var claw_target: Vector3 = CLAW_HOME
+var claw_move_target: Vector3 = CLAW_HOME
+var claw_pos: Vector3 = CLAW_HOME
+var claw_yaw: float = 0.0
+var drop_state: int = 0 # 0 ready, 1 down, 2 grip, 3 return, 4 deliver
+var drop_time: float = 0.0
+var grabbed_toy: RigidBody3D
+var grabbed_index: int = -1
+var pending_prize_data: Dictionary = {}
+var claw_drop_target_y: float = 3.50
+var current_result: String = "ГОТОВ К ИГРЕ"
+var last_prize_name: String = ""
+var last_prize_collection: String = ""
+var last_prize_rarity: String = ""
+var last_prize_xp: int = 0
+var last_reward_rubles: int = 0
+var camera: Camera3D
+var camera_base: Vector3 = Vector3(0.0, 8.05, 12.8)
+var camera_look: Vector3 = Vector3(0.0, 4.85, 0.0)
+var time_alive: float = 0.0
+
+# Графическое качество: 0 — ПЛОХО, 1 — НИЗКО, 2 — СРЕДНЕ, 3 — ВЫСОКО, 4 — УЛЬТРА.
+# Настройка влияет только на рендеринг и не удаляет игровой контент.
+var quality_level: int = 2
+var quality_option: OptionButton
+var loading_screen: Control
+var loading_progress: ProgressBar
+var loading_status: Label
+var loading_percent: Label
+var loading_tip: Label
+var loading_logo: TextureRect
+var loading_ring: Panel
+var loading_elapsed: float = 0.0
+var loading_tip_index: int = 0
+var game_initialized: bool = false
+var scene_lights: Array[Light3D] = []
+var reflection_probe: ReflectionProbe
+var world_environment: WorldEnvironment
+var event_ui_update_timer: float = 0.0
+var active_event_theme: String = ""
+var active_event_accent: Color = Color("#8A684C")
+var active_event_glow: Color = Color("#F2DCC0")
+var active_event_rare_bonus: float = 0.0
+var active_event_toy_bonus: float = 0.0
+var event_decor_root: Node3D
+
+var status_label: Label
+var coins_label: Label
+var level_label: Label
+var xp_label: Label
+var xp_bar: ProgressBar
+var menu_layer: Control
