@@ -33,6 +33,7 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
     private static final int SERVER_POLL_ID = 1199;
     private static final String KEY_SERVER_URL = "server_url";
     private static final String KEY_PLAYER_ID = "player_id";
+    private static final String KEY_PLAYER_TOKEN = "player_token";
     private static final String KEY_CURSOR = "server_cursor";
 
     @Override public void onReceive(Context context, Intent intent) {
@@ -65,9 +66,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         }
     }
 
-    public static void registerServer(Context context, String serverUrl, String playerId) {
+    public static void registerServer(Context context, String serverUrl, String playerId, String playerToken) {
         if (context == null || serverUrl == null || playerId == null) return;
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_SERVER_URL, serverUrl).putString(KEY_PLAYER_ID, playerId).apply();
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_SERVER_URL, serverUrl).putString(KEY_PLAYER_ID, playerId).putString(KEY_PLAYER_TOKEN, playerToken == null ? "" : playerToken).apply();
         scheduleServerPoll(context);
     }
 
@@ -93,13 +94,14 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         final SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         final String base = prefs.getString(KEY_SERVER_URL, "");
         final String player = prefs.getString(KEY_PLAYER_ID, "");
-        if (base.isEmpty() || player.isEmpty()) return;
+        final String token = prefs.getString(KEY_PLAYER_TOKEN, "");
+        if (base.isEmpty() || player.isEmpty() || token.isEmpty()) return;
         new Thread(() -> {
             HttpURLConnection c = null;
             try {
                 String url = base.replaceAll("/$", "") + "/api/notifications/poll?player_id=" + enc(player) + "&cursor=" + prefs.getLong(KEY_CURSOR, 0L);
                 c = (HttpURLConnection)new URL(url).openConnection();
-                c.setRequestMethod("GET"); c.setConnectTimeout(5000); c.setReadTimeout(7000);
+                c.setRequestMethod("GET"); c.setRequestProperty("Authorization", "Bearer " + token); c.setConnectTimeout(5000); c.setReadTimeout(7000);
                 int code = c.getResponseCode();
                 if (code < 200 || code >= 300) return;
                 String text = read(c.getInputStream());
