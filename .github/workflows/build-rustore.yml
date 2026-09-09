@@ -3,364 +3,143 @@ name: Build Khvataika AAB
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
     runs-on: ubuntu-24.04
-
     permissions:
       contents: read
 
     env:
-      GODOT_VERSION: "4.7.2"
+      GODOT_VERSION: '4.7.2'
       ANDROID_HOME: /opt/android-sdk
       ANDROID_SDK_ROOT: /opt/android-sdk
       KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
 
     steps:
-
-      # ------------------------------------------------------------
-      # 1. Checkout
-      # ------------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           lfs: true
 
-
-      # ------------------------------------------------------------
-      # 2. Java + Android SDK
-      # ------------------------------------------------------------
       - name: Install Java and Android SDK
         shell: bash
         run: |
           set -euo pipefail
-
           sudo apt-get update
-          sudo apt-get install -y \
-            openjdk-17-jdk-headless \
-            wget \
-            unzip
+          sudo apt-get install -y openjdk-17-jdk-headless wget unzip
 
           mkdir -p "$ANDROID_HOME/cmdline-tools"
-
-          wget -q \
-            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
-            -O /tmp/cmdline-tools.zip
-
-          rm -rf /tmp/cmdline-tools
-          mkdir -p /tmp/cmdline-tools
-
-          unzip -q \
-            /tmp/cmdline-tools.zip \
-            -d /tmp/cmdline-tools
-
+          wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" -O /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools
           rm -rf "$ANDROID_HOME/cmdline-tools/latest"
-
-          mv \
-            /tmp/cmdline-tools/cmdline-tools \
-            "$ANDROID_HOME/cmdline-tools/latest"
+          mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
 
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-
           yes | sdkmanager --licenses >/dev/null || true
-
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-36" \
-            "build-tools;36.1.0"
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.1.0"
 
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
-
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
-          java -version
-          sdkmanager --version
-
-
-      # ------------------------------------------------------------
-      # 3. Godot + export templates
-      # ------------------------------------------------------------
       - name: Download Godot 4.7.2 and export templates
         shell: bash
         run: |
           set -euo pipefail
-
           mkdir -p "$HOME/godot"
 
-          wget -q \
-            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" \
-            -O /tmp/godot.zip
-
-          unzip -q \
-            /tmp/godot.zip \
-            -d "$HOME/godot"
-
-          mv \
-            "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" \
-            "$HOME/godot/godot"
-
+          wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d "$HOME/godot"
+          mv "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$HOME/godot/godot"
           chmod +x "$HOME/godot/godot"
 
-          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-
-          mkdir -p "$TEMPLATE_DIR"
-
-          wget -q \
-            "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" \
-            -O /tmp/templates.tpz
-
+          mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
           rm -rf /tmp/godot_templates
           mkdir -p /tmp/godot_templates
+          unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+          cp -R /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
 
-          unzip -q \
-            /tmp/templates.tpz \
-            -d /tmp/godot_templates
+          test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_release.apk"
+          test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_debug.apk"
+          test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip"
+          echo "Godot and export templates ready"
 
-          cp -R \
-            /tmp/godot_templates/templates/. \
-            "$TEMPLATE_DIR/"
-
-          test -f "$TEMPLATE_DIR/android_release.apk"
-          test -f "$TEMPLATE_DIR/android_debug.apk"
-          test -f "$TEMPLATE_DIR/android_source.zip"
-
-          echo "Godot:"
-          "$HOME/godot/godot" --version
-
-          echo "Export templates:"
-          ls -lah "$TEMPLATE_DIR"
-
-
-      # ------------------------------------------------------------
-      # 4. Install Gradle Android template
-      # ------------------------------------------------------------
       - name: Install project Gradle template
         shell: bash
         run: |
           set -euo pipefail
-
           rm -rf android
-
           mkdir -p android/build
-
-          TEMPLATE_DIR="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
-
-          # Godot requires the version marker here.
-          printf '%s\n' "${GODOT_VERSION}.stable" > android/.build_version
-
-          # Install the actual Android Gradle project.
-          unzip -q \
-            "$TEMPLATE_DIR/android_source.zip" \
-            -d android/build
-
-          # Godot uses this marker to recognize generated files.
-          touch android/build/.gdignore
-
-          # Verify everything before continuing.
-          test -f android/.build_version
+          unzip -q "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip" -d android/build
           test -f android/build/gradlew
+          echo "Project Gradle template ready"
 
-          chmod +x android/build/gradlew
-
-          echo "Android Gradle template installed successfully."
-
-          echo "android/.build_version:"
-          cat android/.build_version
-
-          echo "android/build:"
-          ls -lah android/build
-
-
-      # ------------------------------------------------------------
-      # 5. Patch Android notifications
-      # ------------------------------------------------------------
       - name: Patch Android server notifications safely
         shell: bash
         run: |
           set -euo pipefail
-
           MANIFEST="$(find android/build -path '*/src/main/AndroidManifest.xml' -print -quit)"
           JAVA_SOURCE="addons/khvataika_background_notifications/KhvataikaAlarmReceiver.java"
-
           test -n "$MANIFEST"
           test -f "$JAVA_SOURCE"
-
           JAVA_TARGET="$(dirname "$MANIFEST")/java/com/clawneon/khvataika/KhvataikaAlarmReceiver.java"
-
           mkdir -p "$(dirname "$JAVA_TARGET")"
-
-          cp \
-            "$JAVA_SOURCE" \
-            "$JAVA_TARGET"
-
-          python3 - "$MANIFEST" <<'PY'
-          from pathlib import Path
-          import sys
-
-          path = Path(sys.argv[1])
-          text = path.read_text()
-
-          if "android:usesCleartextTraffic=\"true\"" not in text:
-              pos = text.find("<application")
-              end = text.find(">", pos)
-
-              if pos < 0 or end < 0:
-                  raise SystemExit("AndroidManifest application tag not found")
-
-              text = (
-                  text[:end]
-                  + ' android:usesCleartextTraffic="true"'
-                  + text[end:]
-              )
-
-          receiver = """
-                  <receiver
-                      android:name="com.clawneon.khvataika.KhvataikaAlarmReceiver"
-                      android:enabled="true"
-                      android:exported="false">
-                      <intent-filter>
-                          <action android:name="android.intent.action.BOOT_COMPLETED" />
-                          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-                      </intent-filter>
-                  </receiver>
-          """
-
-          if "com.clawneon.khvataika.KhvataikaAlarmReceiver" not in text:
-              close = text.rfind("</application>")
-
-              if close < 0:
-                  raise SystemExit("AndroidManifest closing application tag not found")
-
-              text = text[:close] + receiver + "\n" + text[close:]
-
-          path.write_text(text)
-          PY
-
-          python3 - "$MANIFEST" <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
-
-          ET.parse(sys.argv[1])
-
-          print("AndroidManifest.xml is valid")
-          PY
-
+          cp "$JAVA_SOURCE" "$JAVA_TARGET"
+          python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s=p.read_text(); pos=s.find("<application"); end=s.find(">",pos); assert pos>=0 and end>=0; s=s if "android:usesCleartextTraffic=\"true\"" in s else s[:end]+" android:usesCleartextTraffic=\"true\""+s[end:]; r="\n".join(["","        <receiver","            android:name=\"com.clawneon.khvataika.KhvataikaAlarmReceiver\"","            android:enabled=\"true\"","            android:exported=\"false\">","            <intent-filter>","                <action android:name=\"android.intent.action.BOOT_COMPLETED\" />","                <action android:name=\"android.intent.action.MY_PACKAGE_REPLACED\" />","            </intent-filter>","        </receiver>",""]); close=s.rfind("</application>"); assert close>=0; s=s if "com.clawneon.khvataika.KhvataikaAlarmReceiver" in s else s[:close]+r+s[close:]; p.write_text(s)' "$MANIFEST"
+          python3 -c 'import sys,xml.etree.ElementTree as ET; ET.parse(sys.argv[1]); print("AndroidManifest.xml valid")' "$MANIFEST"
           test -f "$JAVA_TARGET"
+          echo "Android server notification receiver patched"
 
-          echo "Android notification receiver patched."
-
-
-      # ------------------------------------------------------------
-      # 6. Check project
-      # ------------------------------------------------------------
       - name: Check project configuration
         shell: bash
         run: |
           set -euo pipefail
-
           test -f project.godot
           test -f export_presets.cfg
-
           grep -q 'name="Android RuStore AAB"' export_presets.cfg
-
+          grep -q 'textures/vram_compression/import_etc2_astc=true' project.godot
           test -f audio/claw_move.wav
           test -s audio/claw_move.wav
+          echo "Project configuration OK"
 
-          echo "Project configuration OK."
-
-
-      # ------------------------------------------------------------
-      # 7. Restore signing keystore
-      # ------------------------------------------------------------
       - name: Restore release keystore
         shell: bash
         env:
           KEYSTORE_B64: ${{ secrets.RUSTORE_KEYSTORE_B64 }}
           KEYSTORE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.RUSTORE_KEY_ALIAS }}
-
         run: |
           set -euo pipefail
-
           test -n "$KEYSTORE_B64"
           test -n "$KEYSTORE_PASSWORD"
           test -n "$KEY_ALIAS"
-
-          printf '%s' "$KEYSTORE_B64" \
-            | base64 --decode \
-            > "$KEYSTORE_PATH"
-
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
+          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+          echo "Release keystore verified"
 
-          keytool \
-            -list \
-            -keystore "$KEYSTORE_PATH" \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" \
-            >/dev/null
-
-          echo "Release keystore verified."
-
-
-      # ------------------------------------------------------------
-      # 8. Import project before export
-      # ------------------------------------------------------------
-      - name: Import Godot project
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          "$HOME/godot/godot" \
-            --headless \
-            --path . \
-            --editor \
-            --quit
-
-          echo "Godot project import completed."
-
-
-      # ------------------------------------------------------------
-      # 9. Export signed AAB
-      # ------------------------------------------------------------
       - name: Export signed RuStore AAB
         shell: bash
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.KEYSTORE_PATH }}
           GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.RUSTORE_KEY_ALIAS }}
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
-
         run: |
           set -euo pipefail
-
           mkdir -p build/rustore
+          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.13.3.aab
+          test -s build/rustore/khvataika-1.13.3.aab
+          file build/rustore/khvataika-1.13.3.aab
+          echo "AAB export completed"
 
-          "$HOME/godot/godot" \
-            --headless \
-            --path . \
-            --export-release \
-            "Android RuStore AAB" \
-            build/rustore/khvataika-1.12.4.aab
-
-          test -s build/rustore/khvataika-1.12.4.aab
-
-          ls -lh build/rustore/khvataika-1.12.4.aab
-
-          echo "AAB export completed successfully."
-
-
-      # ------------------------------------------------------------
-      # 10. Upload AAB
-      # ------------------------------------------------------------
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
-
         with:
-          name: khvataika-1.12.4-rustore-aab
-          path: build/rustore/khvataika-1.12.4.aab
+          name: khvataika-1.13.3-rustore-aab
+          path: build/rustore/khvataika-1.13.3.aab
           if-no-files-found: error
           retention-days: 14
