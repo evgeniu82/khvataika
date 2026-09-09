@@ -37,6 +37,7 @@ jobs:
           mv /tmp/cmdline-tools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
 
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
@@ -49,6 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
           mkdir -p "$HOME/godot"
 
           wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
@@ -57,48 +59,75 @@ jobs:
           chmod +x "$HOME/godot/godot"
 
           mkdir -p "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+
           wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
+
           rm -rf /tmp/godot_templates
           mkdir -p /tmp/godot_templates
           unzip -q /tmp/templates.tpz -d /tmp/godot_templates
+
           cp -R /tmp/godot_templates/templates/. "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/"
+
+          printf '%s\n' "${GODOT_VERSION}.stable" > "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/version.txt"
 
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_release.apk"
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_debug.apk"
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip"
+          test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/version.txt"
+
           echo "Godot and export templates ready"
 
       - name: Install project Gradle template
         shell: bash
         run: |
           set -euo pipefail
+
           rm -rf android
           mkdir -p android/build
+
           unzip -q "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip" -d android/build
+
+          chmod +x android/build/gradlew
+
+          printf '%s\n' "${GODOT_VERSION}.stable" > android/.build_version
+
+          touch android/build/.gdignore
+
           test -f android/build/gradlew
-          test -f android/build/version.txt
+          test -f android/build/settings.gradle
+          test -f android/build/build.gradle
+          test -f android/build/src/main/AndroidManifest.xml
+          test -f android/.build_version
+
           echo "Project Gradle template ready"
 
       - name: Import Godot project and patch Android notifications
         shell: bash
         run: |
           set -euo pipefail
+
           "$HOME/godot/godot" --headless --editor --path . --quit
+
           test -f android/build/gradlew
-          test -f android/build/version.txt
-          test -f android/build/app/src/main/java/com/clawneon/khvataika/KhvataikaAlarmReceiver.java
+          test -f android/build/src/main/AndroidManifest.xml
+          test -f android/build/src/main/java/com/clawneon/khvataika/KhvataikaAlarmReceiver.java
+
           echo "Godot project imported and Android notification template patched"
 
       - name: Check project configuration
         shell: bash
         run: |
           set -euo pipefail
+
           test -f project.godot
           test -f export_presets.cfg
+
           grep -q 'name="Android RuStore AAB"' export_presets.cfg
           grep -q 'textures/vram_compression/import_etc2_astc=true' project.godot
+
           test -f audio/claw_move.wav
           test -s audio/claw_move.wav
+
           echo "Project configuration OK"
 
       - name: Restore release keystore
@@ -109,12 +138,20 @@ jobs:
           KEY_ALIAS: ${{ secrets.RUSTORE_KEY_ALIAS }}
         run: |
           set -euo pipefail
+
           test -n "$KEYSTORE_B64"
           test -n "$KEYSTORE_PASSWORD"
           test -n "$KEY_ALIAS"
+
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+
           test -s "$KEYSTORE_PATH"
-          keytool -list -keystore "$KEYSTORE_PATH" -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null
+
+          keytool -list \
+            -keystore "$KEYSTORE_PATH" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -alias "$KEY_ALIAS" >/dev/null
+
           echo "Release keystore verified"
 
       - name: Export signed RuStore AAB
@@ -125,10 +162,19 @@ jobs:
           GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
         run: |
           set -euo pipefail
+
           mkdir -p build/rustore
-          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.12.3.aab
+
+          "$HOME/godot/godot" \
+            --headless \
+            --path . \
+            --export-release "Android RuStore AAB" \
+            build/rustore/khvataika-1.12.3.aab
+
           test -s build/rustore/khvataika-1.12.3.aab
+
           file build/rustore/khvataika-1.12.3.aab
+
           echo "AAB export completed"
 
       - name: Upload AAB artifact
