@@ -20,6 +20,7 @@ jobs:
       KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -35,14 +36,16 @@ jobs:
 
           mkdir -p "$ANDROID_HOME/cmdline-tools"
 
-          wget -q "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
+          wget -q \
+            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip" \
             -O /tmp/cmdline-tools.zip
 
           unzip -q /tmp/cmdline-tools.zip -d /tmp/cmdline-tools
 
           rm -rf "$ANDROID_HOME/cmdline-tools/latest"
 
-          mv /tmp/cmdline-tools/cmdline-tools \
+          mv \
+            /tmp/cmdline-tools/cmdline-tools \
             "$ANDROID_HOME/cmdline-tools/latest"
 
           export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
@@ -60,7 +63,7 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
 
-      - name: Download Godot and export templates
+      - name: Download Godot 4.7.2 and export templates
         shell: bash
         run: |
           set -euo pipefail
@@ -98,7 +101,7 @@ jobs:
           test -f \
             "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip"
 
-          echo "Godot ready"
+          echo "Godot and export templates ready"
 
       - name: Install project Gradle template
         shell: bash
@@ -112,9 +115,23 @@ jobs:
             "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip" \
             -d android/build
 
-          test -f android/build/gradlew
-          test -d android/build/app
-          test -d android/build/gradle
+          echo "Searching for Gradle project..."
+
+          GRADLEW="$(find android/build -type f -name gradlew -print -quit)"
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew not found"
+            find android/build -maxdepth 5 -type f | head -100
+            exit 1
+          fi
+
+          SOURCE_ROOT="$(dirname "$GRADLEW")"
+
+          echo "Gradle project found at: $SOURCE_ROOT"
+
+          test -f "$SOURCE_ROOT/gradlew"
+          test -d "$SOURCE_ROOT/app"
+          test -d "$SOURCE_ROOT/gradle"
 
           echo "Gradle template ready"
 
@@ -123,9 +140,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          MANIFEST="$(find android/build -path '*/src/main/AndroidManifest.xml' -print -quit)"
+          MANIFEST="$(find android/build -type f -path '*/src/main/AndroidManifest.xml' -print -quit)"
 
-          test -n "$MANIFEST"
+          if [ -z "$MANIFEST" ]; then
+            echo "ERROR: AndroidManifest.xml not found"
+            find android/build -type f -name AndroidManifest.xml
+            exit 1
+          fi
+
+          echo "Manifest found: $MANIFEST"
 
           JAVA_SOURCE="addons/khvataika_background_notifications/KhvataikaAlarmReceiver.java"
 
@@ -138,56 +161,56 @@ jobs:
           cp "$JAVA_SOURCE" "$JAVA_TARGET"
 
           python3 - "$MANIFEST" <<'PY'
-from pathlib import Path
-import sys
-import xml.etree.ElementTree as ET
+          from pathlib import Path
+          import sys
+          import xml.etree.ElementTree as ET
 
-path = Path(sys.argv[1])
-text = path.read_text()
+          path = Path(sys.argv[1])
+          text = path.read_text()
 
-if 'android:usesCleartextTraffic="true"' not in text:
-    pos = text.find("<application")
-    end = text.find(">", pos)
+          if 'android:usesCleartextTraffic="true"' not in text:
+              pos = text.find("<application")
+              end = text.find(">", pos)
 
-    if pos < 0 or end < 0:
-        raise SystemExit("Application tag not found")
+              if pos < 0 or end < 0:
+                  raise SystemExit("Application tag not found")
 
-    text = (
-        text[:end]
-        + ' android:usesCleartextTraffic="true"'
-        + text[end:]
-    )
+              text = (
+                  text[:end]
+                  + ' android:usesCleartextTraffic="true"'
+                  + text[end:]
+              )
 
-receiver = """
-        <receiver
-            android:name="com.clawneon.khvataika.KhvataikaAlarmReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
-            </intent-filter>
-        </receiver>
-"""
+          receiver = """
+                  <receiver
+                      android:name="com.clawneon.khvataika.KhvataikaAlarmReceiver"
+                      android:enabled="true"
+                      android:exported="false">
+                      <intent-filter>
+                          <action android:name="android.intent.action.BOOT_COMPLETED" />
+                          <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                      </intent-filter>
+                  </receiver>
+          """
 
-if "com.clawneon.khvataika.KhvataikaAlarmReceiver" not in text:
-    close = text.rfind("</application>")
+          if "com.clawneon.khvataika.KhvataikaAlarmReceiver" not in text:
+              close = text.rfind("</application>")
 
-    if close < 0:
-        raise SystemExit("Application closing tag not found")
+              if close < 0:
+                  raise SystemExit("Application closing tag not found")
 
-    text = text[:close] + receiver + text[close:]
+              text = text[:close] + receiver + text[close:]
 
-path.write_text(text)
+          path.write_text(text)
 
-ET.parse(path)
+          ET.parse(path)
 
-print("AndroidManifest valid")
-PY
+          print("AndroidManifest.xml is valid")
+          PY
 
           test -f "$JAVA_TARGET"
 
-          echo "Notification receiver installed"
+          echo "Server notification receiver installed"
 
       - name: Check project configuration
         shell: bash
@@ -208,50 +231,4 @@ PY
           KEYSTORE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.RUSTORE_KEY_ALIAS }}
         run: |
-          set -euo pipefail
-
-          test -n "$KEYSTORE_B64"
-          test -n "$KEYSTORE_PASSWORD"
-          test -n "$KEY_ALIAS"
-
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
-
-          test -s "$KEYSTORE_PATH"
-
-          keytool -list \
-            -keystore "$KEYSTORE_PATH" \
-            -storepass "$KEYSTORE_PASSWORD" \
-            -alias "$KEY_ALIAS" \
-            >/dev/null
-
-          echo "Keystore verified"
-
-      - name: Export signed RuStore AAB
-        shell: bash
-        env:
-          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.KEYSTORE_PATH }}
-          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ secrets.RUSTORE_KEY_ALIAS }}
-          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ secrets.RUSTORE_KEYSTORE_PASSWORD }}
-        run: |
-          set -euo pipefail
-
-          mkdir -p build/rustore
-
-          "$HOME/godot/godot" \
-            --headless \
-            --path . \
-            --export-release \
-            "Android RuStore AAB" \
-            build/rustore/khvataika-1.12.4.aab
-
-          test -s build/rustore/khvataika-1.12.4.aab
-
-          echo "AAB export completed"
-
-      - name: Upload AAB artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: khvataika-1.12.4-rustore-aab
-          path: build/rustore/khvataika-1.12.4.aab
-          if-no-files-found: error
-          retention-days: 14
+          set -euo
