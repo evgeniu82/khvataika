@@ -132,14 +132,14 @@ jobs:
           set -euo pipefail
           mkdir -p build/rustore
           "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.13.3.aab
-          test -s build/rustore/khvataika-1.13.3.aab
-          file build/rustore/khvataika-1.13.3.aab
+          test -s build/rustore/khvataika-1.13.6.aab
+          file build/rustore/khvataika-1.13.6.aab
           echo "AAB export completed"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: khvataika-1.13.3-rustore-aab
-          path: build/rustore/khvataika-1.13.3.aab
+          name: khvataika-1.13.6-rustore-aab
+          path: build/rustore/khvataika-1.13.6.aab
           if-no-files-found: error
           retention-days: 14
