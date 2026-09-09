@@ -23,8 +23,8 @@ window/stretch/mode="canvas_items"
 window/handheld/orientation=1
 
 [rendering]
-renderer/rendering_method="mobile"
-renderer/rendering_method.mobile="mobile"
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
 renderer/rendering_method.driver="opengl3"
 textures/default_filters/use_nearest_mipmap_filter=false
 textures/vram_compression/import_etc2_astc=true
@@ -44,4 +44,4 @@ drop_claw={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":32)]
 common/physics_ticks_per_second=60
 
 [rendering/occlusion_culling]
-use_occlusion_culling=true
+use_occlusion_culling=false
