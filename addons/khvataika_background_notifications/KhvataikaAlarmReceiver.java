@@ -1,11 +1,11 @@
 package com.clawneon.khvataika;
 
 import android.app.AlarmManager;
-import android.app.BroadcastReceiver;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.Map;
 
 public class KhvataikaAlarmReceiver extends BroadcastReceiver {
@@ -70,8 +71,7 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         int id = intent.getIntExtra("id", 0);
 
         if (id == SERVER_POLL_ID
-                || "com.clawneon.khvataika.SERVER_POLL"
-                .equals(action)) {
+                || "com.clawneon.khvataika.SERVER_POLL".equals(action)) {
 
             pollServer(context);
             scheduleServerPoll(context);
@@ -119,7 +119,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                     prefs.getLong(
                             KEY_PREFIX + id + "trigger",
                             System.currentTimeMillis()
-                    ) + 86400000L;
+                    );
+
+            next += 86400000L;
 
             while (next <= System.currentTimeMillis()) {
                 next += 86400000L;
@@ -146,7 +148,8 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             context.getSharedPreferences(
                     PREFS,
                     Context.MODE_PRIVATE
-            ).edit()
+            )
+                    .edit()
                     .remove(KEY_PREFIX + id)
                     .remove(KEY_PREFIX + id + "title")
                     .remove(KEY_PREFIX + id + "message")
@@ -172,7 +175,8 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         context.getSharedPreferences(
                 PREFS,
                 Context.MODE_PRIVATE
-        ).edit()
+        )
+                .edit()
                 .putString(
                         KEY_SERVER_URL,
                         serverUrl
@@ -200,20 +204,21 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             return;
         }
 
-        AlarmManager am =
-                (AlarmManager) context.getSystemService(
-                        Context.ALARM_SERVICE
-                );
+        AlarmManager alarmManager =
+                (AlarmManager)
+                        context.getSystemService(
+                                Context.ALARM_SERVICE
+                        );
 
-        if (am == null) {
+        if (alarmManager == null) {
             return;
         }
 
         long when =
                 System.currentTimeMillis()
-                        + 15 * 60 * 1000L;
+                        + 15L * 60L * 1000L;
 
-        PendingIntent pi =
+        PendingIntent pendingIntent =
                 serverPollIntent(
                         context,
                         true
@@ -221,18 +226,18 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
 
         if (Build.VERSION.SDK_INT >= 23) {
 
-            am.setAndAllowWhileIdle(
+            alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     when,
-                    pi
+                    pendingIntent
             );
 
         } else {
 
-            am.set(
+            alarmManager.set(
                     AlarmManager.RTC_WAKEUP,
                     when,
-                    pi
+                    pendingIntent
             );
         }
     }
@@ -242,31 +247,36 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             boolean update
     ) {
 
-        Intent i =
+        Intent intent =
                 new Intent(
                         context,
                         KhvataikaAlarmReceiver.class
                 );
 
-        i.setAction(
+        intent.setAction(
                 "com.clawneon.khvataika.SERVER_POLL"
         );
 
-        i.putExtra(
+        intent.putExtra(
                 "id",
                 SERVER_POLL_ID
         );
 
         int flags =
-                PendingIntent.FLAG_IMMUTABLE
-                        | (update
-                        ? PendingIntent.FLAG_UPDATE_CURRENT
-                        : PendingIntent.FLAG_NO_CREATE);
+                PendingIntent.FLAG_IMMUTABLE;
+
+        if (update) {
+            flags |=
+                    PendingIntent.FLAG_UPDATE_CURRENT;
+        } else {
+            flags |=
+                    PendingIntent.FLAG_NO_CREATE;
+        }
 
         return PendingIntent.getBroadcast(
                 context,
                 SERVER_POLL_ID,
-                i,
+                intent,
                 flags
         );
     }
@@ -281,194 +291,213 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                         Context.MODE_PRIVATE
                 );
 
-        final String base =
+        final String serverUrl =
                 prefs.getString(
                         KEY_SERVER_URL,
                         ""
                 );
 
-        final String player =
+        final String playerId =
                 prefs.getString(
                         KEY_PLAYER_ID,
                         ""
                 );
 
-        final String token =
+        final String playerToken =
                 prefs.getString(
                         KEY_PLAYER_TOKEN,
                         ""
                 );
 
-        if (base.isEmpty()
-                || player.isEmpty()
-                || token.isEmpty()) {
+        if (serverUrl.isEmpty()
+                || playerId.isEmpty()
+                || playerToken.isEmpty()) {
             return;
-        }
+                }
+                Thread thread =
+                new Thread(
+                        new Runnable() {
 
-        new Thread(
-                () -> {
+                            @Override
+                            public void run() {
 
-                    HttpURLConnection c = null;
+                                HttpURLConnection connection =
+                                        null;
 
-                    try {
+                                try {
 
-                        String url =
-                                base.replaceAll(
-                                        "/$",
-                                        ""
-                                )
-                                        + "/api/notifications/poll"
-                                        + "?player_id="
-                                        + enc(player)
-                                        + "&cursor="
-                                        + prefs.getLong(
-                                        KEY_CURSOR,
-                                        0L
-                                );
+                                    String url =
+                                            serverUrl
+                                                    .replaceAll(
+                                                            "/$",
+                                                            ""
+                                                    )
+                                                    + "/api/notifications/poll"
+                                                    + "?player_id="
+                                                    + encode(playerId)
+                                                    + "&cursor="
+                                                    + prefs.getLong(
+                                                            KEY_CURSOR,
+                                                            0L
+                                                    );
 
-                        c =
-                                (HttpURLConnection)
-                                        new URL(url)
-                                                .openConnection();
+                                    connection =
+                                            (HttpURLConnection)
+                                                    new URL(url)
+                                                            .openConnection();
 
-                        c.setRequestMethod("GET");
+                                    connection.setRequestMethod(
+                                            "GET"
+                                    );
 
-                        c.setRequestProperty(
-                                "Authorization",
-                                "Bearer " + token
-                        );
+                                    connection.setRequestProperty(
+                                            "Authorization",
+                                            "Bearer "
+                                                    + playerToken
+                                    );
 
-                        c.setConnectTimeout(5000);
-                        c.setReadTimeout(7000);
+                                    connection.setConnectTimeout(
+                                            5000
+                                    );
 
-                        int code =
-                                c.getResponseCode();
+                                    connection.setReadTimeout(
+                                            7000
+                                    );
 
-                        if (code < 200
-                                || code >= 300) {
-                            return;
-                        }
+                                    int responseCode =
+                                            connection.getResponseCode();
 
-                        String text =
-                                read(
-                                        c.getInputStream()
-                                );
+                                    if (responseCode < 200
+                                            || responseCode >= 300) {
+                                        return;
+                                    }
 
-                        JSONObject root =
-                                new JSONObject(text);
+                                    String response =
+                                            read(
+                                                    connection
+                                                            .getInputStream()
+                                            );
 
-                        JSONArray items =
-                                root.optJSONArray(
-                                        "notifications"
-                                );
+                                    JSONObject root =
+                                            new JSONObject(
+                                                    response
+                                            );
 
-                        long cursor =
-                                root.optLong(
-                                        "next_cursor",
-                                        prefs.getLong(
-                                                KEY_CURSOR,
-                                                0L
-                                        )
-                                );
+                                    JSONArray notifications =
+                                            root.optJSONArray(
+                                                    "notifications"
+                                            );
 
-                        if (items != null) {
+                                    long cursor =
+                                            root.optLong(
+                                                    "next_cursor",
+                                                    prefs.getLong(
+                                                            KEY_CURSOR,
+                                                            0L
+                                                    )
+                                            );
 
-                            for (
-                                    int i = 0;
-                                    i < items.length();
-                                    i++
-                            ) {
+                                    if (notifications != null) {
 
-                                JSONObject n =
-                                        items.optJSONObject(i);
+                                        for (
+                                                int i = 0;
+                                                i < notifications.length();
+                                                i++
+                                        ) {
 
-                                if (n == null) {
-                                    continue;
+                                            JSONObject notification =
+                                                    notifications
+                                                            .optJSONObject(i);
+
+                                            if (notification == null) {
+                                                continue;
+                                            }
+
+                                            int notificationId =
+                                                    notification.optInt(
+                                                            "id",
+                                                            (int)
+                                                                    (System.currentTimeMillis()
+                                                                            / 1000L)
+                                                    );
+
+                                            String title =
+                                                    notification.optString(
+                                                            "title",
+                                                            "Хватайка"
+                                                    );
+
+                                            String message =
+                                                    notification.optString(
+                                                            "message",
+                                                            "Зайди в игру!"
+                                                    );
+
+                                            postNotification(
+                                                    context,
+                                                    notificationId,
+                                                    title,
+                                                    message
+                                            );
+
+                                            cursor =
+                                                    Math.max(
+                                                            cursor,
+                                                            notification.optLong(
+                                                                    "id",
+                                                                    cursor
+                                                            )
+                                                    );
+                                        }
+                                    }
+
+                                    prefs.edit()
+                                            .putLong(
+                                                    KEY_CURSOR,
+                                                    cursor
+                                            )
+                                            .apply();
+
+                                } catch (Exception ignored) {
+
+                                } finally {
+
+                                    if (connection != null) {
+                                        connection.disconnect();
+                                    }
                                 }
-
-                                int notificationId =
-                                        n.optInt(
-                                                "id",
-                                                (int)
-                                                        (System.currentTimeMillis()
-                                                                / 1000)
-                                        );
-
-                                String title =
-                                        n.optString(
-                                                "title",
-                                                "Хватайка"
-                                        );
-
-                                String message =
-                                        n.optString(
-                                                "message",
-                                                "Зайди в игру!"
-                                        );
-
-                                postNotification(
-                                        context,
-                                        notificationId,
-                                        title,
-                                        message
-                                );
-
-                                cursor =
-                                        Math.max(
-                                                cursor,
-                                                n.optLong(
-                                                        "id",
-                                                        cursor
-                                                )
-                                        );
                             }
                         }
+                );
 
-                        prefs.edit()
-                                .putLong(
-                                        KEY_CURSOR,
-                                        cursor
-                                )
-                                .apply();
-
-                    } catch (Exception ignored) {
-
-                    } finally {
-
-                        if (c != null) {
-                            c.disconnect();
-                        }
-                    }
-
-                }
-        ).start();
+        thread.start();
     }
 
-    private static String enc(
+    private static String encode(
             String value
     ) {
 
         try {
 
-            return java.net.URLEncoder.encode(
+            return URLEncoder.encode(
                     value,
                     "UTF-8"
             );
 
-        } catch (Exception e) {
+        } catch (Exception exception) {
 
             return value;
         }
     }
 
     private static String read(
-            InputStream in
+            InputStream inputStream
     ) throws Exception {
 
         BufferedReader reader =
                 new BufferedReader(
                         new InputStreamReader(
-                                in,
+                                inputStream,
                                 "UTF-8"
                         )
                 );
@@ -479,8 +508,7 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         String line;
 
         while (
-                (line = reader.readLine())
-                        != null
+                (line = reader.readLine()) != null
         ) {
 
             builder.append(line);
@@ -507,7 +535,8 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         context.getSharedPreferences(
                 PREFS,
                 Context.MODE_PRIVATE
-        ).edit()
+        )
+                .edit()
                 .putLong(
                         KEY_PREFIX + id,
                         timestampMs
@@ -549,30 +578,33 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             return;
         }
 
-        AlarmManager am =
+        AlarmManager alarmManager =
                 (AlarmManager)
                         context.getSystemService(
                                 Context.ALARM_SERVICE
                         );
 
-        if (am != null) {
+        if (alarmManager != null) {
 
-            PendingIntent p =
+            PendingIntent pendingIntent =
                     pendingIntent(
                             context,
                             id,
                             false
                     );
 
-            if (p != null) {
-                am.cancel(p);
+            if (pendingIntent != null) {
+                alarmManager.cancel(
+                        pendingIntent
+                );
             }
         }
 
         context.getSharedPreferences(
                 PREFS,
                 Context.MODE_PRIVATE
-        ).edit()
+        )
+                .edit()
                 .remove(KEY_PREFIX + id)
                 .remove(KEY_PREFIX + id + "title")
                 .remove(KEY_PREFIX + id + "message")
@@ -603,25 +635,32 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             String key =
                     entry.getKey();
 
-            if (key.startsWith(KEY_PREFIX)
-                    && !key.endsWith("title")
-                    && !key.endsWith("message")
-                    && !key.endsWith("daily")
-                    && !key.endsWith("trigger")) {
+            if (!key.startsWith(KEY_PREFIX)) {
+                continue;
+            }
 
-                try {
+            if (key.endsWith("title")
+                    || key.endsWith("message")
+                    || key.endsWith("daily")
+                    || key.endsWith("trigger")) {
+                continue;
+            }
 
-                    cancel(
-                            context,
-                            Integer.parseInt(
-                                    key.substring(
-                                            KEY_PREFIX.length()
-                                    )
-                            )
-                    );
+            try {
 
-                } catch (Exception ignored) {
-                }
+                int id =
+                        Integer.parseInt(
+                                key.substring(
+                                        KEY_PREFIX.length()
+                                )
+                        );
+
+                cancel(
+                        context,
+                        id
+                );
+
+            } catch (Exception ignored) {
             }
         }
     }
@@ -643,11 +682,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 title,
                 message
         );
-    }
-
-    private static void scheduleInternal(
+    }    private static void scheduleInternal(
             Context context,
-            long timestamp,
+            long timestampMs,
             int id,
             String title,
             String message,
@@ -658,17 +695,17 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             return;
         }
 
-        AlarmManager am =
+        AlarmManager alarmManager =
                 (AlarmManager)
                         context.getSystemService(
                                 Context.ALARM_SERVICE
                         );
 
-        if (am == null) {
+        if (alarmManager == null) {
             return;
         }
 
-        PendingIntent pending =
+        PendingIntent pendingIntent =
                 pendingIntent(
                         context,
                         id,
@@ -678,35 +715,37 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                         daily
                 );
 
-        if (pending == null) {
+        if (pendingIntent == null) {
             return;
         }
 
-        am.cancel(pending);
+        alarmManager.cancel(
+                pendingIntent
+        );
 
         if (Build.VERSION.SDK_INT >= 31
-                && am.canScheduleExactAlarms()) {
+                && alarmManager.canScheduleExactAlarms()) {
 
-            am.setExactAndAllowWhileIdle(
+            alarmManager.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
-                    timestamp,
-                    pending
+                    timestampMs,
+                    pendingIntent
             );
 
         } else if (Build.VERSION.SDK_INT >= 23) {
 
-            am.setAndAllowWhileIdle(
+            alarmManager.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
-                    timestamp,
-                    pending
+                    timestampMs,
+                    pendingIntent
             );
 
         } else {
 
-            am.set(
+            alarmManager.set(
                     AlarmManager.RTC_WAKEUP,
-                    timestamp,
-                    pending
+                    timestampMs,
+                    pendingIntent
             );
         }
     }
@@ -736,25 +775,25 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             boolean daily
     ) {
 
-        Intent i =
+        Intent intent =
                 new Intent(
                         context,
                         KhvataikaAlarmReceiver.class
                 );
 
-        i.setAction(
+        intent.setAction(
                 "com.clawneon.khvataika.NOTIFY_"
                         + id
         );
 
-        i.putExtra(
+        intent.putExtra(
                 "id",
                 id
         );
 
         if (title != null) {
 
-            i.putExtra(
+            intent.putExtra(
                     "title",
                     title
             );
@@ -762,5 +801,292 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
 
         if (message != null) {
 
-            i.putExtra(
-           
+            intent.putExtra(
+                    "message",
+                    message
+            );
+        }
+
+        intent.putExtra(
+                "daily",
+                daily
+        );
+
+        int flags =
+                PendingIntent.FLAG_IMMUTABLE;
+
+        if (update) {
+
+            flags |=
+                    PendingIntent.FLAG_UPDATE_CURRENT;
+
+        } else {
+
+            flags |=
+                    PendingIntent.FLAG_NO_CREATE;
+        }
+
+        return PendingIntent.getBroadcast(
+                context,
+                id,
+                intent,
+                flags
+        );
+    }
+
+    private static void rescheduleAll(
+            Context context
+    ) {
+
+        if (context == null) {
+            return;
+        }
+
+        SharedPreferences prefs =
+                context.getSharedPreferences(
+                        PREFS,
+                        Context.MODE_PRIVATE
+                );
+
+        for (
+                Map.Entry<String, ?> entry :
+                prefs.getAll().entrySet()
+        ) {
+
+            String key =
+                    entry.getKey();
+
+            if (!key.startsWith(KEY_PREFIX)
+                    || key.endsWith("title")
+                    || key.endsWith("message")
+                    || key.endsWith("daily")
+                    || key.endsWith("trigger")) {
+
+                continue;
+            }
+
+            try {
+
+                int id =
+                        Integer.parseInt(
+                                key.substring(
+                                        KEY_PREFIX.length()
+                                )
+                        );
+
+                long timestamp =
+                        prefs.getLong(
+                                key,
+                                0L
+                        );
+
+                String title =
+                        prefs.getString(
+                                KEY_PREFIX
+                                        + id
+                                        + "title",
+                                "Хватайка"
+                        );
+
+                String message =
+                        prefs.getString(
+                                KEY_PREFIX
+                                        + id
+                                        + "message",
+                                "Зайди в игру — тебя ждёт награда!"
+                        );
+
+                boolean daily =
+                        prefs.getBoolean(
+                                KEY_PREFIX
+                                        + id
+                                        + "daily",
+                                false
+                        );
+
+                if (daily) {
+
+                    while (
+                            timestamp
+                                    <= System.currentTimeMillis()
+                    ) {
+
+                        timestamp +=
+                                86400000L;
+                    }
+
+                    prefs.edit()
+                            .putLong(
+                                    key,
+                                    timestamp
+                            )
+                            .putLong(
+                                    KEY_PREFIX
+                                            + id
+                                            + "trigger",
+                                    timestamp
+                            )
+                            .apply();
+                }
+
+                if (
+                        timestamp
+                                > System.currentTimeMillis()
+                ) {
+
+                    scheduleInternal(
+                            context,
+                            timestamp,
+                            id,
+                            title,
+                            message,
+                            daily
+                    );
+                }
+
+            } catch (Exception ignored) {
+            }
+        }
+    }    private static void postNotification(
+            Context context,
+            int id,
+            String title,
+            String message
+    ) {
+
+        if (context == null) {
+            return;
+        }
+
+        NotificationManager manager =
+                (NotificationManager)
+                        context.getSystemService(
+                                Context.NOTIFICATION_SERVICE
+                        );
+
+        if (manager == null) {
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= 26) {
+
+            NotificationChannel channel =
+                    new NotificationChannel(
+                            CHANNEL_ID,
+                            "Хватайка",
+                            NotificationManager.IMPORTANCE_DEFAULT
+                    );
+
+            channel.setDescription(
+                    "Серверные уведомления игры"
+            );
+
+            manager.createNotificationChannel(
+                    channel
+            );
+        }
+
+        Intent launchIntent =
+                context.getPackageManager()
+                        .getLaunchIntentForPackage(
+                                context.getPackageName()
+                        );
+
+        PendingIntent contentIntent =
+                null;
+
+        if (launchIntent != null) {
+
+            launchIntent.addFlags(
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP
+                            | Intent.FLAG_ACTIVITY_SINGLE_TOP
+            );
+
+            contentIntent =
+                    PendingIntent.getActivity(
+                            context,
+                            id,
+                            launchIntent,
+                            PendingIntent.FLAG_IMMUTABLE
+                                    | PendingIntent.FLAG_UPDATE_CURRENT
+                    );
+        }
+
+        Notification.Builder builder;
+
+        if (Build.VERSION.SDK_INT >= 26) {
+
+            builder =
+                    new Notification.Builder(
+                            context,
+                            CHANNEL_ID
+                    );
+
+        } else {
+
+            builder =
+                    new Notification.Builder(
+                            context
+                    );
+        }
+
+        builder.setContentTitle(
+                title == null
+                        ? "Хватайка"
+                        : title
+        );
+
+        builder.setContentText(
+                message == null
+                        ? "Зайди в игру — тебя ждёт награда!"
+                        : message
+        );
+
+        builder.setSmallIcon(
+                android.R.drawable.ic_dialog_info
+        );
+
+        builder.setAutoCancel(
+                true
+        );
+
+        builder.setPriority(
+                Notification.PRIORITY_DEFAULT
+        );
+
+        if (contentIntent != null) {
+
+            builder.setContentIntent(
+                    contentIntent
+            );
+        }
+
+        int thumbnailId =
+                context.getResources()
+                        .getIdentifier(
+                                "khvataika_notification",
+                                "drawable",
+                                context.getPackageName()
+                        );
+
+        if (thumbnailId != 0) {
+
+            Bitmap thumbnail =
+                    BitmapFactory.decodeResource(
+                            context.getResources(),
+                            thumbnailId
+                    );
+
+            if (thumbnail != null) {
+
+                builder.setLargeIcon(
+                        thumbnail
+                );
+            }
+        }
+
+        manager.notify(
+                id,
+                builder.build()
+        );
+    }    }
