@@ -279,9 +279,8 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 intent,
                 flags
         );
-    }
-
-    private static void pollServer(
+            }
+        private static void pollServer(
             final Context context
     ) {
 
@@ -313,8 +312,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 || playerId.isEmpty()
                 || playerToken.isEmpty()) {
             return;
-                }
-                Thread thread =
+        }
+
+        Thread thread =
                 new Thread(
                         new Runnable() {
 
@@ -682,7 +682,7 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 title,
                 message
         );
-    }    private static void scheduleInternal(
+            private static void scheduleInternal(
             Context context,
             long timestampMs,
             int id,
@@ -947,7 +947,8 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             } catch (Exception ignored) {
             }
         }
-    }    private static void postNotification(
+                    }
+        private static void postNotification(
             Context context,
             int id,
             String title,
@@ -1089,4 +1090,6 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 id,
                 builder.build()
         );
-    }    }
+        }
+}
+                                                                     }
