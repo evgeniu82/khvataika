@@ -19,6 +19,7 @@ jobs:
       KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
 
     steps:
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -113,6 +114,7 @@ jobs:
           set -euo pipefail
 
           rm -rf android
+
           mkdir -p android/build
 
           unzip -q \
@@ -121,9 +123,6 @@ jobs:
 
           test -f android/build/gradlew
 
-          # IMPORTANT:
-          # Godot requires this file to know which Gradle template
-          # version is installed.
           echo "${GODOT_VERSION}.stable" > android/.build_version
 
           test -s android/.build_version
@@ -138,7 +137,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          MANIFEST="$(find android/build -path '*/src/main/AndroidManifest.xml' -print -quit)"
+          MANIFEST="$(find android/build \
+            -path '*/src/main/AndroidManifest.xml' \
+            -print -quit)"
 
           JAVA_SOURCE="addons/khvataika_background_notifications/KhvataikaAlarmReceiver.java"
 
@@ -205,7 +206,7 @@ jobs:
 
           test -f "$JAVA_TARGET"
 
-          echo "Android server notification receiver patched"
+          echo "Android notification receiver patched"
 
       - name: Add Khvataika notification thumbnail
         shell: bash
@@ -216,11 +217,14 @@ jobs:
 
           test -s "$SOURCE"
 
-          MANIFEST="$(find android/build -path '*/src/main/AndroidManifest.xml' -print -quit)"
+          MANIFEST="$(find android/build \
+            -path '*/src/main/AndroidManifest.xml' \
+            -print -quit)"
 
           test -n "$MANIFEST"
 
           MAIN_DIR="$(dirname "$MANIFEST")"
+
           DRAWABLE_DIR="$MAIN_DIR/res/drawable"
 
           mkdir -p "$DRAWABLE_DIR"
@@ -229,9 +233,79 @@ jobs:
             "$SOURCE" \
             "$DRAWABLE_DIR/khvataika_notification.png"
 
-          test -s "$DRAWABLE_DIR/khvataika_notification.png"
+          test -s \
+            "$DRAWABLE_DIR/khvataika_notification.png"
 
           echo "Khvataika notification thumbnail added"
+
+      - name: Clean invalid Android resource files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          RES_ROOT="$(find android/build \
+            -type d \
+            -path '*/src/main/res' \
+            -print -quit)"
+
+          test -n "$RES_ROOT"
+
+          echo "Android resources: $RES_ROOT"
+
+          for DIR in \
+            drawable \
+            drawable-hdpi \
+            drawable-mdpi \
+            drawable-xhdpi \
+            drawable-xxhdpi \
+            drawable-xxxhdpi \
+            drawable-anydpi \
+            drawable-anydpi-v21 \
+            drawable-v21 \
+            drawable-v24 \
+            mipmap \
+            mipmap-hdpi \
+            mipmap-mdpi \
+            mipmap-xhdpi \
+            mipmap-xxhdpi \
+            mipmap-xxxhdpi \
+            mipmap-anydpi \
+            mipmap-anydpi-v26 \
+            layout \
+            layout-land \
+            layout-v21 \
+            layout-v24 \
+            menu \
+            values \
+            values-v21 \
+            values-v24 \
+            values-night \
+            values-night-v21 \
+            xml \
+            color \
+            color-v21 \
+            anim \
+            animator \
+            font
+          do
+            TARGET="$RES_ROOT/$DIR"
+
+            if [ -d "$TARGET" ]; then
+
+              find "$TARGET" \
+                -type f \
+                ! -name '*.xml' \
+                ! -name '*.png' \
+                -print \
+                -delete
+
+            fi
+          done
+
+          test -f \
+            "$RES_ROOT/drawable/khvataika_notification.png"
+
+          echo "Android resource folders cleaned"
 
       - name: Check project configuration
         shell: bash
@@ -241,7 +315,9 @@ jobs:
           test -f project.godot
           test -f export_presets.cfg
 
-          grep -q 'name="Android RuStore AAB"' export_presets.cfg
+          grep -q \
+            'name="Android RuStore AAB"' \
+            export_presets.cfg
 
           grep -q \
             'textures/vram_compression/import_etc2_astc=true' \
@@ -265,7 +341,9 @@ jobs:
           test -n "$KEYSTORE_PASSWORD"
           test -n "$KEY_ALIAS"
 
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE_PATH"
+          printf '%s' \
+            "$KEYSTORE_B64" | \
+            base64 --decode > "$KEYSTORE_PATH"
 
           test -s "$KEYSTORE_PATH"
 
@@ -296,9 +374,11 @@ jobs:
             "Android RuStore AAB" \
             build/rustore/khvataika-1.13.6.aab
 
-          test -s build/rustore/khvataika-1.13.6.aab
+          test -s \
+            build/rustore/khvataika-1.13.6.aab
 
-          file build/rustore/khvataika-1.13.6.aab
+          file \
+            build/rustore/khvataika-1.13.6.aab
 
           echo "AAB export completed"
 
