@@ -117,6 +117,8 @@ jobs:
 
           mkdir -p android/build
 
+          touch android/.gdignore
+
           unzip -q \
             "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip" \
             -d android/build
