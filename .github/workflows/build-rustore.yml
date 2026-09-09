@@ -93,6 +93,28 @@ jobs:
           python3 -c 'import sys,xml.etree.ElementTree as ET; ET.parse(sys.argv[1]); print("AndroidManifest.xml valid")' "$MANIFEST"
           test -f "$JAVA_TARGET"
           echo "Android server notification receiver patched"
+     
+      - name: Add Khvataika notification thumbnail
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          SOURCE="addons/khvataika_background_notifications/notification_thumbnail.png"
+          test -s "$SOURCE"
+
+          MANIFEST="$(find android/build -path '*/src/main/AndroidManifest.xml' -print -quit)"
+          test -n "$MANIFEST"
+
+          MAIN_DIR="$(dirname "$MANIFEST")"
+          DRAWABLE_DIR="$MAIN_DIR/res/drawable"
+
+          mkdir -p "$DRAWABLE_DIR"
+
+          cp "$SOURCE" "$DRAWABLE_DIR/khvataika_notification.png"
+
+          test -s "$DRAWABLE_DIR/khvataika_notification.png"
+
+          echo "Khvataika notification thumbnail added"
 
       - name: Check project configuration
         shell: bash
