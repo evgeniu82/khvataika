@@ -199,6 +199,7 @@ var news_unread: int = 4
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
+const SERVER_AUTHORITATIVE: bool = true
 var server_url: String = DEFAULT_SERVER_URL
 var player_id: String = ""
 var player_token: String = ""
@@ -535,6 +536,11 @@ var toys: Array[Dictionary] = [
 ]
 
 func get_collection_names() -> Array[String]:
+    var result: Array[String] = []
+    for toy in toys:
+        var name := String(toy.get("collection", ""))
+        if name != "" and not result.has(name): result.append(name)
+    if not result.is_empty(): return result
     return [
         "ЛЕСНЫЕ ДРУЗЬЯ", "МИЛЫЕ МАЛЫШИ", "ДЖУНГЛИ", "ОКЕАН",
         "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР",
@@ -872,6 +878,13 @@ func notify_phone(title: String, message: String, force: bool = false) -> void:
     var builder: Variant = Notification.Builder(context, notification_channel_id)
     var Drawable = JavaClassWrapper.wrap("android.R$drawable")
     builder.setSmallIcon(int(Drawable.ic_dialog_info))
+    var resources = context.getResources()
+    var large_id = int(resources.getIdentifier("khvataika_notification", "drawable", context.getPackageName()))
+    if large_id != 0:
+        var BitmapFactory = JavaClassWrapper.wrap("android.graphics.BitmapFactory")
+        var large_bitmap = BitmapFactory.decodeResource(resources, large_id)
+        if large_bitmap:
+            builder.setLargeIcon(large_bitmap)
     java_exception = JavaClassWrapper.get_exception()
     if java_exception != null:
         current_result = "ОШИБКА ИКОНКИ УВЕДОМЛЕНИЯ"
@@ -995,6 +1008,12 @@ func update_return_bonus_state() -> void:
         return_bonus_button.visible = return_bonus_available and hud_layer != null and hud_layer.visible
 
 func claim_return_bonus() -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        if _server_action("return_bonus"):
+            current_result = "БОНУС ЗА ВОЗВРАЩЕНИЕ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; update_ui()
+        return
     update_return_bonus_state()
     if not return_bonus_available or return_bonus_claimed:
         current_result = "БОНУС ЗА ВОЗВРАЩЕНИЕ ПОКА НЕДОСТУПЕН"
@@ -1012,6 +1031,12 @@ func claim_return_bonus() -> void:
     update_ui()
 
 func start_workshop_job() -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
+        if _server_action("workshop_job_start", {}):
+            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        return
     if workshop_job_active:
         current_result = "🔧 ИНЖЕНЕРНАЯ РАБОТА УЖЕ ИДЁТ"
         return
@@ -1031,6 +1056,12 @@ func start_workshop_job() -> void:
     refresh_live_systems_panel()
 
 func process_workshop_job() -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
+        if _server_action("workshop_job_claim", {}):
+            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        return
     if not workshop_job_active:
         return
     if int(Time.get_unix_time_from_system()) < workshop_job_end_unix:
@@ -1289,6 +1320,30 @@ func apply_server_game_state(data: Dictionary) -> void:
     if data.has("selected_claw"): selected_claw = clampi(int(data.get("selected_claw", selected_claw)), 0, claw_specs.size()-1)
     if data.has("upgrade_levels") and data["upgrade_levels"] is Array:
         upgrade_levels = data.get("upgrade_levels").duplicate()
+    workshop_parts = maxi(0, int(data.get("workshop_parts", workshop_parts)))
+    workshop_level = maxi(1, int(data.get("workshop_level", workshop_level)))
+    workshop_claw_power = clampi(int(data.get("workshop_claw_power", workshop_claw_power)),0,10)
+    workshop_speed = clampi(int(data.get("workshop_speed", workshop_speed)),0,10)
+    workshop_precision = clampi(int(data.get("workshop_precision", workshop_precision)),0,10)
+    workshop_luck = clampi(int(data.get("workshop_luck", workshop_luck)),0,10)
+    workshop_motor = clampi(int(data.get("workshop_motor", workshop_motor)),0,15)
+    workshop_servo = clampi(int(data.get("workshop_servo", workshop_servo)),0,15)
+    workshop_cable = clampi(int(data.get("workshop_cable", workshop_cable)),0,15)
+    workshop_damper = clampi(int(data.get("workshop_damper", workshop_damper)),0,15)
+    workshop_cooling = clampi(int(data.get("workshop_cooling", workshop_cooling)),0,15)
+    workshop_controller = clampi(int(data.get("workshop_controller", workshop_controller)),0,15)
+    var server_wb: Variant = data.get("workshop_blueprints", workshop_blueprints)
+    if server_wb is Dictionary: workshop_blueprints = server_wb.duplicate(true)
+    workshop_calibration = clampi(int(data.get("workshop_calibration", workshop_calibration)),0,5)
+    workshop_overclock = bool(data.get("workshop_overclock", workshop_overclock))
+    workshop_overclock_games = maxi(0,int(data.get("workshop_overclock_games", workshop_overclock_games)))
+    workshop_job_end_unix = int(data.get("workshop_job_end_unix", workshop_job_end_unix)); workshop_job_active = bool(data.get("workshop_job_active", workshop_job_active)); workshop_job_name = String(data.get("workshop_job_name", workshop_job_name)); workshop_job_reward = maxi(0,int(data.get("workshop_job_reward", workshop_job_reward)))
+    player_avatar_index = clampi(int(data.get("player_avatar_index", player_avatar_index)),0,AVATAR_OPTIONS.size()-1)
+    var os1: Variant = data.get("owned_claw_skins", owned_claw_skins); if os1 is Array: owned_claw_skins=os1.duplicate()
+    var os2: Variant = data.get("owned_toy_skins", owned_toy_skins); if os2 is Array: owned_toy_skins=os2.duplicate()
+    var os3: Variant = data.get("owned_machine_skins", owned_machine_skins); if os3 is Array: owned_machine_skins=os3.duplicate()
+    selected_claw_skin=clampi(int(data.get("selected_claw_skin",selected_claw_skin)),0,maxi(0,claw_skin_specs.size()-1)); selected_toy_skin=clampi(int(data.get("selected_toy_skin",selected_toy_skin)),0,maxi(0,toy_skin_specs.size()-1)); selected_machine_skin=clampi(int(data.get("selected_machine_skin",selected_machine_skin)),0,maxi(0,machine_skin_specs.size()-1))
+    workshop_parts = engineering_parts if workshop_parts == 0 and engineering_parts > 0 else workshop_parts
     if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
     if data.has("referral_used"): referral_used = bool(data.get("referral_used", referral_used))
     update_ui()
@@ -1350,7 +1405,7 @@ func register_device_remote() -> void:
     var receiver = _get_background_notification_receiver()
     var context = Engine.get_singleton("AndroidRuntime").getApplicationContext()
     if receiver != null and context != null:
-        receiver.registerServer(context, _normalized_server_url(), player_id)
+        receiver.registerServer(context, _normalized_server_url(), player_id, player_token)
         var java_exception = JavaClassWrapper.get_exception()
         if java_exception == null:
             remote_device_registered = true
@@ -1463,8 +1518,66 @@ func redeem_promo_code_remote(code: String) -> void:
         promo_status = "СЕРВЕР НЕДОСТУПЕН"
         refresh_promo_panel()
 
+func _apply_remote_catalog(catalog: Dictionary) -> void:
+    var remote_toys: Variant = catalog.get("toys", [])
+    if remote_toys is Array and not remote_toys.is_empty():
+        var mapped: Array[Dictionary] = []
+        for raw_toy in remote_toys:
+            if raw_toy is Dictionary and bool(raw_toy.get("enabled", true)):
+                var toy_dict: Dictionary = raw_toy
+                mapped.append({"name":String(toy_dict.get("name", "Игрушка")), "collection":String(toy_dict.get("collection", "Базовая")), "rarity":String(toy_dict.get("rarity", "ОБЫЧНАЯ")), "weight":float(toy_dict.get("weight", 10.0)), "color":Color.WHITE, "id":String(toy_dict.get("id", ""))})
+        if not mapped.is_empty():
+            toys = mapped
+    var remote_shop: Variant = catalog.get("shop", [])
+    if remote_shop is Array:
+        for raw_item in remote_shop:
+            if not (raw_item is Dictionary):
+                continue
+            var item: Dictionary = raw_item
+            var item_id := String(item.get("id", ""))
+            var item_name := String(item.get("name", ""))
+            var item_price := int(item.get("price", 0))
+            var effect: Dictionary = item.get("effect", {}) if item.get("effect", {}) is Dictionary else {}
+            if item_id.begins_with("claw_") and not item_id.begins_with("claw_skin_"):
+                var ci := int(item_id.trim_prefix("claw_")) - 1
+                if ci >= 0 and ci < claw_specs.size():
+                    claw_specs[ci]["name"] = item_name
+                    claw_specs[ci]["price"] = item_price
+                    claw_specs[ci]["bonus"] = float(effect.get("capture_bonus", claw_specs[ci]["bonus"]))
+            elif item_id.begins_with("upgrade_"):
+                var ui := int(item_id.trim_prefix("upgrade_")) - 1
+                if ui >= 0 and ui < upgrade_specs.size():
+                    upgrade_specs[ui]["name"] = item_name
+                    upgrade_specs[ui]["base_price"] = item_price
+            elif item_id.begins_with("claw_skin_"):
+                var si := int(item_id.trim_prefix("claw_skin_"))
+                if si >= 0 and si < claw_skin_specs.size():
+                    claw_skin_specs[si]["name"] = item_name
+                    claw_skin_specs[si]["price"] = item_price
+            elif item_id.begins_with("toy_skin_"):
+                var ti := int(item_id.trim_prefix("toy_skin_"))
+                if ti >= 0 and ti < toy_skin_specs.size():
+                    toy_skin_specs[ti]["name"] = item_name
+                    toy_skin_specs[ti]["price"] = item_price
+            elif item_id.begins_with("machine_skin_"):
+                var mi := int(item_id.trim_prefix("machine_skin_"))
+                if mi >= 0 and mi < machine_skin_specs.size():
+                    machine_skin_specs[mi]["name"] = item_name
+                    machine_skin_specs[mi]["price"] = item_price
+    var remote_ach: Variant = catalog.get("achievements", [])
+    if remote_ach is Array and not remote_ach.is_empty():
+        var aa: Array[Dictionary] = []
+        for raw_achievement in remote_ach:
+            if raw_achievement is Dictionary and bool(raw_achievement.get("enabled", true)):
+                var achievement: Dictionary = raw_achievement
+                aa.append({"id":String(achievement.get("id", "")), "name":String(achievement.get("name", "Достижение")), "desc":String(achievement.get("description", achievement.get("desc", ""))), "kind":String(achievement.get("kind", "level")), "value":int(achievement.get("value", 1)), "rarity":String(achievement.get("rarity", ""))})
+        if not aa.is_empty():
+            achievement_specs = aa
+
 func _apply_remote_config(config: Dictionary) -> void:
     remote_config = config
+    var server_catalog: Variant = config.get("catalog", {})
+    if server_catalog is Dictionary: _apply_remote_catalog(server_catalog)
     online_maintenance = bool(config.get("maintenance_mode", false))
     online_announcement = String(config.get("global_announcement", ""))
     online_reward_multiplier = clampf(float(config.get("global_reward_multiplier", 1.0)), 0.1, 10.0)
@@ -1480,6 +1593,18 @@ func _apply_remote_config(config: Dictionary) -> void:
     var notif: Variant = config.get("notification_hours", {})
     if notif is Dictionary:
         online_notification_hours = notif
+    var server_seasons: Variant = config.get("season_definitions", [])
+    if server_seasons is Array and not server_seasons.is_empty():
+        var season_list: Array[Dictionary] = []
+        for raw_season in server_seasons:
+            if raw_season is Dictionary: season_list.append(raw_season)
+        if not season_list.is_empty(): season_specs = season_list
+    var server_holidays: Variant = config.get("holiday_calendar", [])
+    if server_holidays is Array and not server_holidays.is_empty():
+        var holiday_list: Array[Dictionary] = []
+        for raw_holiday in server_holidays:
+            if raw_holiday is Dictionary: holiday_list.append(raw_holiday)
+        if not holiday_list.is_empty(): holiday_calendar = holiday_list
     var remote_news: Variant = config.get("news", [])
     if remote_news is Array:
         remote_news_items.clear()
@@ -1503,6 +1628,9 @@ func _apply_remote_config(config: Dictionary) -> void:
     register_device_remote()
     refresh_news_panel(news_panel)
     refresh_rating_panel()
+    refresh_shop()
+    refresh_achievements_panel()
+    refresh_vip_panel()
     update_ui()
 
 func _on_remote_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
@@ -1517,6 +1645,14 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         if kind == "action:promo_redeem": remote_promo_request_active = false
         if bool(data.get("ok", false)) and data.has("game_state") and data["game_state"] is Dictionary:
             apply_server_game_state(data["game_state"])
+        if bool(data.get("ok", false)) and data.has("achievements") and data["achievements"] is Array:
+            pending_new_achievements.clear()
+            for achievement in data["achievements"]:
+                if achievement is Dictionary:
+                    var ach_name := String(achievement.get("name", "Достижение"))
+                    pending_new_achievements.append(ach_name)
+            if not pending_new_achievements.is_empty():
+                current_result = "🏆 НОВЫЕ ДОСТИЖЕНИЯ: " + " • ".join(pending_new_achievements)
         if not bool(data.get("ok", false)):
             current_result = String(data.get("message", "Сервер отклонил действие"))
         else:
@@ -1528,6 +1664,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                         last_prize_name = String(sr.get("name", last_prize_name))
                         last_prize_rarity = String(sr.get("rarity", last_prize_rarity))
                         last_reward_rubles = int((data.get("reward", {}) as Dictionary).get("amount", last_reward_rubles)) if data.get("reward", null) is Dictionary else last_reward_rubles
+                        if bool(data.get("duplicate", false)):
+                            sale_name = last_prize_name
+                            sale_rarity = last_prize_rarity
+                            sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
+                            sale_available = true
+                            show_sale_offer()
                 "action:promo_redeem":
                     promo_status = "Промокод успешно активирован"
                     refresh_promo_panel()
@@ -3934,6 +4076,13 @@ func claim_login_reward() -> void:
     claim_login_reward_for_day(current_day)
 
 func claim_login_reward_for_day(day: int) -> void:
+    if SERVER_AUTHORITATIVE:
+        if day < 1 or day > 7: return
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        if _server_action("daily_login", {"day":day}):
+            current_result = "ЕЖЕДНЕВНАЯ НАГРАДА ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; update_ui()
+        return
     # Обработчик намеренно идемпотентный: повторное касание после получения
     # награды ничего не выдаёт повторно.
     if day < 1 or day > 7:
@@ -4549,6 +4698,12 @@ func build_shop_machine_skins() -> void:
 
 func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int) -> int:
     if index < 0 or index >= specs.size(): return selected
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return selected
+        var item_id := "claw_skin_%d" % index if specs == claw_skin_specs else ("toy_skin_%d" % index if specs == toy_skin_specs else "machine_skin_%d" % index)
+        _server_action("cosmetic_buy", {"item_id":item_id})
+        return selected
     if owned[index]:
         selected = index
     elif coins >= int(specs[index]["price"]):
@@ -4625,6 +4780,9 @@ func refresh_vip_panel() -> void:
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        _server_action("vip_buy", {"index":index}); return
     if index >= vip_owned.size(): vip_owned.resize(vip_specs.size())
     if vip_owned[index]:
         vip_selected = index; current_result = "💎 VIP: %s" % String(vip_specs[index]["name"])
@@ -5090,6 +5248,12 @@ func refresh_chests_panel() -> void:
             b.disabled = chest_opening or amount <= 0 or chest_keys < need
 
 func workshop_upgrade(stat: String) -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
+        if _server_action("workshop_upgrade", {"stat":stat}):
+            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        return
     var level := int(get("workshop_" + stat))
     var max_level := 15 if stat in ["motor", "servo", "cable", "damper", "cooling", "controller"] else 10
     if level >= max_level:
@@ -5122,6 +5286,12 @@ func workshop_blueprint_cost(tier: String) -> int:
     return {"basic":250, "advanced":650, "elite":1400}.get(tier, 999999)
 
 func workshop_buy_blueprint(stat: String, tier: String) -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
+        if _server_action("workshop_blueprint", {"stat":stat,"tier":tier}):
+            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        return
     var order := {"none":0,"basic":1,"advanced":2,"elite":3}
     var current := String(workshop_blueprints.get(stat, "none"))
     if int(order.get(tier, 0)) <= int(order.get(current, 0)): return
@@ -5135,6 +5305,12 @@ func workshop_buy_blueprint(stat: String, tier: String) -> void:
     save_game(); update_ui(); refresh_workshop_panel()
 
 func workshop_calibrate() -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
+        if _server_action("workshop_calibrate", {}):
+            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        return
     var cost := 300 + workshop_calibration * 180
     if workshop_calibration >= 5:
         current_result = "КАЛИБРОВКА МАКСИМАЛЬНА"
@@ -5148,6 +5324,12 @@ func workshop_calibrate() -> void:
     refresh_workshop_panel()
 
 func workshop_toggle_overclock() -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
+        if _server_action("workshop_overclock", {}):
+            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        return
     if workshop_overclock:
         workshop_overclock = false
         workshop_overclock_games = 0
@@ -5833,6 +6015,8 @@ func build_profile_panel() -> PanelContainer:
 
 func select_profile_avatar(index: int) -> void:
     player_avatar_index = clampi(index, 0, AVATAR_OPTIONS.size() - 1)
+    if SERVER_AUTHORITATIVE and _server_ready() and player_token != "":
+        _server_action("profile_update", {"avatar_index":player_avatar_index})
     refresh_profile_panel()
 
 func save_profile_changes() -> void:
@@ -5844,7 +6028,12 @@ func save_profile_changes() -> void:
         var clean := input.text.strip_edges()
         if clean == "": clean = "ИГРОК"
         player_name = clean.substr(0, 20)
-    save_game()
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "ПРОФИЛЬ НЕ СОХРАНЁН: НЕТ СЕРВЕРА"; update_ui(); return
+        _server_action("profile_update", {"name":player_name,"avatar_index":player_avatar_index})
+    else:
+        save_game()
     update_hud_profile_button()
     refresh_profile_panel()
     current_result = "👤 ПРОФИЛЬ СОХРАНЁН"
@@ -6536,6 +6725,11 @@ func build_help_panel() -> PanelContainer:
     return p
 
 func start_game() -> void:
+    if SERVER_AUTHORITATIVE and (not _server_ready() or player_token == ""):
+        current_result = "ПОДКЛЮЧЕНИЕ К СЕРВЕРУ НЕ УСТАНОВЛЕНО — ИГРА ЗАБЛОКИРОВАНА"
+        update_ui()
+        register_player_remote()
+        return
     if online_maintenance:
         var dialog := AcceptDialog.new()
         dialog.title = "Технические работы"
@@ -7032,9 +7226,17 @@ func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
     play_upgrade_sound("grab")
     register_game_activity()
-    if _server_ready() and player_token != "":
-        _server_action("game_start")
-    total_games += 1
+    if _server_ready():
+        if player_token == "":
+            current_result = "НЕТ АВТОРИЗАЦИИ СЕРВЕРА"
+            update_ui()
+            return
+        if not _server_action("game_start"):
+            current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
+            update_ui()
+            return
+    if not SERVER_AUTHORITATIVE:
+        total_games += 1
     if vibration_on:
         Input.vibrate_handheld(55, 0.35)
     save_game()
@@ -7095,8 +7297,21 @@ func resolve_grab() -> bool:
     return true
 
 func finalize_delivered_prize() -> void:
-    if _server_ready() and player_token != "":
-        _server_action("game_finish")
+    if _server_ready():
+        if player_token == "":
+            current_result = "НЕТ АВТОРИЗАЦИИ СЕРВЕРА"
+            pending_prize_data.clear()
+            update_ui()
+            return
+        if not _server_action("game_finish"):
+            current_result = "СЕРВЕР ЗАНЯТ — НАГРАДА НЕ ЗАЧИСЛЕНА"
+            update_ui()
+            return
+        # В онлайн-режиме награду, игрушку, XP, сундук и достижения выдаёт только сервер.
+        pending_prize_data.clear()
+        current_result = "РЕЗУЛЬТАТ ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
+        update_ui()
+        return
     if pending_prize_data.is_empty():
         return
     var d: Dictionary = pending_prize_data
@@ -7395,6 +7610,16 @@ func rarity_reward(rarity: String) -> int:
     return 5
 
 func buy_claw(index: int) -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            update_ui()
+            return
+        if _server_action("shop_buy", {"item_id":"claw_%d" % (index + 1)}):
+            current_result = "Покупка проверяется сервером…"
+            update_ui()
+            return
+        return
     if index >= 0 and index < owned_claws.size() and owned_claws[index]:
         selected_claw = index
         current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
@@ -7422,6 +7647,16 @@ func buy_claw(index: int) -> void:
     update_ui()
 
 func buy_upgrade(index: int) -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            update_ui()
+            return
+        if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
+            current_result = "Улучшение проверяется сервером…"
+            update_ui()
+            return
+        return
     if _server_ready() and player_token != "":
         if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
             current_result = "Улучшение проверяется сервером…"
@@ -7479,6 +7714,13 @@ func show_sale_offer() -> void:
 
 func sell_duplicate() -> void:
     if not sale_available: return
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        if _server_action("sell_duplicate", {"toy_name":sale_name,"amount":sale_price}):
+            sale_available = false
+            if sale_panel: sale_panel.visible = false
+            result_popup.visible = false
+        return
     coins += sale_price
     current_result = "💰 ДУБЛЬ ПРОДАН • +%d ₽" % sale_price
     sale_available = false
@@ -7696,9 +7938,11 @@ func complete_weekly_mission_if_ready() -> void:
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
 
 func claim_daily_bonus() -> void:
-    if _server_ready() and player_token != "":
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("claim_daily"):
             return
+        return
     # Награда выдаётся только один раз в календарный день.
     var today: String = Time.get_date_string_from_system()
     if last_daily_bonus_date == today:
@@ -7760,6 +8004,7 @@ func refresh_upgrade_dashboard() -> void:
         menu_notice_count = int((daily_mission_target - daily_mission_progress) > 0) + int((weekly_mission_target - weekly_mission_progress) > 0) + int(chest_keys > 0)
 
 func save_game() -> void:
+    # SERVER_AUTHORITATIVE: this file is a UI/cache snapshot only. Economy/progress authority lives on server.
     server_settings_dirty = true
     var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
     if f:
