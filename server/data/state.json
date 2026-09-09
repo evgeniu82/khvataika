@@ -1,0 +1,225 @@
+{
+  "settings": {
+    "maintenance_mode": false,
+    "global_announcement": "",
+    "global_reward_multiplier": 1.0,
+    "daily_bonus_amount": 25,
+    "daily_mission_reward": 80,
+    "weekly_mission_reward": 350,
+    "return_bonus_base": 100,
+    "return_bonus_per_day": 25,
+    "return_bonus_max_days": 30,
+    "notification_hours": {
+      "rewards": 12,
+      "streak": 20,
+      "chests": 18
+    }
+  },
+  "promocodes": [
+    {
+      "code": "KHVA2026",
+      "reward": 250,
+      "max_uses": 0,
+      "used": 0,
+      "active": true,
+      "expires": ""
+    },
+    {
+      "code": "STARTER",
+      "reward": 100,
+      "max_uses": 0,
+      "used": 0,
+      "active": true,
+      "expires": ""
+    }
+  ],
+  "news": [
+    {
+      "id": "welcome",
+      "date": "08.09.2026",
+      "type": "update",
+      "title": "🆕 Онлайн-система",
+      "text": "Новости и промокоды теперь можно обновлять через админ-панель."
+    },
+    {
+      "id": "promo",
+      "date": "08.09.2026",
+      "type": "promo",
+      "title": "🎟 Новые промокоды",
+      "text": "Новые коды будут публиковаться здесь."
+    }
+  ],
+  "events": [],
+  "players": {},
+  "audit": [],
+  "season": {
+    "name": "Сезон 1",
+    "max_level": 30,
+    "levels": [
+      {
+        "level": 1,
+        "type": "ключи",
+        "reward": "1 ключ"
+      },
+      {
+        "level": 2,
+        "type": "детали",
+        "reward": "2 детали"
+      },
+      {
+        "level": 3,
+        "type": "сундук",
+        "reward": "Малый сундук"
+      },
+      {
+        "level": 4,
+        "type": "бонус",
+        "reward": "Бонус +100 ₽"
+      },
+      {
+        "level": 5,
+        "type": "рубли",
+        "reward": "100 ₽"
+      },
+      {
+        "level": 6,
+        "type": "ключи",
+        "reward": "1 ключ"
+      },
+      {
+        "level": 7,
+        "type": "детали",
+        "reward": "2 детали"
+      },
+      {
+        "level": 8,
+        "type": "сундук",
+        "reward": "Малый сундук"
+      },
+      {
+        "level": 9,
+        "type": "бонус",
+        "reward": "Бонус +100 ₽"
+      },
+      {
+        "level": 10,
+        "type": "рубли",
+        "reward": "150 ₽"
+      },
+      {
+        "level": 11,
+        "type": "ключи",
+        "reward": "1 ключ"
+      },
+      {
+        "level": 12,
+        "type": "детали",
+        "reward": "2 детали"
+      },
+      {
+        "level": 13,
+        "type": "сундук",
+        "reward": "Малый сундук"
+      },
+      {
+        "level": 14,
+        "type": "бонус",
+        "reward": "Бонус +100 ₽"
+      },
+      {
+        "level": 15,
+        "type": "рубли",
+        "reward": "200 ₽"
+      },
+      {
+        "level": 16,
+        "type": "ключи",
+        "reward": "1 ключ"
+      },
+      {
+        "level": 17,
+        "type": "детали",
+        "reward": "2 детали"
+      },
+      {
+        "level": 18,
+        "type": "сундук",
+        "reward": "Малый сундук"
+      },
+      {
+        "level": 19,
+        "type": "бонус",
+        "reward": "Бонус +100 ₽"
+      },
+      {
+        "level": 20,
+        "type": "рубли",
+        "reward": "250 ₽"
+      },
+      {
+        "level": 21,
+        "type": "ключи",
+        "reward": "1 ключ"
+      },
+      {
+        "level": 22,
+        "type": "детали",
+        "reward": "2 детали"
+      },
+      {
+        "level": 23,
+        "type": "сундук",
+        "reward": "Малый сундук"
+      },
+      {
+        "level": 24,
+        "type": "бонус",
+        "reward": "Бонус +100 ₽"
+      },
+      {
+        "level": 25,
+        "type": "рубли",
+        "reward": "300 ₽"
+      },
+      {
+        "level": 26,
+        "type": "ключи",
+        "reward": "1 ключ"
+      },
+      {
+        "level": 27,
+        "type": "детали",
+        "reward": "2 детали"
+      },
+      {
+        "level": 28,
+        "type": "сундук",
+        "reward": "Малый сундук"
+      },
+      {
+        "level": 29,
+        "type": "бонус",
+        "reward": "Бонус +100 ₽"
+      },
+      {
+        "level": 30,
+        "type": "рубли",
+        "reward": "350 ₽"
+      }
+    ]
+  },
+  "chests": [
+    {
+      "id": "starter",
+      "name": "📦 Стартовый сундук",
+      "key_cost": 1,
+      "rewards": "50 ₽ — 40%\n100 ₽ — 30%\nКлюч — 20%\nДеталь — 10%"
+    },
+    {
+      "id": "gold",
+      "name": "🏆 Золотой сундук",
+      "key_cost": 3,
+      "rewards": "150 ₽ — 35%\n300 ₽ — 30%\n2 ключа — 20%\nРедкая деталь — 15%"
+    }
+  ]
+}
