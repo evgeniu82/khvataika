@@ -131,7 +131,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/rustore
-          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.13.3.aab
+          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.13.6.aab
           test -s build/rustore/khvataika-1.13.6.aab
           file build/rustore/khvataika-1.13.6.aab
           echo "AAB export completed"
