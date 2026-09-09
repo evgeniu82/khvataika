@@ -1,7 +1,7 @@
 package com.clawneon.khvataika;
 
 import android.app.AlarmManager;
-import android.content.BroadcastReceiver;
+import android.app.BroadcastReceiver;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -9,10 +9,9 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.Build;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -22,26 +21,46 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.Calendar;
 import java.util.Map;
 
 public class KhvataikaAlarmReceiver extends BroadcastReceiver {
 
     public static final String CHANNEL_ID = "khvataika_game";
-    private static final String PREFS = "khvataika_background_notifications";
-    private static final String KEY_PREFIX = "notification_";
+
+    private static final String PREFS =
+            "khvataika_background_notifications";
+
+    private static final String KEY_PREFIX =
+            "notification_";
+
     private static final int SERVER_POLL_ID = 1199;
 
-    private static final String KEY_SERVER_URL = "server_url";
-    private static final String KEY_PLAYER_ID = "player_id";
-    private static final String KEY_PLAYER_TOKEN = "player_token";
-    private static final String KEY_CURSOR = "server_cursor";
+    private static final String KEY_SERVER_URL =
+            "server_url";
+
+    private static final String KEY_PLAYER_ID =
+            "player_id";
+
+    private static final String KEY_PLAYER_TOKEN =
+            "player_token";
+
+    private static final String KEY_CURSOR =
+            "server_cursor";
 
     @Override
-    public void onReceive(Context context, Intent intent) {
+    public void onReceive(
+            Context context,
+            Intent intent
+    ) {
 
-        if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())
-                || Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
+        if (context == null || intent == null) {
+            return;
+        }
+
+        String action = intent.getAction();
+
+        if (Intent.ACTION_BOOT_COMPLETED.equals(action)
+                || Intent.ACTION_MY_PACKAGE_REPLACED.equals(action)) {
 
             scheduleServerPoll(context);
             rescheduleAll(context);
@@ -51,33 +70,50 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         int id = intent.getIntExtra("id", 0);
 
         if (id == SERVER_POLL_ID
-                || "com.clawneon.khvataika.SERVER_POLL".equals(intent.getAction())) {
+                || "com.clawneon.khvataika.SERVER_POLL"
+                .equals(action)) {
 
             pollServer(context);
             scheduleServerPoll(context);
             return;
         }
 
-        if (id == 0) return;
+        if (id == 0) {
+            return;
+        }
 
-        String title = intent.getStringExtra("title");
-        String message = intent.getStringExtra("message");
-        boolean daily = intent.getBooleanExtra("daily", false);
+        String title =
+                intent.getStringExtra("title");
 
-        if (title == null) {
+        String message =
+                intent.getStringExtra("message");
+
+        boolean daily =
+                intent.getBooleanExtra("daily", false);
+
+        if (title == null || title.isEmpty()) {
             title = "Хватайка";
         }
 
-        if (message == null) {
-            message = "Зайди в игру — тебя ждёт награда!";
+        if (message == null || message.isEmpty()) {
+            message =
+                    "Зайди в игру — тебя ждёт награда!";
         }
 
-        postNotification(context, id, title, message);
+        postNotification(
+                context,
+                id,
+                title,
+                message
+        );
 
         if (daily) {
 
             SharedPreferences prefs =
-                    context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+                    context.getSharedPreferences(
+                            PREFS,
+                            Context.MODE_PRIVATE
+                    );
 
             long next =
                     prefs.getLong(
@@ -90,7 +126,10 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             }
 
             prefs.edit()
-                    .putLong(KEY_PREFIX + id + "trigger", next)
+                    .putLong(
+                            KEY_PREFIX + id + "trigger",
+                            next
+                    )
                     .apply();
 
             scheduleInternal(
@@ -124,7 +163,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             String playerToken
     ) {
 
-        if (context == null || serverUrl == null || playerId == null) {
+        if (context == null
+                || serverUrl == null
+                || playerId == null) {
             return;
         }
 
@@ -132,42 +173,62 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 PREFS,
                 Context.MODE_PRIVATE
         ).edit()
-                .putString(KEY_SERVER_URL, serverUrl)
-                .putString(KEY_PLAYER_ID, playerId)
+                .putString(
+                        KEY_SERVER_URL,
+                        serverUrl
+                )
+                .putString(
+                        KEY_PLAYER_ID,
+                        playerId
+                )
                 .putString(
                         KEY_PLAYER_TOKEN,
-                        playerToken == null ? "" : playerToken
+                        playerToken == null
+                                ? ""
+                                : playerToken
                 )
                 .apply();
 
         scheduleServerPoll(context);
     }
 
-    public static void scheduleServerPoll(Context context) {
+    public static void scheduleServerPoll(
+            Context context
+    ) {
 
-        if (context == null) return;
+        if (context == null) {
+            return;
+        }
 
         AlarmManager am =
                 (AlarmManager) context.getSystemService(
                         Context.ALARM_SERVICE
                 );
 
-        if (am == null) return;
+        if (am == null) {
+            return;
+        }
 
         long when =
                 System.currentTimeMillis()
                         + 15 * 60 * 1000L;
 
         PendingIntent pi =
-                serverPollIntent(context, true);
+                serverPollIntent(
+                        context,
+                        true
+                );
 
         if (Build.VERSION.SDK_INT >= 23) {
+
             am.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
                     when,
                     pi
             );
+
         } else {
+
             am.set(
                     AlarmManager.RTC_WAKEUP,
                     when,
@@ -191,7 +252,10 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 "com.clawneon.khvataika.SERVER_POLL"
         );
 
-        i.putExtra("id", SERVER_POLL_ID);
+        i.putExtra(
+                "id",
+                SERVER_POLL_ID
+        );
 
         int flags =
                 PendingIntent.FLAG_IMMUTABLE
@@ -207,7 +271,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
         );
     }
 
-    private static void pollServer(final Context context) {
+    private static void pollServer(
+            final Context context
+    ) {
 
         final SharedPreferences prefs =
                 context.getSharedPreferences(
@@ -216,13 +282,22 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 );
 
         final String base =
-                prefs.getString(KEY_SERVER_URL, "");
+                prefs.getString(
+                        KEY_SERVER_URL,
+                        ""
+                );
 
         final String player =
-                prefs.getString(KEY_PLAYER_ID, "");
+                prefs.getString(
+                        KEY_PLAYER_ID,
+                        ""
+                );
 
         final String token =
-                prefs.getString(KEY_PLAYER_TOKEN, "");
+                prefs.getString(
+                        KEY_PLAYER_TOKEN,
+                        ""
+                );
 
         if (base.isEmpty()
                 || player.isEmpty()
@@ -230,132 +305,167 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             return;
         }
 
-        new Thread(() -> {
+        new Thread(
+                () -> {
 
-            HttpURLConnection c = null;
+                    HttpURLConnection c = null;
 
-            try {
+                    try {
 
-                String url =
-                        base.replaceAll("/$", "")
-                                + "/api/notifications/poll?player_id="
-                                + enc(player)
-                                + "&cursor="
-                                + prefs.getLong(KEY_CURSOR, 0L);
-
-                c =
-                        (HttpURLConnection)
-                                new URL(url).openConnection();
-
-                c.setRequestMethod("GET");
-
-                c.setRequestProperty(
-                        "Authorization",
-                        "Bearer " + token
-                );
-
-                c.setConnectTimeout(5000);
-                c.setReadTimeout(7000);
-
-                int code = c.getResponseCode();
-
-                if (code < 200 || code >= 300) {
-                    return;
-                }
-
-                String text =
-                        read(c.getInputStream());
-
-                JSONObject root =
-                        new JSONObject(text);
-
-                JSONArray items =
-                        root.optJSONArray("notifications");
-
-                long cursor =
-                        root.optLong(
-                                "next_cursor",
-                                prefs.getLong(
+                        String url =
+                                base.replaceAll(
+                                        "/$",
+                                        ""
+                                )
+                                        + "/api/notifications/poll"
+                                        + "?player_id="
+                                        + enc(player)
+                                        + "&cursor="
+                                        + prefs.getLong(
                                         KEY_CURSOR,
                                         0L
-                                )
+                                );
+
+                        c =
+                                (HttpURLConnection)
+                                        new URL(url)
+                                                .openConnection();
+
+                        c.setRequestMethod("GET");
+
+                        c.setRequestProperty(
+                                "Authorization",
+                                "Bearer " + token
                         );
 
-                if (items != null) {
+                        c.setConnectTimeout(5000);
+                        c.setReadTimeout(7000);
 
-                    for (int i = 0;
-                         i < items.length();
-                         i++) {
+                        int code =
+                                c.getResponseCode();
 
-                        JSONObject n =
-                                items.optJSONObject(i);
+                        if (code < 200
+                                || code >= 300) {
+                            return;
+                        }
 
-                        if (n == null) continue;
+                        String text =
+                                read(
+                                        c.getInputStream()
+                                );
 
-                        postNotification(
-                                context,
-                                n.optInt(
-                                        "id",
-                                        (int)
-                                                (System.currentTimeMillis()
-                                                        / 1000)
-                                ),
-                                n.optString(
-                                        "title",
-                                        "Хватайка"
-                                ),
-                                n.optString(
-                                        "message",
-                                        "Зайди в игру!"
-                                )
-                        );
+                        JSONObject root =
+                                new JSONObject(text);
 
-                        cursor =
-                                Math.max(
-                                        cursor,
-                                        n.optLong(
-                                                "id",
-                                                cursor
+                        JSONArray items =
+                                root.optJSONArray(
+                                        "notifications"
+                                );
+
+                        long cursor =
+                                root.optLong(
+                                        "next_cursor",
+                                        prefs.getLong(
+                                                KEY_CURSOR,
+                                                0L
                                         )
                                 );
+
+                        if (items != null) {
+
+                            for (
+                                    int i = 0;
+                                    i < items.length();
+                                    i++
+                            ) {
+
+                                JSONObject n =
+                                        items.optJSONObject(i);
+
+                                if (n == null) {
+                                    continue;
+                                }
+
+                                int notificationId =
+                                        n.optInt(
+                                                "id",
+                                                (int)
+                                                        (System.currentTimeMillis()
+                                                                / 1000)
+                                        );
+
+                                String title =
+                                        n.optString(
+                                                "title",
+                                                "Хватайка"
+                                        );
+
+                                String message =
+                                        n.optString(
+                                                "message",
+                                                "Зайди в игру!"
+                                        );
+
+                                postNotification(
+                                        context,
+                                        notificationId,
+                                        title,
+                                        message
+                                );
+
+                                cursor =
+                                        Math.max(
+                                                cursor,
+                                                n.optLong(
+                                                        "id",
+                                                        cursor
+                                                )
+                                        );
+                            }
+                        }
+
+                        prefs.edit()
+                                .putLong(
+                                        KEY_CURSOR,
+                                        cursor
+                                )
+                                .apply();
+
+                    } catch (Exception ignored) {
+
+                    } finally {
+
+                        if (c != null) {
+                            c.disconnect();
+                        }
                     }
+
                 }
-
-                prefs.edit()
-                        .putLong(
-                                KEY_CURSOR,
-                                cursor
-                        )
-                        .apply();
-
-            } catch (Exception ignored) {
-
-            } finally {
-
-                if (c != null) {
-                    c.disconnect();
-                }
-            }
-
-        }).start();
+        ).start();
     }
 
-    private static String enc(String x) {
+    private static String enc(
+            String value
+    ) {
 
         try {
+
             return java.net.URLEncoder.encode(
-                    x,
+                    value,
                     "UTF-8"
             );
+
         } catch (Exception e) {
-            return x;
+
+            return value;
         }
     }
 
-    private static String read(InputStream in)
-            throws Exception {
+    private static String read(
+            InputStream in
+    ) throws Exception {
 
-        BufferedReader r =
+        BufferedReader reader =
                 new BufferedReader(
                         new InputStreamReader(
                                 in,
@@ -363,18 +473,22 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                         )
                 );
 
-        StringBuilder b =
+        StringBuilder builder =
                 new StringBuilder();
 
         String line;
 
-        while ((line = r.readLine()) != null) {
-            b.append(line);
+        while (
+                (line = reader.readLine())
+                        != null
+        ) {
+
+            builder.append(line);
         }
 
-        r.close();
+        reader.close();
 
-        return b.toString();
+        return builder.toString();
     }
 
     public static void schedule(
@@ -386,7 +500,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             boolean daily
     ) {
 
-        if (context == null) return;
+        if (context == null) {
+            return;
+        }
 
         context.getSharedPreferences(
                 PREFS,
@@ -429,7 +545,9 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             int id
     ) {
 
-        if (context == null) return;
+        if (context == null) {
+            return;
+        }
 
         AlarmManager am =
                 (AlarmManager)
@@ -463,33 +581,40 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 .apply();
     }
 
-    public static void cancelAll(Context context) {
+    public static void cancelAll(
+            Context context
+    ) {
 
-        if (context == null) return;
+        if (context == null) {
+            return;
+        }
 
-        SharedPreferences p =
+        SharedPreferences prefs =
                 context.getSharedPreferences(
                         PREFS,
                         Context.MODE_PRIVATE
                 );
 
-        for (Map.Entry<String, ?> e :
-                p.getAll().entrySet()) {
+        for (
+                Map.Entry<String, ?> entry :
+                prefs.getAll().entrySet()
+        ) {
 
-            String k = e.getKey();
+            String key =
+                    entry.getKey();
 
-            if (k.startsWith(KEY_PREFIX)
-                    && !k.endsWith("title")
-                    && !k.endsWith("message")
-                    && !k.endsWith("daily")
-                    && !k.endsWith("trigger")) {
+            if (key.startsWith(KEY_PREFIX)
+                    && !key.endsWith("title")
+                    && !key.endsWith("message")
+                    && !key.endsWith("daily")
+                    && !key.endsWith("trigger")) {
 
                 try {
 
                     cancel(
                             context,
                             Integer.parseInt(
-                                    k.substring(
+                                    key.substring(
                                             KEY_PREFIX.length()
                                     )
                             )
@@ -508,24 +633,30 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
             int id
     ) {
 
-        if (context != null) {
-            postNotification(
-                    context,
-                    id,
-                    title,
-                    message
-            );
+        if (context == null) {
+            return;
         }
+
+        postNotification(
+                context,
+                id,
+                title,
+                message
+        );
     }
 
     private static void scheduleInternal(
             Context context,
-            long t,
+            long timestamp,
             int id,
             String title,
             String message,
             boolean daily
     ) {
+
+        if (context == null) {
+            return;
+        }
 
         AlarmManager am =
                 (AlarmManager)
@@ -533,9 +664,11 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                                 Context.ALARM_SERVICE
                         );
 
-        if (am == null) return;
+        if (am == null) {
+            return;
+        }
 
-        PendingIntent p =
+        PendingIntent pending =
                 pendingIntent(
                         context,
                         id,
@@ -545,33 +678,35 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                         daily
                 );
 
-        if (p == null) return;
+        if (pending == null) {
+            return;
+        }
 
-        am.cancel(p);
+        am.cancel(pending);
 
         if (Build.VERSION.SDK_INT >= 31
                 && am.canScheduleExactAlarms()) {
 
             am.setExactAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
-                    t,
-                    p
+                    timestamp,
+                    pending
             );
 
         } else if (Build.VERSION.SDK_INT >= 23) {
 
             am.setAndAllowWhileIdle(
                     AlarmManager.RTC_WAKEUP,
-                    t,
-                    p
+                    timestamp,
+                    pending
             );
 
         } else {
 
             am.set(
                     AlarmManager.RTC_WAKEUP,
-                    t,
-                    p
+                    timestamp,
+                    pending
             );
         }
     }
@@ -608,137 +743,24 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 );
 
         i.setAction(
-                "com.clawneon.khvataika.NOTIFY_" + id
+                "com.clawneon.khvataika.NOTIFY_"
+                        + id
         );
 
-        i.putExtra("id", id);
+        i.putExtra(
+                "id",
+                id
+        );
 
         if (title != null) {
-            i.putExtra("title", title);
+
+            i.putExtra(
+                    "title",
+                    title
+            );
         }
 
         if (message != null) {
-            i.putExtra("message", message);
-        }
 
-        i.putExtra("daily", daily);
-
-        int flags =
-                PendingIntent.FLAG_IMMUTABLE
-                        | (update
-                        ? PendingIntent.FLAG_UPDATE_CURRENT
-                        : PendingIntent.FLAG_NO_CREATE);
-
-        return PendingIntent.getBroadcast(
-                context,
-                id,
-                i,
-                flags
-        );
-    }
-
-    private static void rescheduleAll(
-            Context context
-    ) {
-
-        SharedPreferences p =
-                context.getSharedPreferences(
-                        PREFS,
-                        Context.MODE_PRIVATE
-                );
-
-        for (Map.Entry<String, ?> e :
-                p.getAll().entrySet()) {
-
-            String k = e.getKey();
-
-            if (!k.startsWith(KEY_PREFIX)
-                    || k.endsWith("title")
-                    || k.endsWith("message")
-                    || k.endsWith("daily")
-                    || k.endsWith("trigger")) {
-                continue;
-            }
-
-            try {
-
-                int id =
-                        Integer.parseInt(
-                                k.substring(
-                                        KEY_PREFIX.length()
-                                )
-                        );
-
-                long t =
-                        p.getLong(k, 0);
-
-                String title =
-                        p.getString(
-                                KEY_PREFIX + id + "title",
-                                "Хватайка"
-                        );
-
-                String msg =
-                        p.getString(
-                                KEY_PREFIX + id + "message",
-                                "Зайди в игру — тебя ждёт награда!"
-                        );
-
-                boolean daily =
-                        p.getBoolean(
-                                KEY_PREFIX + id + "daily",
-                                false
-                        );
-
-                if (daily) {
-                    while (t <= System.currentTimeMillis()) {
-                        t += 86400000L;
-                    }
-                }
-
-                if (t > System.currentTimeMillis()) {
-
-                    scheduleInternal(
-                            context,
-                            t,
-                            id,
-                            title,
-                            msg,
-                            daily
-                    );
-                }
-
-            } catch (Exception ignored) {
-            }
-        }
-    }
-
-    private static void postNotification(
-            Context context,
-            int id,
-            String title,
-            String message
-    ) {
-
-        NotificationManager m =
-                (NotificationManager)
-                        context.getSystemService(
-                                Context.NOTIFICATION_SERVICE
-                        );
-
-        if (m == null) return;
-
-        if (Build.VERSION.SDK_INT >= 26) {
-
-            NotificationChannel ch =
-                    new NotificationChannel(
-                            CHANNEL_ID,
-                            "Хватайка",
-                            NotificationManager.IMPORTANCE_DEFAULT
-                    );
-
-            ch.setDescription(
-                    "Серверные уведомления игры"
-            );
-
-            m.createNotification
+            i.putExtra(
+           
