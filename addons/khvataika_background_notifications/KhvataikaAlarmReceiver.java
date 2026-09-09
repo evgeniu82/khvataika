@@ -1091,5 +1091,4 @@ public class KhvataikaAlarmReceiver extends BroadcastReceiver {
                 builder.build()
         );
         }
-}
                                                                      }
