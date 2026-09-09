@@ -201,6 +201,12 @@ var news_unread: int = 4
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
 var server_url: String = DEFAULT_SERVER_URL
 var player_id: String = ""
+var player_token: String = ""
+var remote_action_name: String = ""
+var server_settings_dirty: bool = false
+var server_settings_sync_timer: float = 0.0
+var blocked_overlay: PanelContainer
+var news_menu_button: Button
 var remote_config: Dictionary = {}
 var remote_news_items: Array[Dictionary] = []
 var remote_leaderboard: Array[Dictionary] = []
@@ -1246,11 +1252,97 @@ func apply_server_game_state(data: Dictionary) -> void:
     return_bonus_available = bool(data.get("return_bonus_available", return_bonus_available))
     return_bonus_claimed = bool(data.get("return_bonus_claimed", return_bonus_claimed))
     last_active_unix = int(data.get("last_active_unix", last_active_unix))
+    # v2 authoritative server schema mapping. Client state is presentation only;
+    # the values below come from the server snapshot after every accepted action.
+    var inv: Variant = data.get("inventory", {})
+    if inv is Dictionary:
+        chest_keys = maxi(0, int(inv.get("chest_keys", chest_keys)))
+        engineering_parts = maxi(0, int(inv.get("parts", engineering_parts)))
+        var server_chests: Variant = inv.get("chests", {})
+        if server_chests is Dictionary:
+            for ck in chest_inventory.keys():
+                chest_inventory[ck] = maxi(0, int(server_chests.get(ck, chest_inventory.get(ck, 0))))
+        var server_toys: Variant = inv.get("toys", {})
+        if server_toys is Dictionary:
+            toy_inventory_counts = server_toys.duplicate(true)
+    var missions: Variant = data.get("missions", {})
+    if missions is Dictionary:
+        daily_mission_progress = maxi(0, int(missions.get("daily_progress", daily_mission_progress)))
+        daily_mission_claimed = bool(missions.get("daily_claimed", daily_mission_claimed))
+        weekly_mission_progress = maxi(0, int(missions.get("weekly_progress", weekly_mission_progress)))
+        weekly_mission_claimed = bool(missions.get("weekly_claimed", weekly_mission_claimed))
+        daily_mission_date = String(missions.get("daily_key", daily_mission_date))
+        weekly_mission_key = String(missions.get("weekly_key", weekly_mission_key))
+    var season_data: Variant = data.get("season", {})
+    if season_data is Dictionary:
+        season_pass_xp = maxi(0, int(season_data.get("xp", season_pass_xp)))
+        season_pass_level = clampi(int(season_data.get("level", season_pass_level)), 1, SEASON_PASS_MAX_LEVEL)
+    var server_settings: Variant = data.get("settings", {})
+    if server_settings is Dictionary:
+        if server_settings.has("language"): language = String(server_settings.get("language"))
+        if server_settings.has("quality_level"): quality_level = clampi(int(server_settings.get("quality_level")), 0, 4)
+        if server_settings.has("fps_limit"): fps_limit = maxi(30, int(server_settings.get("fps_limit")))
+        if server_settings.has("notifications_on"): notifications_on = bool(server_settings.get("notifications_on"))
+    if data.has("owned_items") and data["owned_items"] is Array:
+        var owned_server: Array = data.get("owned_items")
+        for i in range(owned_claws.size()): owned_claws[i] = owned_server.has("claw_%d" % (i + 1))
+    if data.has("selected_claw"): selected_claw = clampi(int(data.get("selected_claw", selected_claw)), 0, claw_specs.size()-1)
+    if data.has("upgrade_levels") and data["upgrade_levels"] is Array:
+        upgrade_levels = data.get("upgrade_levels").duplicate()
+    if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
+    if data.has("referral_used"): referral_used = bool(data.get("referral_used", referral_used))
     update_ui()
     refresh_chests_panel()
     refresh_workshop_panel()
     refresh_live_systems_panel()
     save_game()
+
+func show_server_blocked(reason: String = "") -> void:
+    if blocked_overlay and is_instance_valid(blocked_overlay):
+        blocked_overlay.visible = true
+        return
+    blocked_overlay = PanelContainer.new()
+    blocked_overlay.name = "ServerBlockedOverlay"
+    blocked_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    blocked_overlay.z_index = 10000
+    style_panel(blocked_overlay, Color("#140B0B"), Color("#A53A3A"), 0, 0)
+    var box := VBoxContainer.new()
+    box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+    box.custom_minimum_size = Vector2(860, 520)
+    box.alignment = BoxContainer.ALIGNMENT_CENTER
+    blocked_overlay.add_child(box)
+    var title := Label.new(); title.text = "🔒  АККАУНТ ЗАБЛОКИРОВАН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 38); box.add_child(title)
+    var msg := Label.new(); msg.text = "Доступ к игре ограничен сервером.
+" + (reason if reason != "" else ""); msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; msg.add_theme_font_size_override("font_size", 24); box.add_child(msg)
+    var contact := Label.new(); contact.text = "Для разблокировки напишите на:
+evgeniu.tsepaev19@gmail.com"; contact.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; contact.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; contact.add_theme_font_size_override("font_size", 22); box.add_child(contact)
+    if hud_layer:
+        hud_layer.add_child(blocked_overlay)
+        hud_layer.visible = true
+    else:
+        menu_layer.add_child(blocked_overlay)
+    set_main_menu_controls(false)
+
+func _remote_headers() -> PackedStringArray:
+    var h := PackedStringArray(["Content-Type: application/json"])
+    if player_token != "":
+        h.append("Authorization: Bearer " + player_token)
+    return h
+
+func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
+    if not _server_ready() or player_token == "" or remote_request_kind != "":
+        return false
+    var data := payload.duplicate(true)
+    data["type"] = action_name
+    data["action_id"] = "%s_%s_%s" % [action_name, player_id, str(Time.get_ticks_msec())]
+    remote_action_name = action_name
+    remote_request_kind = "action:" + action_name
+    var err := remote_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(data))
+    if err != OK:
+        remote_request_kind = ""
+        remote_action_name = ""
+        return false
+    return true
 
 func register_device_remote() -> void:
     if not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
@@ -1281,7 +1373,7 @@ func register_player_remote() -> void:
         return
     remote_request_kind = "register"
     var payload := {"player_id": player_id, "name": player_name}
-    var headers := PackedStringArray(["Content-Type: application/json"])
+    var headers := _remote_headers()
     var err := remote_http.request(_normalized_server_url() + "/api/player/register", headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
     if err != OK:
         remote_request_kind = ""
@@ -1309,6 +1401,7 @@ func sync_player_to_server() -> void:
         return
     var payload := {
         "player_id": player_id,
+            "player_token": player_token,
         "name": player_name,
         "score": int(get_player_online_score()),
         "level": player_level,
@@ -1321,7 +1414,7 @@ func sync_player_to_server() -> void:
         "game_state": get_server_game_state()
     }
     remote_request_kind = "sync"
-    var headers := PackedStringArray(["Content-Type: application/json"])
+    var headers := _remote_headers()
     var err := remote_http.request(_normalized_server_url() + "/api/player/sync", headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
     if err != OK:
         remote_request_kind = ""
@@ -1339,7 +1432,7 @@ func request_global_rating() -> void:
         remote_sync_status = "ОШИБКА РЕЙТИНГА"
 
 func apply_referral_remote(code: String) -> void:
-    if not _server_ready():
+    if not _server_ready() or player_token == "":
         referral_status_label.text = "Сервер недоступен. Попробуйте позже."
         return
     if remote_request_kind != "":
@@ -1347,25 +1440,26 @@ func apply_referral_remote(code: String) -> void:
         remote_sync_pending = true
         return
     remote_pending_referral = code.strip_edges().to_upper()
-    remote_request_kind = "referral"
-    var headers := PackedStringArray(["Content-Type: application/json"])
-    var payload := {"player_id": player_id, "name": player_name, "referral_code": remote_pending_referral}
-    var err := remote_http.request(_normalized_server_url() + "/api/referral/apply", headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+    remote_request_kind = "action:referral_apply"
+    var payload := {"type":"referral_apply", "action_id":"ref_%s_%s" % [player_id, str(Time.get_ticks_msec())], "referral_code":remote_pending_referral}
+    var err := remote_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(payload))
     if err != OK:
         remote_request_kind = ""
         referral_status_label.text = "Сервер недоступен. Попробуйте позже."
 
 func redeem_promo_code_remote(code: String) -> void:
-    if remote_promo_request_active or not _server_ready():
+    if remote_promo_request_active or not _server_ready() or player_token == "":
+        return
+    if remote_request_kind != "":
         return
     remote_promo_request_active = true
     remote_pending_promo = code.strip_edges().to_upper()
-    remote_request_kind = "promo"
-    var headers := PackedStringArray(["Content-Type: application/json"])
-    var payload := {"player_id": player_id, "name": player_name, "code": remote_pending_promo}
-    var err := remote_http.request(_normalized_server_url() + "/api/promo/redeem", headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
+    remote_request_kind = "action:promo_redeem"
+    var payload := {"type":"promo_redeem", "action_id":"promo_%s_%s" % [player_id, str(Time.get_ticks_msec())], "code":remote_pending_promo}
+    var err := remote_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(payload))
     if err != OK:
         remote_promo_request_active = false
+        remote_request_kind = ""
         promo_status = "СЕРВЕР НЕДОСТУПЕН"
         refresh_promo_panel()
 
@@ -1394,7 +1488,7 @@ func _apply_remote_config(config: Dictionary) -> void:
                 remote_news_items.append(item)
         if not remote_news_items.is_empty():
             news_items = remote_news_items.duplicate(true)
-            news_unread = remote_news_items.size()
+            news_unread = maxi(0, int(config.get("unread_news", remote_news_items.size())))
     var event: Variant = config.get("active_event", {})
     if event is Dictionary and not event.is_empty():
         active_event_id = String(event.get("id", active_event_id))
@@ -1414,49 +1508,44 @@ func _apply_remote_config(config: Dictionary) -> void:
 func _on_remote_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
     var kind := remote_request_kind
     remote_request_kind = ""
-    if kind == "promo":
-        remote_promo_request_active = false
-    if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300:
-        if kind == "promo":
-            promo_status = "Промокод не принят • сервер недоступен"
-            refresh_promo_panel()
+    if data.has("token") and String(data.get("token", "")) != "":
+        player_token = String(data.get("token"))
+        save_game()
+    if kind.begins_with("action:"):
+        remote_action_name = ""
+        if kind == "action:settings_update": server_settings_dirty = false
+        if kind == "action:promo_redeem": remote_promo_request_active = false
+        if bool(data.get("ok", false)) and data.has("game_state") and data["game_state"] is Dictionary:
+            apply_server_game_state(data["game_state"])
+        if not bool(data.get("ok", false)):
+            current_result = String(data.get("message", "Сервер отклонил действие"))
         else:
-            remote_sync_retry_count += 1
-            remote_sync_status = "СЕРВЕР НЕДОСТУПЕН • ПОВТОР %d" % remote_sync_retry_count
-            remote_sync_timer = 3.0
-        return
-    var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
-    if not parsed is Dictionary:
-        remote_sync_retry_count += 1
-        remote_sync_status = "ОШИБКА ДАННЫХ СЕРВЕРА • ПОВТОР %d" % remote_sync_retry_count
-        remote_sync_timer = 3.0
-        return
-    var data: Dictionary = parsed
-    if kind == "promo":
-        if bool(data.get("ok", false)):
-            var reward := int(data.get("reward", 0))
-            coins += maxi(0, reward)
-            promo_codes_used[remote_pending_promo] = true
-            promo_status = "Промокод принят • +%d ₽" % reward
-            current_result = "🎟 ПРОМОКОД • +%d ₽" % reward
-            save_game()
+            match kind:
+                "action:game_start": current_result = "КЛЕШНЬ ГОТОВА К ПОПЫТКЕ"
+                "action:game_finish":
+                    var sr: Dictionary = data.get("prize", {}) if data.get("prize", null) is Dictionary else {}
+                    if bool(data.get("success", false)) and not sr.is_empty():
+                        last_prize_name = String(sr.get("name", last_prize_name))
+                        last_prize_rarity = String(sr.get("rarity", last_prize_rarity))
+                        last_reward_rubles = int((data.get("reward", {}) as Dictionary).get("amount", last_reward_rubles)) if data.get("reward", null) is Dictionary else last_reward_rubles
+                "action:promo_redeem":
+                    promo_status = "Промокод успешно активирован"
+                    refresh_promo_panel()
+                "action:referral_apply":
+                    referral_status_label.text = "Реферальный бонус зачислен сервером"
+                    refresh_referral_panel()
+                "action:shop_buy":
+                    var bought: Variant = data.get("item", {})
+                    if bought is Dictionary and String(bought.get("category", "")) == "claws":
+                        selected_claw = clampi(int((bought.get("effect", {}) as Dictionary).get("claw_index", selected_claw)), 0, claw_specs.size()-1)
+                    current_result = "ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
+                "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
+                "action:claim_daily", "action:claim_daily_mission", "action:claim_weekly_mission": current_result = "НАГРАДА ЗАЧИСЛЕНА СЕРВЕРОМ"
+                "action:settings_update":
+                    apply_quality_settings()
+                    apply_language()
+                    update_quality_info()
             update_ui()
-        else:
-            promo_status = String(data.get("message", "Промокод не принят"))
-        refresh_promo_panel()
-        return
-    if kind == "referral":
-        if bool(data.get("ok", false)):
-            referral_used = true
-            var reward := int(data.get("reward", referral_welcome_reward))
-            coins += maxi(0, reward)
-            referral_status_label.text = "Подарок получен: +%d ₽. Другу начислена награда." % reward
-            current_result = "🎁 РЕФЕРАЛ • +%d ₽" % reward
-            save_game()
-            update_ui()
-        else:
-            referral_status_label.text = String(data.get("message", "Реферальный код не принят"))
-        refresh_referral_panel()
         return
     if data.has("game_state") and data["game_state"] is Dictionary:
         apply_server_game_state(data["game_state"])
@@ -1788,8 +1877,14 @@ func refresh_news_panel(panel: PanelContainer = null) -> void:
         var cv:=VBoxContainer.new(); cv.add_theme_constant_override("separation",5); card.add_child(cv)
         var title:=Label.new(); title.text="%s  •  %s" % [String(item.get("date","")),String(item.get("title",""))]; title.add_theme_font_size_override("font_size",21); title.modulate=Color("#E1C29A"); cv.add_child(title)
         var body:=Label.new(); body.text=String(item.get("text","")); body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; body.add_theme_font_size_override("font_size",17); body.modulate=Color("#D8C3AA"); cv.add_child(body)
+        var read_button:=Button.new(); read_button.text="ПРОЧИТАНО"; read_button.custom_minimum_size=Vector2(0,48); style_button(read_button,Color("#76583F")); var news_id:=String(item.get("id","")); read_button.pressed.connect(func():
+            if _server_ready() and player_token != "":
+                _server_action("news_read", {"news_id":news_id})
+            news_unread = maxi(0, news_unread - 1)
+            read_button.disabled = true
+        ); cv.add_child(read_button)
         list.add_child(card)
-    news_unread=0
+    # Индикатор снимается только после серверного подтверждения прочтения.
 
 func build_rating_panel() -> PanelContainer:
     var p:=build_info_menu_panel("RatingPanel",Vector2(970,900))
@@ -3274,8 +3369,8 @@ func build_ui() -> void:
     rating.pressed.connect(func(): open_panel("rating"))
     menu_layer.add_child(rating); main_menu_controls.append(rating); decorate_main_menu_button(rating)
 
-    var news := make_menu_button("📰  НОВОСТИ", Vector2(left_x, y4), Vector2(col_w, row_h), Color("#76583F"))
-    news.pressed.connect(func(): open_panel("news"))
+    news_menu_button = make_menu_button("📰  НОВОСТИ", Vector2(left_x, y4), Vector2(col_w, row_h), Color("#76583F"))
+    news_menu_button.pressed.connect(func(): open_panel("news"))
     menu_layer.add_child(news); main_menu_controls.append(news); decorate_main_menu_button(news)
 
     var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#5E554D"))
@@ -3501,6 +3596,9 @@ func _on_android_back_pressed() -> void:
     update_android_navigation()
 
 func _unhandled_input(event: InputEvent) -> void:
+    if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
+        get_viewport().set_input_as_handled()
+        return
     # Свободное касание/клик по игровому полю закрывает открытое боковое окно.
     # Кнопки интерфейса обрабатываются раньше и сюда не попадают.
     if event is InputEventScreenTouch and event.pressed:
@@ -4780,6 +4878,16 @@ func award_chest_for_win(rarity: String) -> void:
 
 func open_chest(kind: String) -> void:
     if chest_opening: return
+    if _server_ready() and player_token != "":
+        if _server_action("chest_open", {"kind":kind}):
+            chest_opening = true
+            chest_last_reward = "🔒 СУНДУК ОТКРЫВАЕТСЯ НА СЕРВЕРЕ…"
+            refresh_chests_panel()
+            get_tree().create_timer(0.8).timeout.connect(func():
+                chest_opening = false
+                refresh_chests_panel()
+                update_ui())
+            return
     var amount := int(chest_inventory.get(kind, 0))
     var key_cost := int(chest_key_costs.get(kind, 1))
     if amount <= 0:
@@ -6566,6 +6674,8 @@ func update_ui() -> void:
             active_note = "\n⚡  %s" % active_event_name
         machine_status_label.text = "🧸  ПРИЗЫ: %d\n🍀  ИГРУШКА ДНЯ: %s ×3\n🔥  СЕРИЯ ПОБЕД: %d\n📦  ПАРТИЯ: %s%s" % [prize_bodies.size(), lucky_name, current_win_streak, batch_type, active_note]
     update_missions()
+    if news_menu_button and is_instance_valid(news_menu_button):
+        news_menu_button.text = "📰  НОВОСТИ  !" if news_unread > 0 else "📰  НОВОСТИ"
 
 func _process(delta: float) -> void:
     time_alive += delta
@@ -6575,6 +6685,12 @@ func _process(delta: float) -> void:
             if notification_pending_test:
                 notification_pending_test = false
                 _send_pending_test_notification()
+    server_settings_sync_timer -= delta
+    if server_settings_dirty and server_settings_sync_timer <= 0.0 and _server_ready() and player_token != "" and remote_request_kind == "":
+        var settings_payload := {"music":music_on,"sfx":sfx_on,"sfx_volume_db":sfx_volume_db,"music_volume_db":music_volume_db,"vibration_on":vibration_on,"energy_saving_on":energy_saving_on,"confirm_purchases_on":confirm_purchases_on,"confirm_rare_chests_on":confirm_rare_chests_on,"fps_limit":fps_limit,"joystick_sensitivity":joystick_sensitivity,"grab_button_scale":grab_button_scale,"auto_tips_on":auto_tips_on,"notifications_on":notifications_on,"notify_rewards_on":notify_rewards_on,"notify_streak_on":notify_streak_on,"notify_events_on":notify_events_on,"notify_workshop_on":notify_workshop_on,"notify_chests_on":notify_chests_on,"quality_level":quality_level,"language":language}
+        if _server_action("settings_update", {"settings":settings_payload}):
+            server_settings_dirty = false
+            server_settings_sync_timer = 30.0
     remote_sync_timer -= delta
     if remote_sync_timer <= 0.0 and _server_ready():
         remote_sync_timer = 10.0
@@ -6750,6 +6866,8 @@ func process_claw(delta: float) -> void:
             if grabbed:
                 drop_state = 3
             else:
+                if _server_ready() and player_token != "":
+                    _server_action("game_finish")
                 # Если клешня ничего не взяла, никаких лишних движений к отверстию:
                 # сразу плавно возвращаем её в верхнюю парковочную точку над отверстием.
                 grabbed_toy = null
@@ -6771,6 +6889,8 @@ func process_claw(delta: float) -> void:
             # Иногда игрушка соскальзывает после подъёма. В этом случае она
             # остаётся обычным призом и НЕ засчитывается игроку.
             if grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
+                if _server_ready() and player_token != "":
+                    _server_action("game_finish")
                 grabbed_toy.freeze = false
                 grabbed_toy.sleeping = false
                 grabbed_toy.linear_velocity = Vector3(randf_range(-0.4, 0.4), -1.6, randf_range(-0.4, 0.4))
@@ -6912,6 +7032,8 @@ func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
     play_upgrade_sound("grab")
     register_game_activity()
+    if _server_ready() and player_token != "":
+        _server_action("game_start")
     total_games += 1
     if vibration_on:
         Input.vibrate_handheld(55, 0.35)
@@ -6973,6 +7095,8 @@ func resolve_grab() -> bool:
     return true
 
 func finalize_delivered_prize() -> void:
+    if _server_ready() and player_token != "":
+        _server_action("game_finish")
     if pending_prize_data.is_empty():
         return
     var d: Dictionary = pending_prize_data
@@ -7271,6 +7395,17 @@ func rarity_reward(rarity: String) -> int:
     return 5
 
 func buy_claw(index: int) -> void:
+    if index >= 0 and index < owned_claws.size() and owned_claws[index]:
+        selected_claw = index
+        current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
+        save_game()
+        update_ui()
+        return
+    if _server_ready() and player_token != "":
+        if _server_action("shop_buy", {"item_id":"claw_%d" % (index + 1)}):
+            current_result = "Покупка проверяется сервером…"
+            update_ui()
+            return
     var price := int(claw_specs[index]["price"])
     if owned_claws[index]:
         selected_claw = index
@@ -7287,6 +7422,11 @@ func buy_claw(index: int) -> void:
     update_ui()
 
 func buy_upgrade(index: int) -> void:
+    if _server_ready() and player_token != "":
+        if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
+            current_result = "Улучшение проверяется сервером…"
+            update_ui()
+            return
     if index < 0 or index >= upgrade_specs.size():
         return
     var level: int = upgrade_levels[index]
@@ -7532,6 +7672,9 @@ func show_waiting_screen() -> void:
     waiting_tip_label.text = tips[int(time_alive / 12.0) % tips.size()]
 
 func complete_daily_mission_if_ready() -> void:
+    if _server_ready() and player_token != "" and daily_mission_progress >= daily_mission_target and not daily_mission_claimed:
+        if _server_action("claim_daily_mission"):
+            return
     if daily_mission_progress >= daily_mission_target and not daily_mission_claimed:
         coins += server_reward_amount(daily_mission_reward)
         daily_mission_progress = daily_mission_target
@@ -7541,6 +7684,9 @@ func complete_daily_mission_if_ready() -> void:
         notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +50 ₽ уже получена!")
 
 func complete_weekly_mission_if_ready() -> void:
+    if _server_ready() and player_token != "" and weekly_mission_progress >= weekly_mission_target and not weekly_mission_claimed:
+        if _server_action("claim_weekly_mission"):
+            return
     if weekly_mission_progress >= weekly_mission_target and not weekly_mission_claimed:
         coins += server_reward_amount(weekly_mission_reward)
         weekly_mission_progress = weekly_mission_target
@@ -7550,6 +7696,9 @@ func complete_weekly_mission_if_ready() -> void:
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
 
 func claim_daily_bonus() -> void:
+    if _server_ready() and player_token != "":
+        if _server_action("claim_daily"):
+            return
     # Награда выдаётся только один раз в календарный день.
     var today: String = Time.get_date_string_from_system()
     if last_daily_bonus_date == today:
@@ -7611,6 +7760,7 @@ func refresh_upgrade_dashboard() -> void:
         menu_notice_count = int((daily_mission_target - daily_mission_progress) > 0) + int((weekly_mission_target - weekly_mission_progress) > 0) + int(chest_keys > 0)
 
 func save_game() -> void:
+    server_settings_dirty = true
     var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
     if f:
         f.store_string(JSON.stringify({
@@ -7650,6 +7800,7 @@ func save_game() -> void:
             "language": language,
             "server_url": server_url,
             "player_id": player_id,
+            "player_token": player_token,
             "bonus_keys": bonus_keys,
             "engineering_parts": engineering_parts,
             "claw": selected_claw,
@@ -7742,6 +7893,7 @@ func load_save() -> void:
     f.close()
     if typeof(parsed) != TYPE_DICTIONARY: return
     var data: Dictionary = parsed
+    player_token = String(data.get("player_token", player_token))
     player_name = String(data.get("player_name", "ИГРОК")).strip_edges()
     if player_name == "":
         player_name = "ИГРОК"
