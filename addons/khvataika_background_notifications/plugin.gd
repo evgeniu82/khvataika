@@ -4,6 +4,7 @@ extends EditorPlugin
 const JAVA_RELATIVE := "app/src/main/java/com/clawneon/khvataika/KhvataikaAlarmReceiver.java"
 const MANIFEST_RELATIVE := "app/src/main/AndroidManifest.xml"
 const JAVA_TEMPLATE := "res://addons/khvataika_background_notifications/KhvataikaAlarmReceiver.java"
+const NOTIFICATION_THUMBNAIL := "res://addons/khvataika_background_notifications/notification_thumbnail.png"
 
 func _enter_tree() -> void:
     set_process(true)
@@ -20,6 +21,14 @@ func _patch_android_template() -> bool:
     if not FileAccess.file_exists(manifest_path):
         return false
     var source := FileAccess.get_file_as_string(JAVA_TEMPLATE)
+    var res_dir := root.path_join("app/src/main/res/drawable")
+    DirAccess.make_dir_recursive_absolute(res_dir)
+    if FileAccess.file_exists(NOTIFICATION_THUMBNAIL):
+        var thumb := FileAccess.get_file_as_bytes(NOTIFICATION_THUMBNAIL)
+        var thumb_file := FileAccess.open(res_dir.path_join("khvataika_notification.png"), FileAccess.WRITE)
+        if thumb_file:
+            thumb_file.store_buffer(thumb)
+            thumb_file.close()
     var java_dir := java_path.get_base_dir()
     DirAccess.make_dir_recursive_absolute(java_dir)
     var java_file := FileAccess.open(java_path, FileAccess.WRITE)
