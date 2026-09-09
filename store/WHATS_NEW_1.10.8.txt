@@ -1,0 +1,4 @@
+Хватайка v1.10.8
+- Restored the Android system boot splash miniature image.
+- Custom loading-screen miniature reduced substantially and centered.
+- Loading text, progress bar, percentage and tips remain unobstructed.

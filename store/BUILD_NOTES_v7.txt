@@ -1,0 +1,10 @@
+Хватайка v1.12.1 notifications fix v7
+
+- Включён Gradle Android export для APK и RuStore AAB.
+- Включён editor-плагин background notifications.
+- Java BroadcastReceiver теперь реально подключается из main.gd вместо отключённого заглушечного пути.
+- Фоновые уведомления планируются через Android AlarmManager и могут сработать после закрытия приложения.
+- Иконка фонового уведомления использует гарантированно существующий Android drawable.
+- RECEIVE_BOOT_COMPLETED и POST_NOTIFICATIONS остаются включены.
+
+GitHub Actions also installs android_source.zip into android/build and opens the project headlessly so the enabled editor plugin patches the Gradle manifest and Java receiver before the AAB export.

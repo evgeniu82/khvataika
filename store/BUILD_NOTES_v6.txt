@@ -1,0 +1,6 @@
+Хватайка v1.12.1 v6
+
+APK preset is configured to use Godot's prebuilt Android export template (Gradle disabled) so Android editor/GABE directory-access and stale build-lock errors do not block APK export.
+POST_NOTIFICATIONS is enabled in the Android APK and RuStore AAB presets.
+The optional custom background Java receiver/editor plugin is disabled for the stable APK build. Foreground/test notifications use Godot AndroidRuntime + Android NotificationManager.
+The project build/cache directory is intentionally excluded from this archive.

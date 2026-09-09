@@ -1,0 +1,3 @@
+v1.10.6
+- Loading screen miniature reduced to 10x10 and centered.
+- Text, loading bar and percentage remain separated from the miniature for a clean Android layout.
