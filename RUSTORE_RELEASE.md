@@ -2,15 +2,15 @@
 
 ## Готово в проекте
 - Название: **Хватайка**
-- Версия: **1.2.0**
-- Version code: **1**
+- Версия: **1.13.6**
+- Version code: **13**
 - Package ID: **com.clawneon.khvataika**
 - Android preset: **Android RuStore AAB**
 - Формат сборки: **AAB**
 - Архитектура: **ARM64**
 - Ориентация: **портретная**
 - Иконка RuStore: `store/icon_512.png` (512×512 PNG)
-- Разрешения Android в пресете не запрашиваются.
+- Разрешения Android: `INTERNET`, `RECEIVE_BOOT_COMPLETED`, `SCHEDULE_EXACT_ALARM`, `POST_NOTIFICATIONS`.
 
 ## Короткое описание (до 80 символов)
 Кран-автомат с игрушками, коллекциями, сундуками и мастерской.
@@ -44,8 +44,8 @@
 
 ## Что ещё нужно сделать вручную
 1. Установить Android SDK/JDK и Android export templates для Godot 4.7.2.
-2. Создать собственный **release keystore** и не передавать его третьим лицам.
-3. В Godot открыть Project → Export → Android RuStore AAB и указать release keystore, alias и пароль.
+2. Использовать **тот же release keystore**, который уже привязан к опубликованному приложению. Если приложение ещё не публиковалось — создать release keystore и сохранить его в безопасном месте.
+3. Для GitHub Actions передать тот же release keystore через Secrets: `RUSTORE_KEYSTORE_B64`, `RUSTORE_KEYSTORE_PASSWORD`, `RUSTORE_KEY_ALIAS`.
 4. Экспортировать **Release AAB**, без Debug.
 5. Установить полученный AAB/тестовую сборку на Android и проверить запуск, сохранения, ориентацию, звук и отсутствие вылетов.
 6. Сделать минимум 3 реальные скриншота телефона для карточки RuStore. Не использовать макеты вместо скриншотов игры.
@@ -53,4 +53,4 @@
 8. Загрузить AAB и отправить версию на модерацию.
 
 ## Важно о подписи
-Файл `export_presets.cfg` подготовлен под release AAB, но данные вашего keystore намеренно не записаны. Это нужно сделать на вашем компьютере, чтобы ключ подписи не оказался внутри проекта/архива.
+Файл `export_presets.cfg` и GitHub Actions подготовлены под release AAB. Приватный keystore намеренно не входит в ZIP: подпись выполняется тем же постоянным ключом через GitHub Secrets.

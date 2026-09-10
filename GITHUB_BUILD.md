@@ -13,7 +13,7 @@
    - `RUSTORE_KEYSTORE_PASSWORD` — пароль keystore.
    - `RUSTORE_KEY_ALIAS` — alias ключа.
 5. Открыть **Actions → Build Khvataika for RuStore → Run workflow**.
-6. После успешной сборки открыть результат workflow и скачать artifact `khvataika-rustore-1.2.0-aab`.
+6. После успешной сборки открыть результат workflow и скачать artifact `khvataika-1.13.6-rustore-aab`.
 
 ## Важно про ключ подписи
 
