@@ -217,6 +217,7 @@ var remote_notification_timer: float = 12.0
 var remote_notification_cursor: int = 0
 var remote_device_registered: bool = false
 var remote_sync_retry_count: int = 0
+var remote_auth_retry_timer: float = 2.0
 var remote_http: HTTPRequest
 var remote_request_kind: String = ""
 var remote_sync_pending: bool = false
@@ -1447,9 +1448,10 @@ func poll_server_notifications() -> void:
         return
     remote_request_kind = "notifications"
     var url := _normalized_server_url() + "/api/notifications/poll?player_id=" + player_id.uri_encode() + "&cursor=" + str(remote_notification_cursor)
-    var err := remote_http.request(url)
+    var err := remote_http.request(url, _remote_headers())
     if err != OK:
         remote_request_kind = ""
+        remote_sync_status = "ОШИБКА УВЕДОМЛЕНИЙ"
 
 func register_player_remote() -> void:
     if not _server_ready():
@@ -1668,10 +1670,65 @@ func _apply_remote_config(config: Dictionary) -> void:
 func _on_remote_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
     var kind := remote_request_kind
     remote_request_kind = ""
+    var body_text := body.get_string_from_utf8().strip_edges()
     var data: Dictionary = {}
-    var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
-    if parsed is Dictionary:
-        data = parsed
+
+    # Never try to parse a transport error, empty body or HTML error page as JSON.
+    # This prevents the recurring "Parse JSON failed" noise and, more importantly,
+    # keeps the game state machine alive when the server is temporarily unavailable.
+    if result != HTTPRequest.RESULT_SUCCESS:
+        remote_sync_retry_count = mini(remote_sync_retry_count + 1, 10)
+        remote_sync_status = "СЕРВЕР НЕДОСТУПЕН • ПОВТОРНОЕ ПОДКЛЮЧЕНИЕ"
+        if kind.begins_with("action:"):
+            remote_action_name = ""
+            if kind == "action:promo_redeem":
+                remote_promo_request_active = false
+            current_result = "Сервер временно недоступен. Повторяем подключение…"
+            update_ui()
+        return
+
+    if response_code < 200 or response_code >= 300:
+        if response_code == 401 and kind != "register":
+            # Session expired/server restarted: obtain a fresh player token automatically.
+            player_token = ""
+            remote_device_registered = false
+            remote_sync_retry_count = 0
+            remote_sync_status = "СЕАНС ИГРОКА ИСТЁК • ПЕРЕПОДКЛЮЧЕНИЕ"
+            if kind.begins_with("action:"):
+                remote_action_name = ""
+                if kind == "action:promo_redeem":
+                    remote_promo_request_active = false
+                current_result = "Переподключаемся к серверу…"
+            remote_auth_retry_timer = 0.5
+            call_deferred("register_player_remote")
+            update_ui()
+            return
+        remote_sync_retry_count = mini(remote_sync_retry_count + 1, 10)
+        remote_sync_status = "ОШИБКА СЕРВЕРА • HTTP %d" % response_code
+        if kind.begins_with("action:"):
+            remote_action_name = ""
+            if kind == "action:promo_redeem":
+                remote_promo_request_active = false
+            current_result = "Сервер отклонил запрос (HTTP %d)" % response_code
+            update_ui()
+        return
+
+    if body_text != "":
+        var parsed: Variant = JSON.parse_string(body_text)
+        if parsed is Dictionary:
+            data = parsed
+        else:
+            remote_sync_status = "ОШИБКА ФОРМАТА ОТВЕТА СЕРВЕРА"
+            if kind.begins_with("action:"):
+                remote_action_name = ""
+                if kind == "action:promo_redeem":
+                    remote_promo_request_active = false
+                current_result = "Сервер вернул некорректный ответ"
+                update_ui()
+            return
+    else:
+        remote_sync_status = "ПУСТОЙ ОТВЕТ СЕРВЕРА"
+        return
     if data.has("token") and String(data.get("token", "")) != "":
         player_token = String(data.get("token"))
         save_game()
@@ -1760,6 +1817,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
     if kind == "register" or kind == "sync" or kind == "config" or kind == "rating":
         remote_sync_status = "АККАУНТ ЗАРЕГИСТРИРОВАН • СЕРВЕР ПОДКЛЮЧЕН"
         remote_sync_retry_count = 0
+        remote_auth_retry_timer = 10.0
     if kind == "register":
         remote_sync_pending = false
         call_deferred("sync_remote_config")
@@ -7247,8 +7305,13 @@ func _process(delta: float) -> void:
         if _server_action("settings_update", {"settings":settings_payload}):
             server_settings_dirty = false
             server_settings_sync_timer = 30.0
+    remote_auth_retry_timer -= delta
+    if _server_ready() and player_token == "" and remote_request_kind == "":
+        if remote_auth_retry_timer <= 0.0:
+            remote_auth_retry_timer = 10.0
+            register_player_remote()
     remote_sync_timer -= delta
-    if remote_sync_timer <= 0.0 and _server_ready():
+    if remote_sync_timer <= 0.0 and _server_ready() and player_token != "":
         remote_sync_timer = 10.0
         sync_player_to_server()
     remote_notification_timer -= delta
