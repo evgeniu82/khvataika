@@ -688,7 +688,13 @@ func _achievement_exists(id: String) -> bool:
     return false
 
 func _ready() -> void:
+    # Показываем собственный загрузочный экран как можно раньше.
+    # Раньше перед ним выполнялись локальная инициализация и чтение сохранения,
+    # из-за чего на Android мог появляться серый кадр между boot splash и игрой.
     randomize()
+    create_loading_screen()
+    await get_tree().process_frame
+
     add_extended_collections()
     add_progressive_achievements()
     add_diverse_achievements()
@@ -712,10 +718,10 @@ func _ready() -> void:
         if not get_tree().is_connected("on_request_permissions_result", permission_callable):
             get_tree().connect("on_request_permissions_result", permission_callable)
     update_return_bonus_state()
+    # Сеть и Android-уведомления никогда не должны быть частью первого кадра.
     call_deferred("setup_android_notifications")
     call_deferred("register_player_remote")
     call_deferred("sync_remote_config")
-    create_loading_screen()
     call_deferred("initialize_game_async")
     call_deferred("build_upgrade_sound_system")
 
@@ -2305,7 +2311,7 @@ func create_loading_screen() -> void:
     loading_screen.add_child(footer)
 
     var version := Label.new()
-    version.text = "MOBILE EDITION  •  v1.11.0"
+    version.text = "MOBILE EDITION  •  v1.13.6"
     version.position = Vector2(70, 1795)
     version.size = Vector2(940, 38)
     version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2323,6 +2329,8 @@ func set_loading_progress(value: float, text: String) -> void:
     await get_tree().process_frame
 
 func initialize_game_async() -> void:
+    # Гарантируем, что загрузочный экран уже отрисован до тяжёлой 3D-сборки.
+    await get_tree().process_frame
     await set_loading_progress(5.0, "ПОДГОТОВКА ПРОФИЛЯ...")
     ensure_referral_code()
     process_incoming_referral()
