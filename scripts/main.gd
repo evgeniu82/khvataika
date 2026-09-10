@@ -279,11 +279,13 @@ var loading_screen: Control
 var startup_splash: CanvasLayer
 var loading_progress: ProgressBar
 var loading_status: Label
+var loading_stage: Label
 var loading_percent: Label
 var loading_tip: Label
 var loading_ring: Panel
 var loading_elapsed: float = 0.0
 var loading_tip_index: int = 0
+var loading_step_index: int = 0
 var game_initialized: bool = false
 var scene_lights: Array[Light3D] = []
 var reflection_probe: ReflectionProbe
@@ -303,6 +305,7 @@ var xp_label: Label
 var xp_bar: ProgressBar
 var menu_layer: Control
 var hud_layer: Control
+var gameplay_modal_blocker: Control
 var shop_panel: PanelContainer
 var shop_content: VBoxContainer
 var shop_category: String = "upgrades"
@@ -732,12 +735,10 @@ func _ready() -> void:
     call_deferred("build_upgrade_sound_system")
 
 func _is_android_runtime_available() -> bool:
-    # The Godot editor can itself run on Android, but custom game Java classes
-    # are only available in the exported APK. Never probe them from the editor.
-    return not Engine.is_editor_hint() and OS.has_feature("android") and Engine.has_singleton("AndroidRuntime")
+    return OS.has_feature("android") and not Engine.is_editor_hint() and Engine.has_singleton("AndroidRuntime")
 
 func _get_background_notification_receiver() -> Variant:
-    if Engine.is_editor_hint() or not _is_android_runtime_available():
+    if not _is_android_runtime_available():
         return null
     # The Java receiver is compiled into the Gradle Android template by the
     # editor plugin. Return its JavaClass so static schedule/cancel/postNow
@@ -839,7 +840,7 @@ func test_game_notification() -> void:
 
 
 func setup_android_notifications() -> void:
-    if Engine.is_editor_hint() or not OS.has_feature("android"):
+    if not OS.has_feature("android"):
         return
     _ensure_android_notification_channel()
     if not _android_notification_permission_granted():
@@ -1197,7 +1198,8 @@ func get_server_game_state() -> Dictionary:
         "referral_code": referral_code, "referral_used": referral_used
     }
 
-func _to_bool_array(value: Variant, fallback: Array[bool]) -> Array[bool]:
+
+func _bool_array_from_variant(value: Variant, fallback: Array[bool]) -> Array[bool]:
     if value is Array:
         var result: Array[bool] = []
         for item in value:
@@ -1205,7 +1207,7 @@ func _to_bool_array(value: Variant, fallback: Array[bool]) -> Array[bool]:
         return result
     return fallback.duplicate()
 
-func _to_int_array(value: Variant, fallback: Array[int]) -> Array[int]:
+func _int_array_from_variant(value: Variant, fallback: Array[int]) -> Array[int]:
     if value is Array:
         var result: Array[int] = []
         for item in value:
@@ -1285,18 +1287,18 @@ func apply_server_game_state(data: Dictionary) -> void:
     season_pass_level = clampi(int(data.get("season_pass_level", season_pass_level)), 1, SEASON_PASS_MAX_LEVEL)
     active_season_id = String(data.get("active_season_id", active_season_id))
     var arr: Variant = data.get("owned_claws", owned_claws)
-    owned_claws = _to_bool_array(arr, owned_claws)
+    owned_claws = _bool_array_from_variant(arr, owned_claws)
     arr = data.get("owned_claw_skins", owned_claw_skins)
-    owned_claw_skins = _to_bool_array(arr, owned_claw_skins)
+    owned_claw_skins = _bool_array_from_variant(arr, owned_claw_skins)
     arr = data.get("owned_toy_skins", owned_toy_skins)
-    owned_toy_skins = _to_bool_array(arr, owned_toy_skins)
+    owned_toy_skins = _bool_array_from_variant(arr, owned_toy_skins)
     arr = data.get("owned_machine_skins", owned_machine_skins)
-    owned_machine_skins = _to_bool_array(arr, owned_machine_skins)
+    owned_machine_skins = _bool_array_from_variant(arr, owned_machine_skins)
     selected_claw_skin = clampi(int(data.get("selected_claw_skin", selected_claw_skin)), 0, maxi(0, claw_skin_specs.size() - 1))
     selected_toy_skin = clampi(int(data.get("selected_toy_skin", selected_toy_skin)), 0, maxi(0, toy_skin_specs.size() - 1))
     selected_machine_skin = clampi(int(data.get("selected_machine_skin", selected_machine_skin)), 0, maxi(0, machine_skin_specs.size() - 1))
     arr = data.get("vip_owned", vip_owned)
-    vip_owned = _to_bool_array(arr, vip_owned)
+    vip_owned = _bool_array_from_variant(arr, vip_owned)
     vip_selected = clampi(int(data.get("vip_selected", vip_selected)), 0, maxi(0, vip_specs.size() - 1))
     selected_claw = clampi(int(data.get("claw", selected_claw)), 0, maxi(0, claw_specs.size() - 1))
     var d: Variant = data.get("collection", collection)
@@ -1306,7 +1308,7 @@ func apply_server_game_state(data: Dictionary) -> void:
     d = data.get("completed_collections", completed_collections)
     if d is Dictionary: completed_collections = d
     arr = data.get("upgrades", upgrade_levels)
-    upgrade_levels = _to_int_array(arr, upgrade_levels)
+    upgrade_levels = _int_array_from_variant(arr, upgrade_levels)
     d = data.get("promo_codes_used", promo_codes_used)
     if d is Dictionary: promo_codes_used = d
     return_bonus_days = maxi(0, int(data.get("return_bonus_days", return_bonus_days)))
@@ -1349,7 +1351,7 @@ func apply_server_game_state(data: Dictionary) -> void:
         for i in range(owned_claws.size()): owned_claws[i] = owned_server.has("claw_%d" % (i + 1))
     if data.has("selected_claw"): selected_claw = clampi(int(data.get("selected_claw", selected_claw)), 0, claw_specs.size()-1)
     if data.has("upgrade_levels") and data["upgrade_levels"] is Array:
-        upgrade_levels = _to_int_array(data.get("upgrade_levels"), upgrade_levels)
+        upgrade_levels = _int_array_from_variant(data.get("upgrade_levels"), upgrade_levels)
     workshop_parts = maxi(0, int(data.get("workshop_parts", workshop_parts)))
     workshop_level = maxi(1, int(data.get("workshop_level", workshop_level)))
     workshop_claw_power = clampi(int(data.get("workshop_claw_power", workshop_claw_power)),0,10)
@@ -1369,9 +1371,9 @@ func apply_server_game_state(data: Dictionary) -> void:
     workshop_overclock_games = maxi(0,int(data.get("workshop_overclock_games", workshop_overclock_games)))
     workshop_job_end_unix = int(data.get("workshop_job_end_unix", workshop_job_end_unix)); workshop_job_active = bool(data.get("workshop_job_active", workshop_job_active)); workshop_job_name = String(data.get("workshop_job_name", workshop_job_name)); workshop_job_reward = maxi(0,int(data.get("workshop_job_reward", workshop_job_reward)))
     player_avatar_index = clampi(int(data.get("player_avatar_index", player_avatar_index)),0,AVATAR_OPTIONS.size()-1)
-    var os1: Variant = data.get("owned_claw_skins", owned_claw_skins); owned_claw_skins = _to_bool_array(os1, owned_claw_skins)
-    var os2: Variant = data.get("owned_toy_skins", owned_toy_skins); owned_toy_skins = _to_bool_array(os2, owned_toy_skins)
-    var os3: Variant = data.get("owned_machine_skins", owned_machine_skins); owned_machine_skins = _to_bool_array(os3, owned_machine_skins)
+    var os1: Variant = data.get("owned_claw_skins", owned_claw_skins); owned_claw_skins = _bool_array_from_variant(os1, owned_claw_skins)
+    var os2: Variant = data.get("owned_toy_skins", owned_toy_skins); owned_toy_skins = _bool_array_from_variant(os2, owned_toy_skins)
+    var os3: Variant = data.get("owned_machine_skins", owned_machine_skins); owned_machine_skins = _bool_array_from_variant(os3, owned_machine_skins)
     selected_claw_skin=clampi(int(data.get("selected_claw_skin",selected_claw_skin)),0,maxi(0,claw_skin_specs.size()-1)); selected_toy_skin=clampi(int(data.get("selected_toy_skin",selected_toy_skin)),0,maxi(0,toy_skin_specs.size()-1)); selected_machine_skin=clampi(int(data.get("selected_machine_skin",selected_machine_skin)),0,maxi(0,machine_skin_specs.size()-1))
     workshop_parts = engineering_parts if workshop_parts == 0 and engineering_parts > 0 else workshop_parts
     if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
@@ -1430,7 +1432,7 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
     return true
 
 func register_device_remote() -> void:
-    if Engine.is_editor_hint() or not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
+    if not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
         return
     var receiver = _get_background_notification_receiver()
     var context = Engine.get_singleton("AndroidRuntime").getApplicationContext()
@@ -2300,6 +2302,15 @@ func create_loading_screen() -> void:
     tips_title.modulate = Color("#C9A982")
     loading_screen.add_child(tips_title)
 
+    loading_stage = Label.new()
+    loading_stage.text = "ШАГ 0 • ПОДГОТОВКА"
+    loading_stage.position = Vector2(100, 880)
+    loading_stage.size = Vector2(880, 40)
+    loading_stage.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    loading_stage.add_theme_font_size_override("font_size", 15)
+    loading_stage.modulate = Color("#9E8975")
+    loading_screen.add_child(loading_stage)
+
     loading_tip = Label.new()
     loading_tip.text = "СОВЕТ: ТЩАТЕЛЬНО НАВОДИ КЛЕШНЮ — РЕДКИЕ ИГРУШКИ СТОЯТ ТОГО."
     loading_tip.position = Vector2(100, 1170)
@@ -2347,70 +2358,131 @@ func create_loading_screen() -> void:
     version.modulate = Color("#5D493A")
     loading_screen.add_child(version)
 
-func set_loading_progress(value: float, text: String) -> void:
-    if loading_progress:
-        loading_progress.value = value
-    if loading_percent:
-        loading_percent.text = "%d%%" % int(value)
+func set_loading_status(text: String) -> void:
+    # Меняет только описание текущей операции. Процент не двигается, пока
+    # операция действительно не завершена.
     if loading_status:
         loading_status.text = text
+    if loading_stage:
+        loading_stage.text = "ВЫПОЛНЯЕТСЯ • %s" % text
+    await get_tree().process_frame
+
+func set_loading_progress(value: float, text: String) -> void:
+    # Процент показывает только ЗАВЕРШЁННУЮ операцию. Пока операция выполняется,
+    # индикатор остаётся на предыдущем подтверждённом значении.
+    var safe_value := clampf(value, 0.0, 100.0)
+    loading_step_index += 1
+    if loading_progress:
+        loading_progress.value = safe_value
+    if loading_percent:
+        loading_percent.text = "%d%%" % int(safe_value)
+    if loading_status:
+        loading_status.text = text
+    if loading_stage:
+        loading_stage.text = "ШАГ %d • %s" % [loading_step_index, text]
     await get_tree().process_frame
 
 func initialize_game_async() -> void:
-    # Гарантируем, что загрузочный экран уже отрисован до тяжёлой 3D-сборки.
+    # Реальный последовательный загрузчик: процент продвигается только после
+    # фактического завершения соответствующей операции. Между тяжёлыми этапами
+    # обязательно отдаём кадр движку, чтобы загрузочный экран оставался живым.
     await get_tree().process_frame
-    await set_loading_progress(5.0, "ПОДГОТОВКА ПРОФИЛЯ...")
+
+    await set_loading_status("ЗАГРУЖАЕМ ПРОФИЛЬ И РЕФЕРАЛЬНЫЕ ДАННЫЕ...")
     ensure_referral_code()
     process_incoming_referral()
-
-    await set_loading_progress(15.0, "СОЗДАНИЕ МИРА...")
+    await set_loading_progress(5.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
+    await set_loading_status("СОЗДАЁМ ИГРОВОЙ МИР И ПРИМЕНЯЕМ КАЧЕСТВО...")
     build_world()
     apply_quality_settings()
-    await get_tree().process_frame
-
-    await set_loading_progress(30.0, "СБОРКА АВТОМАТА...")
+    await set_loading_progress(15.0, "МИР СОЗДАН")
+    await set_loading_status("СОЗДАЁМ АВТОМАТ И АКТИВИРУЕМ СОБЫТИЕ...")
     build_machine()
-    # Сначала определяем сегодняшнюю тему, чтобы уже первые 60 игрушек
-    # могли получить тематическое распределение.
     activate_calendar_event()
-    await get_tree().process_frame
-
-    await set_loading_progress(43.0, "НАСТРОЙКА МЕХАНИКИ...")
+    await set_loading_progress(30.0, "АВТОМАТ СОЗДАН")
+    await set_loading_status("СОЗДАЁМ РЕЛЬСЫ, КЛЕШНЮ И ПРИЦЕЛ...")
     build_overhead_rails()
+    await get_tree().process_frame
     build_claw()
+    await get_tree().process_frame
     build_aim_marker()
     await get_tree().process_frame
+    await set_loading_progress(43.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
+    await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКИ...")
+    await build_prizes_async()
+    await get_tree().process_frame
+    await set_loading_progress(62.0, "ИГРУШКИ ЗАГРУЖЕНЫ")
 
-    await set_loading_progress(62.0, "ЗАГРУЗКА ИГРУШЕК...")
-    build_prizes()
+    # В проекте GPUParticles3D сейчас намеренно отключены. Поэтому не делаем
+    # фиктивный тяжёлый этап: здесь только фиксируем реальное состояние эффектов.
+    await set_loading_status("ПРОВЕРЯЕМ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И ОСВЕЩЕНИЕ...")
+    sparkle_particles = null
+    await get_tree().process_frame
+    await set_loading_progress(72.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
     await get_tree().process_frame
 
-    await set_loading_progress(72.0, "ПОДГОТОВКА ЭФФЕКТОВ...")
-    build_particles()
-    await get_tree().process_frame
+    await build_ui()
 
-    await set_loading_progress(82.0, "ЗАГРУЗКА МЕНЮ...")
-    build_ui()
-    apply_language()
+    await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
     build_audio()
+    await get_tree().process_frame
+    await set_loading_progress(97.0, "ЗВУК ПОДГОТОВЛЕН")
+    await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
     apply_shop_visuals()
     await get_tree().process_frame
-
-    await set_loading_progress(91.0, "ПОДГОТОВКА БОНУСОВ...")
+    await set_loading_progress(98.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
+    await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     setup_daily_systems()
+    await get_tree().process_frame
     setup_login_streak()
+    await get_tree().process_frame
     setup_events()
+    await get_tree().process_frame
     claim_daily_bonus()
-    start_game()
+    await get_tree().process_frame
     update_ui()
+    await get_tree().process_frame
     apply_quality_settings()
+    await get_tree().process_frame
+    await set_loading_progress(99.0, "БОНУСЫ И СОХРАНЕНИЕ ПОДГОТОВЛЕНЫ")
 
-    await set_loading_progress(100.0, "ГОТОВО")
-    await get_tree().create_timer(0.20).timeout
+    # До этой точки НИ ОДНО пользовательское меню и сам игровой экран не
+    # должны быть видимы. Всё подготавливаем скрытым под загрузчиком.
+    await set_loading_status("ФИНАЛЬНАЯ ПРОВЕРКА И ПОДГОТОВКА ИГРОВОГО ЭКРАНА...")
+    close_all_panels()
+    if menu_layer and is_instance_valid(menu_layer):
+        menu_layer.visible = false
+    set_main_menu_controls(false)
+    if hud_layer and is_instance_valid(hud_layer):
+        hud_layer.visible = false
+    set_gameplay_3d_visible(false)
+    current_result = "ГОТОВ К ИГРЕ"
+    update_ui()
+    await get_tree().process_frame
+
+    # КРИТИЧЕСКИЙ ПОРЯДОК ПЕРЕХОДА:
+    # 1) сначала показываем на загрузочном экране настоящий 100%;
+    # 2) отдаём движку кадр, чтобы пользователь реально увидел 100%;
+    # 3) только после этого убираем загрузчик и показываем игровой экран.
+    await set_loading_progress(100.0, "ГОТОВО — ИГРОВОЙ ЭКРАН ПОДГОТОВЛЕН")
+    await get_tree().process_frame
+
     game_initialized = true
+    register_game_activity()
+    if loading_screen and is_instance_valid(loading_screen):
+        loading_screen.visible = false
+
+    if hud_layer and is_instance_valid(hud_layer):
+        hud_layer.visible = true
+    set_gameplay_3d_visible(true)
+    update_ui()
+    await get_tree().process_frame
+
+    # Удаляем загрузчик уже после фактического переключения на игру.
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.queue_free()
     loading_screen = null
+
 
 func _notification(what: int) -> void:
     if what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_APPLICATION_PAUSED:
@@ -2883,6 +2955,100 @@ func build_prizes() -> void:
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         spawn_random_prizes(TARGET_PRIZE_COUNT - prize_bodies.size())
+
+func build_prizes_async() -> void:
+    # Реальная последовательная загрузка игрушек. Каждая игрушка создаётся
+    # отдельно, после чего загрузчик обновляет фактический прогресс и отдаёт
+    # кадр движку. Поэтому на экране всегда видно, сколько объектов уже создано.
+    for body in prize_bodies:
+        if body and is_instance_valid(body):
+            body.queue_free()
+    prize_bodies.clear()
+    prize_data.clear()
+
+    var total_to_build := INITIAL_PRIZE_COUNT
+    if not saved_prizes.is_empty():
+        total_to_build = saved_prizes.size()
+    total_to_build = maxi(total_to_build, 1)
+
+    if saved_prizes.is_empty():
+        for i in range(INITIAL_PRIZE_COUNT):
+            await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКУ %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
+            spawn_one_random_prize(i)
+            var toy_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+            await set_loading_progress(toy_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
+        return
+
+    var valid_saved_count := 0
+    for saved in saved_prizes:
+        if saved is Dictionary:
+            valid_saved_count += 1
+    if valid_saved_count <= 0:
+        valid_saved_count = INITIAL_PRIZE_COUNT
+
+    var loaded_count := 0
+    for saved in saved_prizes:
+        if not (saved is Dictionary):
+            continue
+        loaded_count += 1
+        await set_loading_status("ВОССТАНАВЛИВАЕМ ИГРУШКУ %d ИЗ %d..." % [loaded_count, valid_saved_count])
+        var source_index: int = clampi(int(saved.get("source_index", 0)), 0, toys.size() - 1)
+        var pos_data: Variant = saved.get("position", [0.0, 3.5, 0.0])
+        var rot_data: Variant = saved.get("rotation", [0.0, 0.0, 0.0])
+        var pos := Vector3(float(pos_data[0]), float(pos_data[1]), float(pos_data[2])) if pos_data is Array and pos_data.size() >= 3 else Vector3(0, 3.5, 0)
+        var rot := Vector3(float(rot_data[0]), float(rot_data[1]), float(rot_data[2])) if rot_data is Array and rot_data.size() >= 3 else Vector3.ZERO
+        var kind := String(saved.get("kind", "toy"))
+        if kind == "capsule":
+            var capsule := make_coin_capsule(pos)
+            capsule.rotation = rot
+            prize_bodies.append(capsule)
+            prize_data.append({"kind":"capsule", "name":"Капсула с монетами", "rarity":"БОНУС", "collection":"МОНЕТНЫЙ БОНУС", "reward_min":3, "reward_max":12})
+        else:
+            var variant: int = int(saved.get("variant", 0))
+            var size_factor: float = clampf(float(saved.get("size_factor", 1.0)), 0.90, 1.12)
+            var variant_color: Color = get_toy_variant_color(toys[source_index]["color"], variant)
+            var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor)
+            body.rotation = rot
+            prize_bodies.append(body)
+            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+        var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
+        await set_loading_progress(saved_progress, "ИГРУШКА %d ИЗ %d ВОССТАНОВЛЕНА" % [loaded_count, valid_saved_count])
+
+    if prize_bodies.is_empty():
+        for i in range(INITIAL_PRIZE_COUNT):
+            await set_loading_status("ДОПОЛНЯЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
+            spawn_one_random_prize(i)
+            var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+            await set_loading_progress(fallback_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
+    elif prize_bodies.size() < TARGET_PRIZE_COUNT:
+        var missing := TARGET_PRIZE_COUNT - prize_bodies.size()
+        for i in range(missing):
+            await set_loading_status("ДОЗАГРУЖАЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, missing])
+            spawn_one_random_prize(i)
+            var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
+            await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])
+
+func spawn_one_random_prize(n: int) -> void:
+    var rng := RandomNumberGenerator.new()
+    rng.randomize()
+    var x: float = rng.randf_range(-2.65, 2.65)
+    var z: float = rng.randf_range(-1.62, 1.62)
+    var layer: int = n % 8
+    var y: float = minf(3.20 + float(layer) * 0.26 + rng.randf_range(-0.04, 0.05), MAX_PRIZE_CENTER_Y)
+    if rng.randf() < CAPSULE_CHANCE:
+        var capsule := make_coin_capsule(Vector3(x, y, z))
+        capsule.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-PI, PI), rng.randf_range(-0.25, 0.25))
+        prize_bodies.append(capsule)
+        prize_data.append({"kind":"capsule", "name":"Капсула с монетами", "rarity":"БОНУС", "collection":"МОНЕТНЫЙ БОНУС", "reward_min":3, "reward_max":12})
+        return
+    var source_index := rng.randi_range(0, toys.size() - 1)
+    var variant := rng.randi_range(0, 3)
+    var variant_color := get_toy_variant_color(toys[source_index]["color"], variant)
+    var size_factor := rng.randf_range(0.90, 1.12)
+    var body := make_physics_toy(source_index, toys[source_index], Vector3(x, y, z), variant_color, size_factor)
+    body.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-PI, PI), rng.randf_range(-0.25, 0.25))
+    prize_bodies.append(body)
+    prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
 func get_thematic_toy_indices() -> Array[int]:
     var result: Array[int] = []
@@ -3466,8 +3632,13 @@ func add_neon_header(parent: Control, title_text: String, subtitle_text: String 
         parent.add_child(sub)
 
 func build_ui() -> void:
+    await set_loading_status("СОЗДАНИЕ ГЛАВНОГО МЕНЮ...")
     menu_layer = Control.new()
     menu_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    # Главное меню создаётся во время загрузки, но НЕ должно быть видно до её
+    # полного завершения. Иначе пользователь может увидеть меню поверх
+    # незавершённой инициализации.
+    menu_layer.visible = false
     add_child(menu_layer)
 
     var backdrop := ColorRect.new()
@@ -3558,32 +3729,95 @@ func build_ui() -> void:
     var help := make_menu_button("❓  ПОМОЩЬ", Vector2(left_x, y4 + row_h + gap), Vector2(930, row_h), Color("#76583F"))
     help.pressed.connect(func(): open_panel("help"))
     menu_layer.add_child(help); main_menu_controls.append(help); decorate_main_menu_button(help)
+    await set_loading_progress(82.0, "ГЛАВНОЕ МЕНЮ ГОТОВО")
+    await get_tree().process_frame
 
+    await set_loading_status("HUD ГОТОВ...")
     hud_layer = Control.new()
     hud_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     hud_layer.visible = false
     add_child(hud_layer)
+    # Полноэкранный невидимый блокировщик ввода для модальных окон.
+    # Он находится под самим окном, но над игровыми кнопками, поэтому касания
+    # по открытой панели никогда не проходят на нижний слой.
+    gameplay_modal_blocker = Control.new()
+    gameplay_modal_blocker.name = "GameplayModalBlocker"
+    gameplay_modal_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+    gameplay_modal_blocker.visible = false
+    gameplay_modal_blocker.z_index = 20
+    hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
+    await get_tree().process_frame
+    await set_loading_progress(83.0, "HUD ГОТОВ")
+
+    await set_loading_status("МАГАЗИН ГОТОВ...")
     shop_panel = build_shop_panel()
+    await get_tree().process_frame
+    await set_loading_progress(84.0, "МАГАЗИН ГОТОВ")
+
+    await set_loading_status("КОЛЛЕКЦИЯ ГОТОВА...")
     collection_panel = build_collection_panel()
+    await get_tree().process_frame
+    await set_loading_progress(85.0, "КОЛЛЕКЦИЯ ГОТОВА")
+
+    await set_loading_status("НАСТРОЙКИ ГОТОВЫ...")
     settings_panel = build_settings_panel()
+    await get_tree().process_frame
     achievements_panel = build_achievements_panel()
+    await get_tree().process_frame
+    await set_loading_progress(86.0, "НАСТРОЙКИ И ДОСТИЖЕНИЯ ГОТОВЫ")
+
+    await set_loading_status("ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ...")
     profile_panel = build_profile_panel()
+    await get_tree().process_frame
     help_panel = build_help_panel()
+    await get_tree().process_frame
+    await set_loading_progress(87.0, "ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ")
+
+    await set_loading_status("РЕФЕРАЛЫ И VIP ГОТОВЫ...")
     referral_panel = build_referral_panel()
+    await get_tree().process_frame
     vip_panel = build_vip_panel()
+    await get_tree().process_frame
+    await set_loading_progress(88.0, "РЕФЕРАЛЫ И VIP ГОТОВЫ")
+
+    await set_loading_status("СЕЗОНЫ И СУНДУКИ ГОТОВЫ...")
     seasons_panel = build_seasons_panel()
+    await get_tree().process_frame
     chests_panel = build_chests_panel()
+    await get_tree().process_frame
+    await set_loading_progress(89.0, "СЕЗОНЫ И СУНДУКИ ГОТОВЫ")
+
+    await set_loading_status("МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ...")
     workshop_panel = build_workshop_panel()
+    await get_tree().process_frame
     season_pass_panel = build_season_pass_panel()
+    await get_tree().process_frame
+    await set_loading_progress(90.0, "МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ")
+
+    await set_loading_status("ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ...")
     promo_panel = build_promo_panel()
+    await get_tree().process_frame
     news_panel = build_news_panel()
+    await get_tree().process_frame
+    await set_loading_progress(91.0, "ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ")
+
+    await set_loading_status("РЕЙТИНГ И БОНУС ГОТОВЫ...")
     rating_panel = build_rating_panel()
+    await get_tree().process_frame
     return_bonus_panel = build_return_bonus_panel()
+    await get_tree().process_frame
+    await set_loading_progress(92.0, "РЕЙТИНГ И БОНУС ГОТОВЫ")
     # Старый объединённый центр больше не показывается: его функции разобраны по разделам.
     live_systems_panel = null
+    await set_loading_status("ОКНО РЕЗУЛЬТАТА ГОТОВО...")
     build_result_popup()
+    await get_tree().process_frame
+    await set_loading_progress(93.0, "ОКНО РЕЗУЛЬТАТА ГОТОВО")
+    await set_loading_status("HUD ЗАВЕРШЁН...")
     build_extra_hud()
+    await get_tree().process_frame
     profile_panel.reparent(hud_layer, false)
     seasons_panel.reparent(hud_layer, false)
     chests_panel.reparent(hud_layer, false)
@@ -3602,8 +3836,15 @@ func build_ui() -> void:
     season_pass_panel.z_index = 30
     return_bonus_panel.z_index = 30
     profile_panel.z_index = 30
+    await set_loading_progress(94.0, "HUD ЗАВЕРШЁН")
+    await set_loading_status("НАВИГАЦИЯ ANDROID НАСТРОЕНА...")
     setup_android_ui_navigation()
+    await get_tree().process_frame
+    await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
+    await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
     setup_android_scrolls()
+    await get_tree().process_frame
+    await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
 
 func setup_android_scrolls() -> void:
     # Единая настройка прокрутки для всех длинных окон под Android.
@@ -3883,14 +4124,6 @@ func build_extra_hud() -> void:
     event_button.tooltip_text = "НЕДЕЛЬНЫЕ СОБЫТИЯ"
     event_button.pressed.connect(toggle_event_panel)
     hud_layer.add_child(event_button)
-
-    # Бонус за возвращение: отдельный круг на игровом экране, под всеми
-    # остальными правыми кругами. Круг полностью скрыт, пока бонус недоступен.
-    return_bonus_button = make_menu_circle_button("🎁", "БОНУС ЗА ВОЗВРАЩЕНИЕ", Vector2(948, 565), Color("#9A7653"))
-    return_bonus_button.name = "ReturnBonusCircleButton"
-    return_bonus_button.pressed.connect(func(): open_panel("return_bonus"))
-    return_bonus_button.visible = return_bonus_available
-    hud_layer.add_child(return_bonus_button)
 
     build_daily_login_panel()
     build_event_panel()
@@ -5801,6 +6034,7 @@ func make_data_row(parent: VBoxContainer, title_text: String, value_text: String
     parent.add_child(row)
 
 func build_profile_panel() -> PanelContainer:
+    ensure_referral_code()
     var p := PanelContainer.new()
     p.name = "ProfilePanel"
     p.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -5927,22 +6161,79 @@ func build_profile_panel() -> PanelContainer:
     id_card.custom_minimum_size = Vector2(0, 82)
     style_panel(id_card, Color("#1A130F"), Color("#9A7653"), 16, 2)
     v.add_child(id_card)
-    var id_box := VBoxContainer.new()
-    id_box.alignment = BoxContainer.ALIGNMENT_CENTER
-    id_card.add_child(id_box)
+    var id_row := HBoxContainer.new()
+    id_row.name = "PlayerIdRow"
+    id_row.alignment = BoxContainer.ALIGNMENT_CENTER
+    id_row.add_theme_constant_override("separation", 8)
+    id_card.add_child(id_row)
+
+    var id_info := VBoxContainer.new()
+    id_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    id_info.alignment = BoxContainer.ALIGNMENT_CENTER
+    id_row.add_child(id_info)
+
     var id_caption := Label.new()
     id_caption.text = "ID ИГРОКА"
     id_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     id_caption.add_theme_font_size_override("font_size", 14)
     id_caption.modulate = Color("#C09A70")
-    id_box.add_child(id_caption)
+    id_info.add_child(id_caption)
+
     var id_value := Label.new()
     id_value.name = "PlayerIdLabel"
     id_value.text = player_id if player_id != "" else "ПОЛУЧАЕМ…"
     id_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     id_value.add_theme_font_size_override("font_size", 21)
     id_value.modulate = Color("#F0D4A9")
-    id_box.add_child(id_value)
+    id_info.add_child(id_value)
+
+    var copy_id := Button.new()
+    copy_id.name = "CopyPlayerIdButton"
+    copy_id.text = "Копировать"
+    copy_id.custom_minimum_size = Vector2(118, 38)
+    copy_id.add_theme_font_size_override("font_size", 13)
+    style_button(copy_id, Color("#76583F"))
+    copy_id.tooltip_text = "Скопировать ID игрока"
+    copy_id.pressed.connect(func(): copy_profile_value(player_id, "ID игрока", copy_id))
+    id_row.add_child(copy_id)
+
+    var referral_card := PanelContainer.new()
+    referral_card.name = "ProfileReferralCard"
+    referral_card.custom_minimum_size = Vector2(0, 82)
+    style_panel(referral_card, Color("#1A130F"), Color("#9A7653"), 16, 2)
+    v.add_child(referral_card)
+    var referral_row := HBoxContainer.new()
+    referral_row.add_theme_constant_override("separation", 8)
+    referral_row.alignment = BoxContainer.ALIGNMENT_CENTER
+    referral_card.add_child(referral_row)
+
+    var referral_info := VBoxContainer.new()
+    referral_info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    referral_info.alignment = BoxContainer.ALIGNMENT_CENTER
+    referral_row.add_child(referral_info)
+    var referral_caption := Label.new()
+    referral_caption.text = "РЕФЕРАЛЬНЫЙ КОД"
+    referral_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    referral_caption.add_theme_font_size_override("font_size", 14)
+    referral_caption.modulate = Color("#C09A70")
+    referral_info.add_child(referral_caption)
+    var referral_value := Label.new()
+    referral_value.name = "ReferralCodeLabel"
+    referral_value.text = referral_code if referral_code != "" else "ПОЛУЧАЕМ…"
+    referral_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    referral_value.add_theme_font_size_override("font_size", 21)
+    referral_value.modulate = Color("#F0D4A9")
+    referral_info.add_child(referral_value)
+
+    var copy_referral := Button.new()
+    copy_referral.name = "CopyReferralCodeButton"
+    copy_referral.text = "Копировать"
+    copy_referral.custom_minimum_size = Vector2(118, 38)
+    copy_referral.add_theme_font_size_override("font_size", 13)
+    style_button(copy_referral, Color("#76583F"))
+    copy_referral.tooltip_text = "Скопировать реферальный код"
+    copy_referral.pressed.connect(func(): copy_profile_value(referral_code, "Реферальный код", copy_referral))
+    referral_row.add_child(copy_referral)
 
     # Редактирование профиля.
     var edit_card := PanelContainer.new()
@@ -6077,6 +6368,24 @@ func save_profile_changes() -> void:
     if status:
         status.text = "✓ Имя и аватарка сохранены"
 
+func copy_profile_value(value: String, title: String, button: Button = null) -> void:
+    var clean := value.strip_edges()
+    if clean == "" or clean == "ПОЛУЧАЕМ…":
+        if button:
+            button.text = "Недоступно"
+            get_tree().create_timer(1.2).timeout.connect(func():
+                if is_instance_valid(button): button.text = "Копировать"
+            )
+        return
+    DisplayServer.clipboard_set(clean)
+    if button:
+        button.text = "✓ Скопировано"
+        get_tree().create_timer(1.2).timeout.connect(func():
+            if is_instance_valid(button): button.text = "Копировать"
+        )
+    current_result = "📋 %s скопирован в буфер обмена" % title
+    update_ui()
+
 func refresh_profile_panel() -> void:
     if not profile_panel: return
     var scroll := profile_panel.get_node_or_null("ProfileScroll") as ScrollContainer
@@ -6117,6 +6426,11 @@ func refresh_profile_panel() -> void:
     if input and not input.has_focus(): input.text = player_name
     var id_value := v.get_node_or_null("ProfileIdCard/VBoxContainer/PlayerIdLabel") as Label
     if id_value: id_value.text = player_id if player_id != "" else "ПОЛУЧАЕМ…"
+    var referral_card := v.get_node_or_null("ProfileReferralCard") as PanelContainer
+    if referral_card:
+        var referral_value := referral_card.find_child("ReferralCodeLabel", true, false) as Label
+        if referral_value:
+            referral_value.text = referral_code if referral_code != "" else "ПОЛУЧАЕМ…"
 
     var grid := v.get_node_or_null("ProfileEditCard/VBoxContainer/AvatarGrid") as GridContainer
     if grid:
@@ -6151,9 +6465,7 @@ func refresh_profile_panel() -> void:
         ["Детали мастерской", str(workshop_parts)],
         ["Идеальных захватов", str(perfect_grabs)],
         ["Лучший приз", best_result],
-        ["Максимальная награда", "%d ₽" % highest_reward_rubles],
-        ["ID игрока", player_id if player_id != "" else "ПОЛУЧАЕМ…"],
-        ["Реферальный код", referral_code if referral_code != "" else "ПОЛУЧАЕМ…"]
+        ["Максимальная награда", "%d ₽" % highest_reward_rubles]
     ]
     for row in stats:
         var card := PanelContainer.new()
@@ -6790,13 +7102,19 @@ func update_hud_profile_button() -> void:
     hud_profile_button.tooltip_text = "Профиль: %s" % player_name
 
 func show_main_menu() -> void:
+    if not game_initialized:
+        return
     close_all_panels()
+    if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
+        gameplay_modal_blocker.visible = false
     hud_layer.visible = false
     set_gameplay_3d_visible(false)
     set_main_menu_controls(true)
     menu_layer.visible = true
 
 func open_panel(which: String) -> void:
+    if not game_initialized:
+        return
     # Окна на экране аппарата работают как переключатель: открыть одно —
     # автоматически закрыть все остальные. При этом сам аппарат остаётся видимым.
     if which == "profile" or which == "seasons" or which == "chests" or which == "workshop" or which == "season_pass" or which == "return_bonus":
@@ -6805,6 +7123,8 @@ func open_panel(which: String) -> void:
         set_main_menu_controls(false)
         hud_layer.visible = true
         set_gameplay_3d_visible(true)
+        if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
+            gameplay_modal_blocker.visible = true
         if which == "profile":
             profile_panel.visible = true
             refresh_profile_panel()
@@ -6854,13 +7174,19 @@ func open_panel(which: String) -> void:
     update_android_navigation()
 
 func close_gameplay_overlay() -> void:
+    if not game_initialized:
+        return
     close_all_panels()
+    if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
+        gameplay_modal_blocker.visible = false
     menu_layer.visible = false
     hud_layer.visible = true
     set_gameplay_3d_visible(true)
     update_android_navigation()
 
 func close_all_panels() -> void:
+    if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
+        gameplay_modal_blocker.visible = false
     if shop_panel: shop_panel.visible = false
     if collection_panel: collection_panel.visible = false
     if settings_panel: settings_panel.visible = false
@@ -6941,11 +7267,15 @@ func _process(delta: float) -> void:
         if loading_tip and is_instance_valid(loading_tip):
             var tips := [
                 "СОВЕТ: РЕДКИЕ ИГРУШКИ ПОЯВЛЯЮТСЯ НЕ СЛУЧАЙНО.",
-                "СОВЕТ: МАСТЕРСКАЯ ПОМОГАЕТ РАЗВИВАТЬ АППАРАТ.",
-                "СОВЕТ: СОБИРАЙТЕ КОЛЛЕКЦИИ И ПОЛУЧАЙТЕ ДОСТИЖЕНИЯ.",
-                "СОВЕТ: ВО ВРЕМЯ ПРАЗДНИКОВ ПОЯВЛЯЮТСЯ ОСОБЫЕ БОНУСЫ."
+                "СОВЕТ: НАВОДИ КЛЕШНЮ ТОЧНЕЕ — ТАК ПРОЩЕ ЗАХВАТИТЬ ПРИЗ.",
+                "СОВЕТ: СОБИРАЙ КОЛЛЕКЦИИ — ЗА ДОСТИЖЕНИЯ ПОЛАГАЮТСЯ НАГРАДЫ.",
+                "СОВЕТ: МАСТЕРСКАЯ ПОМОГАЕТ ПРОКАЧИВАТЬ ВОЗМОЖНОСТИ АППАРАТА.",
+                "СОВЕТ: ПРОВЕРЯЙ СУНДУКИ И СЕЗОННЫЕ НАГРАДЫ.",
+                "СОВЕТ: ПРАЗДНИЧНЫЕ СОБЫТИЯ МОГУТ ДАТЬ ОСОБЫЕ БОНУСЫ.",
+                "СОВЕТ: ПРОМОКОДЫ МОГУТ ОТКРЫТЬ ДОПОЛНИТЕЛЬНЫЕ НАГРАДЫ.",
+                "СОВЕТ: ЗАБИРАЙ ЕЖЕДНЕВНЫЙ БОНУС, ЧТОБЫ НЕ ПРОПУСКАТЬ НАГРАДЫ."
             ]
-            var next_tip := int(loading_elapsed / 2.8) % tips.size()
+            var next_tip := int(loading_elapsed / 2.5) % tips.size()
             if next_tip != loading_tip_index:
                 loading_tip_index = next_tip
                 loading_tip.text = tips[loading_tip_index]
@@ -7914,10 +8244,7 @@ func register_game_activity() -> void:
         waiting_overlay.visible = false
 
 func update_missions() -> void:
-    # During asynchronous startup HUD is not created until the 82% stage.
-    # _process()/remote callbacks may call update_ui before that, so do nothing
-    # until hud_layer exists. This prevents a runtime error from pausing startup.
-    if hud_layer == null or not is_instance_valid(hud_layer):
+    if not hud_layer or not is_instance_valid(hud_layer):
         return
     var panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
     if panel and panel.visible:
