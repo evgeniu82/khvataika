@@ -276,6 +276,7 @@ var time_alive: float = 0.0
 var quality_level: int = 2
 var quality_option: OptionButton
 var loading_screen: Control
+var startup_splash: CanvasLayer
 var loading_progress: ProgressBar
 var loading_status: Label
 var loading_percent: Label
@@ -692,7 +693,12 @@ func _ready() -> void:
     # Раньше перед ним выполнялись локальная инициализация и чтение сохранения,
     # из-за чего на Android мог появляться серый кадр между boot splash и игрой.
     randomize()
+    startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
     create_loading_screen()
+    # The static StartupSplash in Main.tscn covers the gap before the first
+    # rendered frame. Once the real loading UI exists, it can be hidden safely.
+    if startup_splash and is_instance_valid(startup_splash):
+        startup_splash.visible = false
     await get_tree().process_frame
 
     add_extended_collections()
@@ -726,10 +732,12 @@ func _ready() -> void:
     call_deferred("build_upgrade_sound_system")
 
 func _is_android_runtime_available() -> bool:
-    return OS.has_feature("android") and Engine.has_singleton("AndroidRuntime")
+    # The Godot editor can itself run on Android, but custom game Java classes
+    # are only available in the exported APK. Never probe them from the editor.
+    return not Engine.is_editor_hint() and OS.has_feature("android") and Engine.has_singleton("AndroidRuntime")
 
 func _get_background_notification_receiver() -> Variant:
-    if not _is_android_runtime_available():
+    if Engine.is_editor_hint() or not _is_android_runtime_available():
         return null
     # The Java receiver is compiled into the Gradle Android template by the
     # editor plugin. Return its JavaClass so static schedule/cancel/postNow
@@ -831,7 +839,7 @@ func test_game_notification() -> void:
 
 
 func setup_android_notifications() -> void:
-    if not OS.has_feature("android"):
+    if Engine.is_editor_hint() or not OS.has_feature("android"):
         return
     _ensure_android_notification_channel()
     if not _android_notification_permission_granted():
@@ -1189,6 +1197,22 @@ func get_server_game_state() -> Dictionary:
         "referral_code": referral_code, "referral_used": referral_used
     }
 
+func _to_bool_array(value: Variant, fallback: Array[bool]) -> Array[bool]:
+    if value is Array:
+        var result: Array[bool] = []
+        for item in value:
+            result.append(bool(item))
+        return result
+    return fallback.duplicate()
+
+func _to_int_array(value: Variant, fallback: Array[int]) -> Array[int]:
+    if value is Array:
+        var result: Array[int] = []
+        for item in value:
+            result.append(int(item))
+        return result
+    return fallback.duplicate()
+
 func apply_server_game_state(data: Dictionary) -> void:
     if data.is_empty():
         return
@@ -1261,18 +1285,18 @@ func apply_server_game_state(data: Dictionary) -> void:
     season_pass_level = clampi(int(data.get("season_pass_level", season_pass_level)), 1, SEASON_PASS_MAX_LEVEL)
     active_season_id = String(data.get("active_season_id", active_season_id))
     var arr: Variant = data.get("owned_claws", owned_claws)
-    if arr is Array: owned_claws = arr
+    owned_claws = _to_bool_array(arr, owned_claws)
     arr = data.get("owned_claw_skins", owned_claw_skins)
-    if arr is Array: owned_claw_skins = arr
+    owned_claw_skins = _to_bool_array(arr, owned_claw_skins)
     arr = data.get("owned_toy_skins", owned_toy_skins)
-    if arr is Array: owned_toy_skins = arr
+    owned_toy_skins = _to_bool_array(arr, owned_toy_skins)
     arr = data.get("owned_machine_skins", owned_machine_skins)
-    if arr is Array: owned_machine_skins = arr
+    owned_machine_skins = _to_bool_array(arr, owned_machine_skins)
     selected_claw_skin = clampi(int(data.get("selected_claw_skin", selected_claw_skin)), 0, maxi(0, claw_skin_specs.size() - 1))
     selected_toy_skin = clampi(int(data.get("selected_toy_skin", selected_toy_skin)), 0, maxi(0, toy_skin_specs.size() - 1))
     selected_machine_skin = clampi(int(data.get("selected_machine_skin", selected_machine_skin)), 0, maxi(0, machine_skin_specs.size() - 1))
     arr = data.get("vip_owned", vip_owned)
-    if arr is Array: vip_owned = arr
+    vip_owned = _to_bool_array(arr, vip_owned)
     vip_selected = clampi(int(data.get("vip_selected", vip_selected)), 0, maxi(0, vip_specs.size() - 1))
     selected_claw = clampi(int(data.get("claw", selected_claw)), 0, maxi(0, claw_specs.size() - 1))
     var d: Variant = data.get("collection", collection)
@@ -1282,7 +1306,7 @@ func apply_server_game_state(data: Dictionary) -> void:
     d = data.get("completed_collections", completed_collections)
     if d is Dictionary: completed_collections = d
     arr = data.get("upgrades", upgrade_levels)
-    if arr is Array: upgrade_levels = arr
+    upgrade_levels = _to_int_array(arr, upgrade_levels)
     d = data.get("promo_codes_used", promo_codes_used)
     if d is Dictionary: promo_codes_used = d
     return_bonus_days = maxi(0, int(data.get("return_bonus_days", return_bonus_days)))
@@ -1325,7 +1349,7 @@ func apply_server_game_state(data: Dictionary) -> void:
         for i in range(owned_claws.size()): owned_claws[i] = owned_server.has("claw_%d" % (i + 1))
     if data.has("selected_claw"): selected_claw = clampi(int(data.get("selected_claw", selected_claw)), 0, claw_specs.size()-1)
     if data.has("upgrade_levels") and data["upgrade_levels"] is Array:
-        upgrade_levels = data.get("upgrade_levels").duplicate()
+        upgrade_levels = _to_int_array(data.get("upgrade_levels"), upgrade_levels)
     workshop_parts = maxi(0, int(data.get("workshop_parts", workshop_parts)))
     workshop_level = maxi(1, int(data.get("workshop_level", workshop_level)))
     workshop_claw_power = clampi(int(data.get("workshop_claw_power", workshop_claw_power)),0,10)
@@ -1345,9 +1369,9 @@ func apply_server_game_state(data: Dictionary) -> void:
     workshop_overclock_games = maxi(0,int(data.get("workshop_overclock_games", workshop_overclock_games)))
     workshop_job_end_unix = int(data.get("workshop_job_end_unix", workshop_job_end_unix)); workshop_job_active = bool(data.get("workshop_job_active", workshop_job_active)); workshop_job_name = String(data.get("workshop_job_name", workshop_job_name)); workshop_job_reward = maxi(0,int(data.get("workshop_job_reward", workshop_job_reward)))
     player_avatar_index = clampi(int(data.get("player_avatar_index", player_avatar_index)),0,AVATAR_OPTIONS.size()-1)
-    var os1: Variant = data.get("owned_claw_skins", owned_claw_skins); if os1 is Array: owned_claw_skins=os1.duplicate()
-    var os2: Variant = data.get("owned_toy_skins", owned_toy_skins); if os2 is Array: owned_toy_skins=os2.duplicate()
-    var os3: Variant = data.get("owned_machine_skins", owned_machine_skins); if os3 is Array: owned_machine_skins=os3.duplicate()
+    var os1: Variant = data.get("owned_claw_skins", owned_claw_skins); owned_claw_skins = _to_bool_array(os1, owned_claw_skins)
+    var os2: Variant = data.get("owned_toy_skins", owned_toy_skins); owned_toy_skins = _to_bool_array(os2, owned_toy_skins)
+    var os3: Variant = data.get("owned_machine_skins", owned_machine_skins); owned_machine_skins = _to_bool_array(os3, owned_machine_skins)
     selected_claw_skin=clampi(int(data.get("selected_claw_skin",selected_claw_skin)),0,maxi(0,claw_skin_specs.size()-1)); selected_toy_skin=clampi(int(data.get("selected_toy_skin",selected_toy_skin)),0,maxi(0,toy_skin_specs.size()-1)); selected_machine_skin=clampi(int(data.get("selected_machine_skin",selected_machine_skin)),0,maxi(0,machine_skin_specs.size()-1))
     workshop_parts = engineering_parts if workshop_parts == 0 and engineering_parts > 0 else workshop_parts
     if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
@@ -1406,7 +1430,7 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
     return true
 
 func register_device_remote() -> void:
-    if not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
+    if Engine.is_editor_hint() or not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
         return
     var receiver = _get_background_notification_receiver()
     var context = Engine.get_singleton("AndroidRuntime").getApplicationContext()
@@ -1642,6 +1666,10 @@ func _apply_remote_config(config: Dictionary) -> void:
 func _on_remote_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
     var kind := remote_request_kind
     remote_request_kind = ""
+    var data: Dictionary = {}
+    var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
+    if parsed is Dictionary:
+        data = parsed
     if data.has("token") and String(data.get("token", "")) != "":
         player_token = String(data.get("token"))
         save_game()
@@ -3521,7 +3549,7 @@ func build_ui() -> void:
 
     news_menu_button = make_menu_button("📰  НОВОСТИ", Vector2(left_x, y4), Vector2(col_w, row_h), Color("#76583F"))
     news_menu_button.pressed.connect(func(): open_panel("news"))
-    menu_layer.add_child(news); main_menu_controls.append(news); decorate_main_menu_button(news)
+    menu_layer.add_child(news_menu_button); main_menu_controls.append(news_menu_button); decorate_main_menu_button(news_menu_button)
 
     var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#5E554D"))
     settings.pressed.connect(func(): open_panel("settings"))
@@ -7886,6 +7914,11 @@ func register_game_activity() -> void:
         waiting_overlay.visible = false
 
 func update_missions() -> void:
+    # During asynchronous startup HUD is not created until the 82% stage.
+    # _process()/remote callbacks may call update_ui before that, so do nothing
+    # until hud_layer exists. This prevents a runtime error from pausing startup.
+    if hud_layer == null or not is_instance_valid(hud_layer):
+        return
     var panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
     if panel and panel.visible:
         var is_daily := String(panel.get_meta("mission_type", "daily")) == "daily"
