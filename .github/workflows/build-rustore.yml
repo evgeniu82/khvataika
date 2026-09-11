@@ -312,7 +312,7 @@ jobs:
 
           echo "Android server notification receiver patched"
 
-      - name: Rebuild signed RuStore AAB after Android patch
+            - name: Build signed APK after Android patch
         shell: bash
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.KEYSTORE_PATH }}
@@ -321,29 +321,28 @@ jobs:
         run: |
           set -euo pipefail
 
-          rm -f build/rustore/khvataika-1.13.6.aab
-
+          rm -f build/rustore/khvataika-1.13.6.apk
           mkdir -p build/rustore
 
-          echo "Exporting final signed AAB..."
+          echo "Exporting final signed APK..."
 
           "$HOME/godot/godot" \
             --headless \
             --path . \
             --export-release \
-            "Android RuStore AAB" \
-            "build/rustore/khvataika-1.13.6.aab"
+            "Android" \
+            "build/rustore/khvataika-1.13.6.apk"
 
-          test -s build/rustore/khvataika-1.13.6.aab
+          test -s build/rustore/khvataika-1.13.6.apk
 
-          file build/rustore/khvataika-1.13.6.aab
+          file build/rustore/khvataika-1.13.6.apk
 
-          echo "Final AAB export completed"
+          echo "Final APK export completed"
 
-      - name: Upload AAB artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: khvataika-1.13.6-rustore-aab
-          path: build/rustore/khvataika-1.13.6.aab
+          name: khvataika-1.13.6-apk
+          path: build/rustore/khvataika-1.13.6.apk
           if-no-files-found: error
           retention-days: 14
