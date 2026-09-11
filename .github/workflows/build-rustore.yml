@@ -68,17 +68,29 @@ jobs:
           test -f "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip"
           echo "Godot and export templates ready"
 
+      - name: Import project resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Finish Godot's resource import queue before Gradle setup.
+          "$HOME/godot/godot" --headless --path . --import
+          echo "Project resources imported"
+
       - name: Install project Gradle template
         shell: bash
         run: |
           set -euo pipefail
           rm -rf android
+          mkdir -p android/build
 
-          # IMPORTANT: install the template through Godot itself.
-          # This creates res://android/.build_version, which Godot checks
-          # before allowing a Gradle Android export. Manually unzipping
-          # android_source.zip into android/build loses that version marker.
-          "$HOME/godot/godot" --headless --path . --install-android-build-template
+          # Install the official Gradle source template directly.
+          # This avoids the standalone template-install command that caused
+          # resource-loader errors in the previous CI run.
+          TEMPLATE_ZIP="$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable/android_source.zip"
+          test -f "$TEMPLATE_ZIP"
+          unzip -q "$TEMPLATE_ZIP" -d android/build
+          touch android/build/.gdignore
+          printf '%s\n' "${GODOT_VERSION}.stable" > android/.build_version
 
           test -f android/.build_version
           test -f android/build/gradlew
