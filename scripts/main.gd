@@ -2496,8 +2496,6 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
     setup_events()
     await get_tree().process_frame
-    claim_daily_bonus()
-    await get_tree().process_frame
     update_ui()
     await get_tree().process_frame
     apply_quality_settings()
