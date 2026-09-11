@@ -316,6 +316,10 @@ var owned_machine_skins: Array[bool] = []
 var selected_claw_skin: int = 0
 var selected_toy_skin: int = 0
 var selected_machine_skin: int = 0
+var server_attempt_ready: bool = false
+var server_attempt_success: bool = false
+var server_attempt_toy_id: String = ""
+var server_attempt_reward: Dictionary = {}
 var vip_panel: PanelContainer
 var seasons_panel: PanelContainer
 var vip_owned: Array[bool] = []
@@ -1753,7 +1757,20 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             current_result = String(data.get("message", "Сервер отклонил действие"))
         else:
             match kind:
-                "action:game_start": current_result = "КЛЕШНЬ ГОТОВА К ПОПЫТКЕ"
+                "action:game_start":
+                    server_attempt_ready = false
+                    server_attempt_success = false
+                    server_attempt_toy_id = ""
+                    server_attempt_reward = {}
+                    var start_attempt: Variant = data.get("attempt", {})
+                    if start_attempt is Dictionary:
+                        server_attempt_ready = true
+                        server_attempt_success = bool(start_attempt.get("success", false))
+                        server_attempt_toy_id = String(start_attempt.get("toy_id", ""))
+                        var start_reward: Variant = start_attempt.get("reward", {})
+                        if start_reward is Dictionary:
+                            server_attempt_reward = start_reward.duplicate(true)
+                    current_result = "КЛЕШНЬ ГОТОВА К ПОПЫТКЕ"
                 "action:game_finish":
                     var sr: Dictionary = data.get("prize", {}) if data.get("prize", null) is Dictionary else {}
                     if bool(data.get("success", false)) and not sr.is_empty():
@@ -1789,7 +1806,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 "action:daily_login":
                     setup_login_streak()
                     update_daily_login_ui()
-                    current_result = "ЕЖЕДНЕВНАЯ СЕРИЯ: ДЕНЬ %d • НАГРАДА ЗАЧИСЛЕНА СЕРВЕРОМ" % login_streak
+                    refresh_shop()
+                    current_result = "🎁 ДЕНЬ %d • ПРИЗ ПОЛУЧЕН • СЕРИЯ ПРОДОЛЖЕНА" % login_streak
                 "action:claim_daily", "action:claim_daily_mission", "action:claim_weekly_mission": current_result = "НАГРАДА ЗАЧИСЛЕНА СЕРВЕРОМ"
                 "action:settings_update":
                     apply_quality_settings()
@@ -4379,10 +4397,12 @@ func update_daily_login_ui() -> void:
             # Обработчик сам проверяет, можно ли забрать этот день.
             btn.disabled = false
             if claimed:
-                btn.text = "✓ ДЕНЬ %d\nПОЛУЧЕН" % day
+                btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ ПОЛУЧЕН" % day
+                btn.tooltip_text = "Приз за этот день уже получен"
                 style_button(btn, Color("#5FBF72"))
             elif available:
                 btn.text = "🎁 ДЕНЬ %d\n+%d ₽\nЗАБРАТЬ" % [day, 20 + day * 5]
+                btn.tooltip_text = "Забрать приз за сегодняшний день"
                 style_button(btn, Color("#C09A70"))
             else:
                 btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
@@ -5091,6 +5111,17 @@ func apply_shop_visuals() -> void:
                 if mm: mm.albedo_color = ms["frame"]
         for light in machine_lights:
             if light: light.light_color = ms["light"]
+    # Скин игрушек должен менять внешний вид уже созданных призов сразу после выбора.
+    if selected_toy_skin < toy_skin_specs.size():
+        var tint: Color = toy_skin_specs[selected_toy_skin]["tint"]
+        for body in prize_bodies:
+            if body and is_instance_valid(body):
+                var meshes := body.find_children("", "MeshInstance3D", true, false)
+                for mesh_node in meshes:
+                    var toy_mesh := mesh_node as MeshInstance3D
+                    if toy_mesh:
+                        var toy_mat := toy_mesh.material_override as StandardMaterial3D
+                        if toy_mat: toy_mat.albedo_color = tint
 
 func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
@@ -7497,6 +7528,11 @@ func process_claw(delta: float) -> void:
         drop_time += delta
         animate_grip(clampf(drop_time / 0.35, 0.0, 1.0))
         if drop_time >= 0.48:
+            if _server_ready() and player_token != "" and not server_attempt_ready:
+                # Ждём ответ game_start, чтобы физика клешни никогда не расходилась
+                # с решением сервера.
+                drop_time = 0.30
+                return
             var grabbed := resolve_grab()
             drop_time = 0.0
             if grabbed:
@@ -7524,7 +7560,7 @@ func process_claw(delta: float) -> void:
         if claw_pos.y >= CLAW_HOME.y - 0.03:
             # Иногда игрушка соскальзывает после подъёма. В этом случае она
             # остаётся обычным призом и НЕ засчитывается игроку.
-            if grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
+            if not SERVER_AUTHORITATIVE and grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
                 if _server_ready() and player_token != "":
                     _server_action("game_finish")
                 grabbed_toy.freeze = false
@@ -7673,6 +7709,10 @@ func drop_claw() -> void:
             current_result = "НЕТ АВТОРИЗАЦИИ СЕРВЕРА"
             update_ui()
             return
+        server_attempt_ready = false
+        server_attempt_success = false
+        server_attempt_toy_id = ""
+        server_attempt_reward = {}
         if not _server_action("game_start"):
             current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
             update_ui()
@@ -7691,6 +7731,49 @@ func drop_claw() -> void:
     update_ui()
 
 func resolve_grab() -> bool:
+    # В онлайне результат захвата уже определён сервером в game_start.
+    # Клиент отвечает только за визуальную часть и выбор игрушки под клешнёй.
+    if _server_ready() and player_token != "":
+        if not server_attempt_ready:
+            current_result = "ЖДЁМ ОТВЕТ СЕРВЕРА…"
+            update_ui()
+            return false
+        if not server_attempt_success:
+            current_result = "НЕ УДЕРЖАЛА 😅"
+            play_upgrade_sound("fail")
+            current_win_streak = 0
+            update_ui()
+            return false
+        var server_choice := -1
+        if server_attempt_toy_id != "":
+            for i in range(prize_data.size()):
+                if String(prize_data[i].get("kind", "toy")) == "toy":
+                    var pi := int(prize_data[i].get("index", -1))
+                    if pi >= 0 and pi < toys.size() and String(toys[pi].get("id", "")) == server_attempt_toy_id:
+                        server_choice = i
+                        break
+        var chosen_server := server_choice if server_choice >= 0 else choose_top_layer_prize()
+        if chosen_server < 0 or chosen_server >= prize_bodies.size():
+            current_result = "ПОД КЛЕШНЁЙ НЕТ ПРИЗА"
+            update_ui()
+            return false
+        grabbed_index = chosen_server
+        var selected_body_server := prize_bodies[chosen_server]
+        grabbed_toy = selected_body_server
+        pending_prize_data = prize_data[chosen_server].duplicate(true)
+        pending_prize_data["weight"] = float(selected_body_server.get_meta("toy_weight", 38.0)) if selected_body_server else 38.0
+        last_reward_rubles = int(server_attempt_reward.get("amount", 0))
+        last_prize_xp = 0
+        last_prize_name = String(pending_prize_data.get("name", "Приз"))
+        last_prize_collection = String(pending_prize_data.get("collection", ""))
+        last_prize_rarity = String(pending_prize_data.get("rarity", ""))
+        if grabbed_toy and is_instance_valid(grabbed_toy):
+            grabbed_toy.freeze = true
+            grabbed_toy.sleeping = true
+        current_result = "ЗАХВАТ: %s • СЕРВЕР ПОДТВЕРДИЛ" % last_prize_name
+        update_ui()
+        return true
+
     var bonus: float = float(claw_specs[selected_claw]["bonus"])
     var upgrade_bonus: float = float(upgrade_levels[0] + upgrade_levels[1] + upgrade_levels[2]) * 0.028
     var success_chance: float = clampf(0.28 + bonus + upgrade_bonus, 0.0, 0.95)
