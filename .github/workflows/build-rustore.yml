@@ -312,7 +312,7 @@ jobs:
 
           echo "Android server notification receiver patched"
 
-            - name: Build signed APK after Android patch
+      - name: Build signed APK after Android patch
         shell: bash
         env:
           GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.KEYSTORE_PATH }}
