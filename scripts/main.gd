@@ -1379,10 +1379,13 @@ func apply_server_game_state(data: Dictionary) -> void:
     workshop_parts = engineering_parts if workshop_parts == 0 and engineering_parts > 0 else workshop_parts
     if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
     if data.has("referral_used"): referral_used = bool(data.get("referral_used", referral_used))
+    apply_shop_visuals()
     update_ui()
+    refresh_shop()
     refresh_chests_panel()
     refresh_workshop_panel()
     refresh_live_systems_panel()
+    update_daily_login_ui()
     save_game()
 
 func show_server_blocked(reason: String = "") -> void:
@@ -1773,8 +1776,20 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     var bought: Variant = data.get("item", {})
                     if bought is Dictionary and String(bought.get("category", "")) == "claws":
                         selected_claw = clampi(int((bought.get("effect", {}) as Dictionary).get("claw_index", selected_claw)), 0, claw_specs.size()-1)
+                    apply_shop_visuals()
+                    refresh_shop()
                     current_result = "ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
+                "action:cosmetic_buy":
+                    apply_shop_visuals()
+                    build_prizes()
+                    refresh_shop()
+                    refresh_vip_panel()
+                    current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
+                "action:daily_login":
+                    setup_login_streak()
+                    update_daily_login_ui()
+                    current_result = "ЕЖЕДНЕВНАЯ СЕРИЯ: ДЕНЬ %d • НАГРАДА ЗАЧИСЛЕНА СЕРВЕРОМ" % login_streak
                 "action:claim_daily", "action:claim_daily_mission", "action:claim_weekly_mission": current_result = "НАГРАДА ЗАЧИСЛЕНА СЕРВЕРОМ"
                 "action:settings_update":
                     apply_quality_settings()
