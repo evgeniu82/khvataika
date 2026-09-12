@@ -1798,7 +1798,19 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                         var start_reward: Variant = start_attempt.get("reward", {})
                         if start_reward is Dictionary:
                             server_attempt_reward = start_reward.duplicate(true)
-                    current_result = "КЛЕШНЬ ГОТОВА К ПОПЫТКЕ"
+
+                    # game_start приходит асинхронно. Если сервер ответил уже после
+                    # выхода из drop_claw(), обязательно запускаем физическую
+                    # последовательность опускания клешни здесь.
+                    if server_attempt_ready and drop_state == 0:
+                        claw_target = claw_pos
+                        claw_move_target = claw_pos
+                        claw_drop_target_y = find_top_layer_drop_y()
+                        drop_state = 1
+                        drop_time = 0.0
+                        current_result = "КЛЕШНЬ ОПУСКАЕТСЯ..."
+                    else:
+                        current_result = "КЛЕШНЬ ГОТОВА К ПОПЫТКЕ"
                 "action:game_finish":
                     var sr: Dictionary = data.get("prize", {}) if data.get("prize", null) is Dictionary else {}
                     if bool(data.get("success", false)) and not sr.is_empty():
