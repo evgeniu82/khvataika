@@ -47,7 +47,7 @@ func _process(delta: float) -> void:
             _fail("ОШИБКА ЗАГРУЗКИ ИГРОВОГО МОДУЛЯ")
             set_process(false)
             return
-        _set_progress(20.0, "ИГРОВОЙ МОДУЛЬ ЗАГРУЖЕН", "ШАГ 4 • ПОДГОТОВКА ИГРЫ")
+        _set_progress(12.0, "ИГРОВОЙ МОДУЛЬ ПОДГОТОВЛЕН", "ШАГ 4 • ПОДГОТОВКА ИГРЫ")
         await get_tree().process_frame
         core_instance = core_scene.instantiate() as Node3D
         if core_instance == null:
@@ -56,15 +56,13 @@ func _process(delta: float) -> void:
             return
         core_instance.name = "ClawNeonReal3D"
         add_child(core_instance)
+        # GameCore запускает свою последовательную инициализацию самостоятельно
+        # из обычного _ready() после чистого кадра. Bootstrap больше не проверяет
+        # наличие метода и не вызывает main.gd напрямую: это устраняет последний
+        # хрупкий участок передачи управления на Android.
         await get_tree().process_frame
-        await get_tree().process_frame
-        _set_progress(25.0, "ОСНОВНОЙ МОДУЛЬ ПОДКЛЮЧЕН", "ШАГ 5 • ПЕРЕДАЧА ЗАВЕРШЕНА")
-        if is_instance_valid(core_instance) and core_instance.has_method("begin_sequential_initialization"):
-            core_instance.call("begin_sequential_initialization")
-            set_process(false)
-        else:
-            _fail("ОШИБКА ЗАПУСКА ОСНОВНОГО МОДУЛЯ")
-            set_process(false)
+        _set_progress(15.0, "ИГРОВОЙ МОДУЛЬ ЗАПУЩЕН", "ШАГ 5 • ПЕРЕДАЧА ЗАВЕРШЕНА")
+        set_process(false)
         return
     if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
         _fail("НЕ УДАЛОСЬ ЗАГРУЗИТЬ ИГРОВОЙ МОДУЛЬ")

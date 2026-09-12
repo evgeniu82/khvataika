@@ -734,11 +734,23 @@ func _ready() -> void:
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
     set_process(true)
+    # GameCore owns its startup. It waits one clean engine frame and then starts
+    # the sequential initializer. Bootstrap only creates this node and never
+    # calls into the huge main script.
+    call_deferred("_begin_startup_after_frame")
+
+func _begin_startup_after_frame() -> void:
+    if startup_initialization_running or game_initialized:
+        return
+    startup_initialization_requested = true
+    startup_initialization_running = true
+    await get_tree().process_frame
+    if not game_initialized:
+        initialize_game_async()
 
 func begin_sequential_initialization() -> void:
-    # Bootstrap calls this directly after Main has received a clean engine frame.
-    # Do NOT rely on Main._process() or a cross-script property handshake here:
-    # on some Android builds that handshake can remain at the 15% handoff point.
+    # Compatibility entry point kept for older scenes/builds. The current
+    # Bootstrap does not call this method; GameCore starts itself from _ready().
     if startup_initialization_running or game_initialized:
         return
     startup_initialization_requested = true
