@@ -203,6 +203,8 @@ const SERVER_AUTHORITATIVE: bool = true
 # CONTROL TEST: keep the five recently added feature groups out of startup.
 # Their code remains in the project; this switch only isolates the startup path.
 const STARTUP_CONTROL_TEST: bool = true
+# TEST 1: daily login/mission systems only. All other new startup features remain isolated.
+const DAILY_ONLY_TEST: bool = true
 var server_url: String = DEFAULT_SERVER_URL
 var player_id: String = ""
 var player_token: String = ""
@@ -2529,7 +2531,14 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
     await set_loading_progress(98.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
-    if not STARTUP_CONTROL_TEST:
+    if DAILY_ONLY_TEST:
+        await set_loading_status("ПРОВЕРЯЕМ ЕЖЕДНЕВНУЮ СЕРИЮ...")
+        setup_daily_systems()
+        await get_tree().process_frame
+        setup_login_streak()
+        await get_tree().process_frame
+        await set_loading_progress(99.0, "ЕЖЕДНЕВНАЯ СЕРИЯ ГОТОВА")
+    elif not STARTUP_CONTROL_TEST:
         setup_daily_systems()
         await get_tree().process_frame
         setup_login_streak()
