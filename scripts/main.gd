@@ -315,6 +315,7 @@ var hud_layer: Control
 var gameplay_modal_blocker: Control
 var shop_panel: PanelContainer
 var shop_content: VBoxContainer
+var shop_feedback_label: Label
 var shop_category: String = "upgrades"
 var owned_claw_skins: Array[bool] = []
 var owned_toy_skins: Array[bool] = []
@@ -1708,6 +1709,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             if kind == "action:promo_redeem":
                 remote_promo_request_active = false
             current_result = "Сервер временно недоступен. Повторяем подключение…"
+            if kind == "action:cosmetic_buy":
+                refresh_shop()
             update_ui()
         return
 
@@ -1734,6 +1737,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             if kind == "action:promo_redeem":
                 remote_promo_request_active = false
             current_result = "Сервер отклонил запрос (HTTP %d)" % response_code
+            if kind == "action:cosmetic_buy":
+                refresh_shop()
             update_ui()
         return
 
@@ -1748,6 +1753,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 if kind == "action:promo_redeem":
                     remote_promo_request_active = false
                 current_result = "Сервер вернул некорректный ответ"
+                if kind == "action:cosmetic_buy":
+                    refresh_shop()
                 update_ui()
             return
     else:
@@ -1772,6 +1779,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 current_result = "🏆 НОВЫЕ ДОСТИЖЕНИЯ: " + " • ".join(pending_new_achievements)
         if not bool(data.get("ok", false)):
             current_result = String(data.get("message", "Сервер отклонил действие"))
+            if kind == "action:cosmetic_buy":
+                refresh_shop()
         else:
             match kind:
                 "action:game_start":
@@ -1819,6 +1828,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     refresh_shop()
                     refresh_vip_panel()
                     current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
+                "action:shop_select":
+                    apply_shop_visuals()
+                    build_prizes()
+                    refresh_shop()
+                    refresh_vip_panel()
+                    current_result = "СКИН ВЫБРАН И СОХРАНЁН НА СЕРВЕРЕ"
                 "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
                 "action:daily_login":
                     setup_login_streak()
@@ -5051,6 +5066,16 @@ func build_shop_panel() -> PanelContainer:
     wallet.modulate = GOLD
     root.add_child(wallet)
 
+    # Результат операции показываем прямо внутри магазина.
+    # Иначе сообщение сервера было скрыто панелью магазина.
+    shop_feedback_label = Label.new()
+    shop_feedback_label.name = "ShopFeedback"
+    shop_feedback_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    shop_feedback_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    shop_feedback_label.add_theme_font_size_override("font_size", 17)
+    shop_feedback_label.modulate = Color("#F0D4A9")
+    root.add_child(shop_feedback_label)
+
     var scroll := ScrollContainer.new()
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     root.add_child(scroll)
@@ -5072,6 +5097,8 @@ func refresh_shop() -> void:
     for child in shop_content.get_children(): child.queue_free()
     var wallet := shop_panel.get_node_or_null("VBoxContainer/ShopWallet")
     if wallet: wallet.text = "💰  БАЛАНС: %d ₽" % coins
+    if shop_feedback_label and is_instance_valid(shop_feedback_label):
+        shop_feedback_label.text = "" if current_result == "ГОТОВ К ИГРЕ" else current_result
 
     match shop_category:
         "upgrades": build_shop_upgrades()
@@ -5156,8 +5183,9 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return selected
         var item_id := "claw_skin_%d" % index if specs == claw_skin_specs else ("toy_skin_%d" % index if specs == toy_skin_specs else "machine_skin_%d" % index)
-        # Уже купленный скин можно установить сразу, не дожидаясь ответа HTTP.
-        # Сервер всё равно подтверждает выбор и сохраняет его.
+        # Если предмет уже куплен, это именно ВЫБОР, а не повторная покупка.
+        # Не отправляем cosmetic_buy повторно: используем отдельный shop_select,
+        # чтобы сервер сохранил выбранный скин без списания рублей.
         if owned[index]:
             selected = index
             if specs == claw_skin_specs:
@@ -5169,10 +5197,24 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
             apply_shop_visuals()
             if specs == toy_skin_specs:
                 build_prizes()
-            refresh_shop()
-            current_result = "УСТАНОВЛЕН СКИН: %s" % String(specs[index].get("name", "ГОТОВО"))
+            current_result = "СКИН ВЫБРАН: %s" % String(specs[index].get("name", "ГОТОВО"))
             update_ui()
-        _server_action("cosmetic_buy", {"item_id":item_id})
+            refresh_shop()
+            if _server_action("shop_select", {"item_id":item_id}):
+                current_result = "СКИН ВЫБРАН И СОХРАНЯЕТСЯ НА СЕРВЕРЕ"
+            else:
+                current_result = "СКИН ВЫБРАН • СЕРВЕР ЗАНЯТ, ПОВТОРИТЕ ЧУТЬ ПОЗЖЕ"
+            update_ui()
+            refresh_shop()
+            return selected
+
+        # Новый скин покупается через авторитетный сервер.
+        if _server_action("cosmetic_buy", {"item_id":item_id}):
+            current_result = "ПОКУПКА СКИНА ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
+        else:
+            current_result = "ОПЕРАЦИЯ ЗАНЯТА — ПОДОЖДИТЕ"
+        update_ui()
+        refresh_shop()
         return selected
     if owned[index]:
         selected = index
