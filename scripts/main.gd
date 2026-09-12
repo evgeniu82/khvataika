@@ -16,7 +16,7 @@ const CLAW_MAX := Vector3(2.55, 8.20, 1.55)
 const TOY_SCALE := 0.04968
 const TARGET_PRIZE_COUNT: int = 60
 const MAX_PRIZE_CENTER_Y: float = 5.12
-const GRAB_SLIP_CHANCE: float = 0.22
+const GRAB_SLIP_CHANCE: float = 0.18
 const CAPSULE_CHANCE: float = 0.055
 
 const CYAN := Color("#28E8FF")
@@ -154,6 +154,7 @@ var _last_nav_context: String = ""
 
 # Оставлен только звук движения клешни.
 var sfx_move: AudioStreamPlayer
+var sfx_streams: Dictionary = {}
 var sfx_volume_db: float = -4.0
 var music_volume_db: float = -8.0
 var vibration_on: bool = true
@@ -327,6 +328,10 @@ var server_attempt_success: bool = false
 var server_attempt_toy_id: String = ""
 var server_attempt_toy_name: String = ""
 var server_attempt_reward: Dictionary = {}
+var server_attempt_slip: bool = false
+var server_target_prize_index: int = -1
+var joystick_hold_x: float = 0.0
+var joystick_hold_z: float = 0.0
 var vip_panel: PanelContainer
 var seasons_panel: PanelContainer
 var vip_owned: Array[bool] = []
@@ -729,6 +734,7 @@ func _ready() -> void:
     ensure_player_id()
     remote_http = HTTPRequest.new()
     remote_http.name = "RemoteGameHTTP"
+    remote_http.timeout = 3.0
     add_child(remote_http)
     remote_http.request_completed.connect(_on_remote_http_completed)
 
@@ -736,10 +742,12 @@ func _ready() -> void:
     # A regular background sync must never delay a claw drop or skin installation.
     claw_http = HTTPRequest.new()
     claw_http.name = "ClawActionHTTP"
+    claw_http.timeout = 1.5
     add_child(claw_http)
     claw_http.request_completed.connect(_on_claw_http_completed)
     cosmetic_http = HTTPRequest.new()
     cosmetic_http.name = "CosmeticActionHTTP"
+    cosmetic_http.timeout = 2.0
     add_child(cosmetic_http)
     cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
     # Android permission responses are delivered by MainLoop/SceneTree.
@@ -1446,13 +1454,18 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
     if not _server_ready() or player_token == "":
         return false
     if remote_request_kind != "":
-        # Не теряем важные действия, если в этот момент идёт обычная синхронизация.
-        # Особенно это важно для ЗАХВАТА и выбора скина на Android.
-        if action_name in ["game_start", "cosmetic_buy", "daily_login"]:
-            var queued := {"name": action_name, "payload": payload.duplicate(true)}
-            remote_action_queue.append(queued)
-            return true
-        return false
+        # Приоритетные игровые действия не ждут фоновой синхронизации.
+        if action_name in ["game_start", "cosmetic_buy", "daily_login", "game_finish", "workshop_upgrade", "workshop_blueprint", "workshop_calibrate"]:
+            if remote_request_kind in ["config", "sync", "notifications", "rating", "register"]:
+                remote_http.cancel_request()
+                remote_request_kind = ""
+                remote_action_name = ""
+            else:
+                var queued := {"name": action_name, "payload": payload.duplicate(true)}
+                remote_action_queue.append(queued)
+                return true
+        else:
+            return false
     var data := payload.duplicate(true)
     data["type"] = action_name
     data["action_id"] = "%s_%s_%s" % [action_name, player_id, str(Time.get_ticks_msec())]
@@ -1711,6 +1724,10 @@ func _on_claw_http_completed(result: int, response_code: int, headers: PackedStr
         server_attempt_reward = {}
         # The physical cycle may already be running; it will safely return home.
         if drop_state == 1 or drop_state == 2:
+            claw_move_target = CLAW_HOME
+            claw_target = CLAW_HOME
+            drop_state = 8
+            drop_time = 0.0
             current_result = "СЕРВЕР НЕ ОТВЕТИЛ — КЛЕШНЬ ВОЗВРАЩАЕТСЯ"
         update_ui()
         return
@@ -1722,6 +1739,10 @@ func _on_claw_http_completed(result: int, response_code: int, headers: PackedStr
         server_attempt_toy_name = ""
         server_attempt_reward = {}
         if drop_state == 1 or drop_state == 2:
+            claw_move_target = CLAW_HOME
+            claw_target = CLAW_HOME
+            drop_state = 8
+            drop_time = 0.0
             current_result = String(parsed.get("message", "Сервер отклонил попытку")) if parsed is Dictionary else "Сервер вернул ошибку"
         update_ui()
         return
@@ -1738,6 +1759,7 @@ func _on_claw_http_completed(result: int, response_code: int, headers: PackedStr
         server_attempt_toy_name = String(start_attempt.get("toy_name", ""))
         var reward: Variant = start_attempt.get("reward", {})
         server_attempt_reward = reward.duplicate(true) if reward is Dictionary else {}
+        server_attempt_slip = bool(start_attempt.get("slip", false))
     update_ui()
 
 func _on_cosmetic_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
@@ -1784,6 +1806,7 @@ func _abort_server_claw_attempt(message: String) -> void:
     server_attempt_toy_id = ""
     server_attempt_toy_name = ""
     server_attempt_reward = {}
+    server_attempt_slip = false
     if drop_state != 0:
         claw_move_target = CLAW_HOME
         claw_target = CLAW_HOME
@@ -1888,6 +1911,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     # После успешного получения серверной награды этот день
                     # сразу становится закрытым в интерфейсе.
                     daily_claim_available = false
+                    play_upgrade_sound("coin")
                     setup_login_streak()
                     update_daily_login_ui()
                 "action:game_start":
@@ -1896,6 +1920,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     server_attempt_toy_id = ""
                     server_attempt_toy_name = ""
                     server_attempt_reward = {}
+                    server_attempt_slip = false
                     var start_attempt: Variant = data.get("attempt", {})
                     if start_attempt is Dictionary:
                         server_attempt_ready = true
@@ -1974,11 +1999,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                         refresh_vip_panel()
                         current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
-                "action:daily_login":
-                    setup_login_streak()
-                    update_daily_login_ui()
-                    refresh_shop()
-                    current_result = "🎁 ДЕНЬ %d • ПРИЗ ПОЛУЧЕН • СЕРИЯ ПРОДОЛЖЕНА" % login_streak
+                # daily_login обработан выше: здесь не дублируем match-ветку.
                 "action:claim_daily", "action:claim_daily_mission", "action:claim_weekly_mission": current_result = "НАГРАДА ЗАЧИСЛЕНА СЕРВЕРОМ"
                 "action:settings_update":
                     apply_quality_settings()
@@ -2764,6 +2785,7 @@ render_mode diffuse_burley, specular_schlick_ggx;
 
 uniform vec4 base_color : source_color;
 uniform float fuzz = 0.035;
+uniform float skin_style = 0.0;
 
 float hash13(vec3 p) {
     p = fract(p * 0.1031);
@@ -2783,8 +2805,51 @@ void fragment() {
     float n2 = hash13(q * 2.17 + 11.0);
     float fabric = mix(n1, n2, 0.35);
     float shade = 0.90 + fabric * 0.12;
-    ALBEDO = base_color.rgb * shade;
-    ROUGHNESS = 0.96;
+    vec3 c = base_color.rgb;
+    float st = mod(floor(skin_style + 0.5), 12.0);
+    if (st == 1.0) {
+        float stripes = step(0.52, fract(UV.y * 7.0));
+        c = mix(c, vec3(0.98, 0.98, 1.0), stripes * 0.45);
+    } else if (st == 2.0) {
+        vec2 p = fract(UV * 6.0) - 0.5;
+        float dots = 1.0 - step(0.16, length(p));
+        c = mix(c, vec3(0.08, 0.02, 0.20), dots * 0.72);
+    } else if (st == 3.0) {
+        c = mix(c, vec3(1.0, 0.68, 0.08), 0.32);
+        METALLIC = 0.35;
+        ROUGHNESS = 0.48;
+    } else if (st == 4.0) {
+        c = mix(c, vec3(0.82, 0.90, 1.0), 0.48);
+        METALLIC = 0.42;
+        ROUGHNESS = 0.34;
+    } else if (st == 5.0) {
+        float stars = step(0.965, hash13(vec3(floor(UV * 18.0), 0.0)));
+        c = mix(c, vec3(0.08, 0.02, 0.25), 0.55);
+        c += vec3(0.35, 0.55, 1.0) * stars;
+    } else if (st == 6.0) {
+        float fire = clamp(UV.y + 0.20 * sin(UV.x * 18.0), 0.0, 1.0);
+        c = mix(vec3(0.95, 0.08, 0.015), vec3(1.0, 0.72, 0.03), fire);
+    } else if (st == 7.0) {
+        c = mix(c, vec3(0.55, 0.95, 1.0), 0.42);
+        c += vec3(0.18, 0.35, 0.48) * (1.0 - UV.y);
+    } else if (st == 8.0) {
+        c = 0.5 + 0.5 * cos(vec3(0.0, 2.1, 4.2) + UV.x * 8.0 + UV.y * 5.0);
+    } else if (st == 9.0) {
+        float gx = step(0.88, fract(UV.x * 12.0));
+        float gy = step(0.88, fract(UV.y * 12.0));
+        c = mix(c, vec3(0.03, 0.18, 0.08), 0.58);
+        c += vec3(0.10, 1.0, 0.40) * max(gx, gy) * 0.65;
+    } else if (st == 10.0) {
+        c = mix(c, vec3(0.025, 0.03, 0.05), 0.78);
+        c += vec3(0.16, 0.20, 0.28) * fabric;
+    } else if (st == 11.0) {
+        c = mix(c, vec3(1.0, 0.48, 0.05), 0.38);
+        c += vec3(0.75, 0.22, 0.95) * pow(max(0.0, sin(UV.x * 14.0 + UV.y * 11.0)), 8.0) * 0.55;
+        METALLIC = 0.22;
+    }
+    ALBEDO = c * shade;
+    if (st == 2.0 || st == 5.0 || st == 8.0 || st == 9.0 || st == 11.0) EMISSION = c * 0.10;
+    if (st != 0.0 && st != 1.0 && st != 2.0 && st != 6.0 && st != 7.0 && st != 10.0) ROUGHNESS = min(ROUGHNESS, 0.72);
     SPECULAR = 0.12;
 }
 """
@@ -3844,6 +3909,9 @@ func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 
     return st
 
 func style_button(b: Button, accent: Color = Color("#A8754A"), large: bool = false) -> void:
+    if not b.has_meta("ui_sfx_bound"):
+        b.set_meta("ui_sfx_bound", true)
+        b.pressed.connect(func(): play_ui_sound("button"))
     b.add_theme_color_override("font_color", Color.WHITE)
     b.add_theme_color_override("font_hover_color", Color.WHITE)
     b.add_theme_color_override("font_pressed_color", Color.WHITE)
@@ -4274,6 +4342,30 @@ func _on_android_back_pressed() -> void:
                 show_main_menu()
     update_android_navigation()
 
+func _input(event: InputEvent) -> void:
+    # Боковые игровые окна закрываются касанием вне самого окна.
+    # Это позволяет выйти из любого правого кружка одним тапом по игровому полю,
+    # не ломая нажатия кнопок внутри открытого окна.
+    if not hud_layer or not hud_layer.visible:
+        return
+    if event is InputEventScreenTouch and event.pressed:
+        var pos := event.position
+        var panel := _get_open_gameplay_side_panel()
+        if panel and not Rect2(panel.global_position, panel.size).has_point(pos):
+            close_side_panels()
+    elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+        var mpos := event.position
+        var mpanel := _get_open_gameplay_side_panel()
+        if mpanel and not Rect2(mpanel.global_position, mpanel.size).has_point(mpos):
+            close_side_panels()
+
+func _get_open_gameplay_side_panel() -> Control:
+    var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as Control
+    if mission_panel and mission_panel.visible: return mission_panel
+    if daily_login_panel and daily_login_panel.visible: return daily_login_panel
+    if event_panel and event_panel.visible: return event_panel
+    return null
+
 func _unhandled_input(event: InputEvent) -> void:
     if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
         get_viewport().set_input_as_handled()
@@ -4413,15 +4505,42 @@ func build_extra_hud() -> void:
     md.add_theme_font_size_override("font_size", 18)
     mv.add_child(md)
 
+func animate_panel_in(panel: Control, from_scale: float = 0.94) -> void:
+    if not panel or not is_instance_valid(panel):
+        return
+    panel.pivot_offset = panel.size * 0.5
+    panel.scale = Vector2(from_scale, from_scale)
+    panel.modulate.a = 0.0
+    var tween := create_tween()
+    tween.set_parallel(true)
+    tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    tween.tween_property(panel, "scale", Vector2.ONE, 0.18)
+    tween.tween_property(panel, "modulate:a", 1.0, 0.14)
+    play_ui_sound("open")
+
+func animate_panel_out(panel: Control) -> void:
+    if not panel or not is_instance_valid(panel):
+        return
+    var tween := create_tween()
+    tween.set_parallel(true)
+    tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+    tween.tween_property(panel, "scale", Vector2(0.96, 0.96), 0.10)
+    tween.tween_property(panel, "modulate:a", 0.0, 0.08)
+
 func close_side_panels(except_name: String = "") -> void:
     var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
-    if mission_panel and except_name != "MissionDetailPanel":
+    if mission_panel and except_name != "MissionDetailPanel" and mission_panel.visible:
+        animate_panel_out(mission_panel)
         mission_panel.visible = false
-    if daily_login_panel and except_name != "DailyLoginPanel":
+    if daily_login_panel and except_name != "DailyLoginPanel" and daily_login_panel.visible:
         daily_login_panel.visible = false
-    if event_panel and except_name != "EventPanel":
+        daily_login_panel.scale = Vector2.ONE
+        daily_login_panel.modulate.a = 1.0
+    if event_panel and except_name != "EventPanel" and event_panel.visible:
+        animate_panel_out(event_panel)
         event_panel.visible = false
-    if return_bonus_panel and except_name != "ReturnBonusPanel":
+    if return_bonus_panel and except_name != "ReturnBonusPanel" and return_bonus_panel.visible:
+        animate_panel_out(return_bonus_panel)
         return_bonus_panel.visible = false
     update_android_navigation()
 
@@ -4449,6 +4568,7 @@ func toggle_mission_detail(is_daily: bool) -> void:
         title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
         detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
     panel.visible = true
+    animate_panel_in(panel)
     update_android_navigation()
 
 func _calendar_day_number(date_str: String) -> int:
@@ -4490,8 +4610,8 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Компактная карточка, привязанная к правому кругу. На Android она
     # полностью помещается в экран и раскрывается влево от кнопки.
-    daily_login_panel.position = Vector2(180, 320)
-    daily_login_panel.size = Vector2(190, 92)
+    daily_login_panel.position = Vector2(20, 320)
+    daily_login_panel.size = Vector2(130, 72)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     hud_layer.add_child(daily_login_panel)
@@ -4505,29 +4625,29 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 7)
+    title.add_theme_font_size_override("font_size", 6)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    detail.add_theme_font_size_override("font_size", 6)
+    detail.add_theme_font_size_override("font_size", 5)
     v.add_child(detail)
 
     daily_days_container = GridContainer.new()
     daily_days_container.name = "DailyDaysGrid"
     daily_days_container.columns = 4
     daily_days_container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-    daily_days_container.add_theme_constant_override("h_separation", 2)
-    daily_days_container.add_theme_constant_override("v_separation", 2)
+    daily_days_container.add_theme_constant_override("h_separation", 1)
+    daily_days_container.add_theme_constant_override("v_separation", 1)
     v.add_child(daily_days_container)
 
     daily_day_buttons.clear()
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(43, 22)
-        day_button.add_theme_font_size_override("font_size", 4)
+        day_button.custom_minimum_size = Vector2(30, 18)
+        day_button.add_theme_font_size_override("font_size", 3)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
         day_button.set_meta("day_index", day)
@@ -4541,7 +4661,7 @@ func build_daily_login_panel() -> void:
     hint.name = "DailyLoginHint"
     hint.text = "Нажми на день, который доступен сейчас"
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    hint.add_theme_font_size_override("font_size", 4)
+    hint.add_theme_font_size_override("font_size", 3)
     v.add_child(hint)
 
 func update_daily_login_ui() -> void:
@@ -4583,20 +4703,26 @@ func toggle_daily_login() -> void:
     if not daily_login_panel:
         return
     if daily_login_panel.visible:
-        daily_login_panel.visible = false
+        animate_panel_out(daily_login_panel)
+        await get_tree().create_timer(0.10).timeout
+        if is_instance_valid(daily_login_panel): daily_login_panel.visible = false
         return
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
     daily_login_panel.visible = true
     # Небольшое появление от точки правого круга: окно выглядит как часть той же навигации.
     # Центр карточки совпадает с центром правого круга; раскрытие идёт строго влево.
-    var final_pos := Vector2(180, 320)
-    daily_login_panel.position = Vector2(450, 320)
+    # Правый край карточки совпадает с внутренним краем правой вертикали кнопок.
+    var right_edge := 1030.0
+    var final_x := maxf(8.0, right_edge - daily_login_panel.size.x)
+    var final_pos := Vector2(final_x, 320)
+    daily_login_panel.position = Vector2(final_x + 55.0, 320)
     daily_login_panel.modulate.a = 0.0
     var tween := create_tween()
     tween.set_parallel(true)
-    tween.tween_property(daily_login_panel, "position", final_pos, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-    tween.tween_property(daily_login_panel, "modulate:a", 1.0, 0.14)
+    tween.tween_property(daily_login_panel, "position", final_pos, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    tween.tween_property(daily_login_panel, "modulate:a", 1.0, 0.16)
+    play_ui_sound("open")
     update_daily_login_ui()
     update_android_navigation()
 
@@ -4831,11 +4957,13 @@ func toggle_event_panel() -> void:
     close_side_panels("EventPanel")
     event_panel.visible = true
     update_event_panel()
+    animate_panel_in(event_panel)
     update_android_navigation()
 
 func build_audio() -> void:
     # Звук движения клешни + отдельная фоновая мелодия без авторских сэмплов.
-    sfx_move = make_sfx_player("res://audio/claw_move.wav")
+    if not sfx_move or not is_instance_valid(sfx_move):
+        sfx_move = make_sfx_player("res://audio/claw_move.wav")
     if sfx_move.stream is AudioStreamWAV:
         (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
     music_player = make_sfx_player("res://audio/background_music.ogg")
@@ -5001,25 +5129,36 @@ func build_hud() -> void:
     menu.pressed.connect(show_main_menu)
     hud_layer.add_child(menu)
 
-    # Виртуальный джойстик: только 4 понятных направления.
-    var pad := make_control_button("✦", Vector2(52, 1570))
+    # Виртуальный джойстик — единая панель. Кнопки являются её дочерними
+    # элементами, поэтому не рисуют отдельный фон поверх джойстика.
+    var pad := Panel.new()
+    pad.name = "ClawJoystickPad"
+    pad.position = Vector2(52, 1570)
     pad.size = Vector2(250, 250)
-    pad.add_theme_font_size_override("font_size", 34)
-    pad.tooltip_text = "Управление клешнью"
+    style_panel(pad, Color("#241B16"), Color("#76583F"), 28, 3)
+    pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
     hud_layer.add_child(pad)
 
     var dirs: Array = [
-        ["↑", Vector2(141, 1582), 0.0, -0.58],
-        ["←", Vector2(62, 1662), -0.58, 0.0],
-        ["→", Vector2(220, 1662), 0.58, 0.0],
-        ["↓", Vector2(141, 1742), 0.0, 0.58]
+        ["↑", Vector2(89, 12), 0.0, -1.0],
+        ["←", Vector2(10, 92), -1.0, 0.0],
+        ["→", Vector2(168, 92), 1.0, 0.0],
+        ["↓", Vector2(89, 172), 0.0, 1.0]
     ]
     for d in dirs:
-        var db := make_control_button(String(d[0]), d[1])
+        var db := make_control_button(String(d[0]), Vector2.ZERO)
+        db.position = d[1]
         db.size = Vector2(72, 68)
         db.add_theme_font_size_override("font_size", 28)
-        db.pressed.connect(func(dx: float = float(d[2]), dz: float = float(d[3])): move_x(dx); move_z(dz))
-        hud_layer.add_child(db)
+        var dx := float(d[2])
+        var dz := float(d[3])
+        db.button_down.connect(func(): joystick_hold_x = dx; joystick_hold_z = dz)
+        db.button_up.connect(func():
+            if is_equal_approx(joystick_hold_x, dx) and is_equal_approx(joystick_hold_z, dz):
+                joystick_hold_x = 0.0
+                joystick_hold_z = 0.0
+        )
+        pad.add_child(db)
 
     var pass_btn := Button.new()
     pass_btn.name = "SeasonPassHudButton"
@@ -5038,7 +5177,7 @@ func build_hud() -> void:
     grab.size = Vector2(330, 190)
     style_button(grab, Color("#8A684C"), true)
     grab.tooltip_text = "Зафиксировать позицию и опустить клешню"
-    grab.pressed.connect(drop_claw)
+    grab.button_down.connect(drop_claw)
     hud_layer.add_child(grab)
 
 
@@ -5252,7 +5391,10 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
         var item_id := "claw_skin_%d" % index if specs == claw_skin_specs else ("toy_skin_%d" % index if specs == toy_skin_specs else "machine_skin_%d" % index)
         # Уже купленный скин можно установить сразу, не дожидаясь ответа HTTP.
         # Сервер всё равно подтверждает выбор и сохраняет его.
-        if owned[index]:
+        # Применяем внешний вид сразу, не ожидая HTTP. Если сервер отклонит
+        # покупку, его game_state ниже восстановит прежний выбор.
+        var can_preview := owned[index] or coins >= int(specs[index]["price"])
+        if can_preview:
             selected = index
             if specs == claw_skin_specs:
                 selected_claw_skin = index
@@ -5312,6 +5454,14 @@ func _recolor_mesh_tree(root: Node, color: Color, skip_names: Array[String] = []
     for child in root.get_children():
         _recolor_mesh_tree(child, color, skip_names)
 
+func _apply_toy_skin_style(root: Node, style_index: int) -> void:
+    if not root or not is_instance_valid(root): return
+    if root is MeshInstance3D and root.material_override is ShaderMaterial:
+        var sm := root.material_override as ShaderMaterial
+        sm.set_shader_parameter("skin_style", float(style_index))
+    for child in root.get_children():
+        _apply_toy_skin_style(child, style_index)
+
 func apply_shop_visuals() -> void:
     var current_machine: Node3D = get_node_or_null("PremiumClawMachine") as Node3D
     if claw and selected_claw_skin >= 0 and selected_claw_skin < claw_skin_specs.size():
@@ -5330,6 +5480,7 @@ func apply_shop_visuals() -> void:
         for body in prize_bodies:
             if body and is_instance_valid(body):
                 _recolor_mesh_tree(body, tint)
+                _apply_toy_skin_style(body, selected_toy_skin)
 
 func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
@@ -7453,6 +7604,10 @@ func open_panel(which: String) -> void:
         else:
             return_bonus_panel.visible = true
             refresh_return_bonus_panel()
+        for child in hud_layer.get_children():
+            if child is PanelContainer and child.visible and child != gameplay_modal_blocker:
+                animate_panel_in(child)
+                break
         return
 
     # Обычные пункты меню открываются отдельным экраном, как и раньше.
@@ -7481,6 +7636,11 @@ func open_panel(which: String) -> void:
     elif which == "rating":
         rating_panel.visible = true
         refresh_rating_panel()
+    # Все основные окна меню появляются одинаково плавно.
+    for child in menu_layer.get_children():
+        if child is PanelContainer and child.visible:
+            animate_panel_in(child)
+            break
     update_android_navigation()
 
 func close_gameplay_overlay() -> void:
@@ -7699,6 +7859,10 @@ func _process(delta: float) -> void:
         claw_pos.z = lerpf(claw_pos.z, claw_move_target.z, smooth)
         if absf(claw_pos.x - claw_move_target.x) < 0.002: claw_pos.x = claw_move_target.x
         if absf(claw_pos.z - claw_move_target.z) < 0.002: claw_pos.z = claw_move_target.z
+        if joystick_hold_x != 0.0 or joystick_hold_z != 0.0:
+            var hold_speed := 2.75 * maxf(0.65, joystick_sensitivity)
+            if joystick_hold_x != 0.0: move_x(joystick_hold_x * delta * hold_speed)
+            if joystick_hold_z != 0.0: move_z(joystick_hold_z * delta * hold_speed)
         if Input.is_action_just_pressed("drop_claw"): drop_claw()
 
 func animate_camera(delta: float) -> void:
@@ -7724,7 +7888,7 @@ func process_claw(delta: float) -> void:
     if drop_state == 1:
         # Опускаемся только до верхнего слоя игрушек под клешнёй.
         # Если сверху уже лежит игрушка, клешня не пытается пробиться к нижним слоям.
-        claw_pos.y = move_toward(claw_pos.y, claw_drop_target_y, delta * 5.0)
+        claw_pos.y = move_toward(claw_pos.y, claw_drop_target_y, delta * 13.0)
         animate_grip(0.0)
         if claw_pos.y <= claw_drop_target_y + 0.02:
             # Контакт клешни слегка сдвигает соседние игрушки — они физически
@@ -7742,13 +7906,13 @@ func process_claw(delta: float) -> void:
 
     elif drop_state == 2:
         drop_time += delta
-        animate_grip(clampf(drop_time / 0.35, 0.0, 1.0))
-        if drop_time >= 0.48:
+        animate_grip(clampf(drop_time / 0.12, 0.0, 1.0))
+        if drop_time >= 0.14:
             if _server_ready() and player_token != "" and not server_attempt_ready:
                 # Не оставляем клешню навсегда внизу, если HTTP-ответ задержался.
                 # Сервер всё равно остаётся источником истины; при нормальном ответе
                 # этот таймер сбрасывается сразу в resolve_grab().
-                if drop_time < 0.75:
+                if drop_time < 0.32:
                     return
                 _abort_server_claw_attempt("Сервер слишком долго отвечает — клешня возвращается")
                 return
@@ -7773,13 +7937,29 @@ func process_claw(delta: float) -> void:
 
     elif drop_state == 3:
         # Сначала поднимаем клешню вертикально, игрушка жёстко следует за ней.
-        claw_pos.y = move_toward(claw_pos.y, CLAW_HOME.y, delta * 4.5)
-        animate_grip(0.0)
+        claw_pos.y = move_toward(claw_pos.y, CLAW_HOME.y, delta * 6.0)
+        animate_grip(1.0)
         follow_grabbed_toy()
         if claw_pos.y >= CLAW_HOME.y - 0.03:
-            # Иногда игрушка соскальзывает после подъёма. В этом случае она
-            # остаётся обычным призом и НЕ засчитывается игроку.
-            if not SERVER_AUTHORITATIVE and grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
+            # Сервер может разрешить успешный захват, но случайно сделать
+            # соскальзывание уже после подъёма — визуально это выглядит естественно.
+            if SERVER_AUTHORITATIVE and server_attempt_slip and grabbed_toy and is_instance_valid(grabbed_toy):
+                grabbed_toy.freeze = false
+                grabbed_toy.sleeping = false
+                grabbed_toy.linear_velocity = Vector3(randf_range(-0.35, 0.35), -1.7, randf_range(-0.35, 0.35))
+                grabbed_toy.angular_velocity = Vector3(randf_range(-1.5, 1.5), randf_range(-1.5, 1.5), randf_range(-1.5, 1.5))
+                grabbed_toy = null
+                grabbed_index = -1
+                pending_prize_data.clear()
+                _server_action("game_finish")
+                claw_move_target = CLAW_HOME
+                claw_target = CLAW_HOME
+                drop_state = 8
+                drop_time = 0.0
+                current_result = "ИГРУШКА СКОЛЬЗНУЛА"
+                save_game()
+                update_ui()
+            elif not SERVER_AUTHORITATIVE and grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
                 if _server_ready() and player_token != "":
                     _server_action("game_finish")
                 grabbed_toy.freeze = false
@@ -7803,10 +7983,10 @@ func process_claw(delta: float) -> void:
     elif drop_state == 4:
         # Теперь именно КЛЕШНЯ С ИГРУШКОЙ едет к отверстию.
         var chute_target := Vector3(PRIZE_HOLE.x, CLAW_HOME.y, PRIZE_HOLE.z)
-        var travel_speed := 5.2
+        var travel_speed := 6.8
         claw_pos.x = move_toward(claw_pos.x, chute_target.x, delta * travel_speed)
         claw_pos.z = move_toward(claw_pos.z, chute_target.z, delta * travel_speed)
-        animate_grip(0.0)
+        animate_grip(1.0)
         follow_grabbed_toy()
         if absf(claw_pos.x - chute_target.x) < 0.02 and absf(claw_pos.z - chute_target.z) < 0.02:
             claw_pos.x = chute_target.x
@@ -7816,8 +7996,8 @@ func process_claw(delta: float) -> void:
 
     elif drop_state == 5:
         # Опускаем клешню прямо над отверстием, сохраняя игрушку в захвате.
-        var release_y := PRIZE_HOLE.y + 2.10
-        claw_pos.y = move_toward(claw_pos.y, release_y, delta * 3.8)
+        var release_y := PRIZE_HOLE.y + 1.95
+        claw_pos.y = move_toward(claw_pos.y, release_y, delta * 5.0)
         animate_grip(0.0)
         follow_grabbed_toy()
         if claw_pos.y <= release_y + 0.01:
@@ -7835,6 +8015,7 @@ func process_claw(delta: float) -> void:
                 grabbed_toy.freeze = false
                 grabbed_toy.sleeping = false
                 grabbed_toy.linear_velocity = Vector3(0, -2.2, 0)
+                play_upgrade_sound("drop")
                 grabbed_toy.angular_velocity = Vector3(randf_range(-1.2, 1.2), randf_range(-1.2, 1.2), randf_range(-1.2, 1.2))
             drop_state = 7
             drop_time = 0.0
@@ -7863,7 +8044,7 @@ func process_claw(delta: float) -> void:
 
     elif drop_state == 8:
         # Возвращаем клешню вверх в её исходное положение над отверстием.
-        var return_speed := 5.0
+        var return_speed := 6.2
         claw_pos.y = move_toward(claw_pos.y, CLAW_HOME.y, delta * return_speed)
         claw_pos.x = move_toward(claw_pos.x, CLAW_HOME.x, delta * return_speed)
         claw_pos.z = move_toward(claw_pos.z, CLAW_HOME.z, delta * return_speed)
@@ -7929,7 +8110,17 @@ func _start_fast_claw_server_attempt() -> bool:
     server_attempt_toy_id = ""
     server_attempt_toy_name = ""
     server_attempt_reward = {}
-    var payload := {"type":"game_start", "action_id":"game_start_%s_%s" % [player_id, str(Time.get_ticks_msec())]}
+    server_attempt_slip = false
+    server_target_prize_index = -1
+    var target_id := ""
+    server_target_prize_index = -1
+    var nearest := choose_nearest_prize()
+    if nearest >= 0 and nearest < prize_data.size():
+        server_target_prize_index = nearest
+        var nd: Dictionary = prize_data[nearest]
+        var ni := int(nd.get("index", -1))
+        if ni >= 0 and ni < toys.size(): target_id = String(toys[ni].get("id", ""))
+    var payload := {"type":"game_start", "target_toy_id":target_id, "action_id":"game_start_%s_%s" % [player_id, str(Time.get_ticks_msec())]}
     claw_http_busy = true
     var err := claw_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(payload))
     if err != OK:
@@ -7962,6 +8153,13 @@ func drop_claw() -> void:
         return
     play_upgrade_sound("grab")
     register_game_activity()
+    var nearest_prize := choose_nearest_prize()
+    if nearest_prize >= 0 and nearest_prize < prize_bodies.size():
+        var nearest_body := prize_bodies[nearest_prize]
+        if nearest_body and is_instance_valid(nearest_body):
+            claw_drop_target_y = clampf(nearest_body.global_position.y + 0.92, 3.50, MAX_PRIZE_CENTER_Y + 0.95)
+    else:
+        claw_drop_target_y = 3.50
     if _server_ready():
         if player_token == "":
             current_result = "НЕТ АВТОРИЗАЦИИ СЕРВЕРА"
@@ -8027,7 +8225,21 @@ func resolve_grab() -> bool:
                 var cdz := candidate.global_position.z - claw_pos.z
                 if sqrt(cdx * cdx + cdz * cdz) > 1.05:
                     server_choice = -1
-        var chosen_server := server_choice if server_choice >= 0 else choose_top_layer_prize()
+        # Фиксируем именно ту ближайшую игрушку, над которой игрок нажал «ЗАХВАТ».
+        # После движения вниз не выбираем другую игрушку случайно.
+        var chosen_server := server_target_prize_index
+        if chosen_server < 0 or chosen_server >= prize_bodies.size():
+            chosen_server = server_choice
+        if chosen_server >= 0 and chosen_server < prize_bodies.size():
+            var exact_body := prize_bodies[chosen_server]
+            if not exact_body or not is_instance_valid(exact_body):
+                chosen_server = -1
+            else:
+                var exact_dist := Vector2(exact_body.global_position.x - claw_pos.x, exact_body.global_position.z - claw_pos.z).length()
+                if exact_dist > 0.90:
+                    chosen_server = -1
+        if chosen_server < 0:
+            chosen_server = choose_top_layer_prize()
         if chosen_server < 0 or chosen_server >= prize_bodies.size():
             current_result = "ПОД КЛЕШНЁЙ НЕТ ПРИЗА"
             update_ui()
@@ -8045,6 +8257,7 @@ func resolve_grab() -> bool:
         if grabbed_toy and is_instance_valid(grabbed_toy):
             grabbed_toy.freeze = true
             grabbed_toy.sleeping = true
+        play_upgrade_sound("win")
         current_result = "ЗАХВАТ: %s • СЕРВЕР ПОДТВЕРДИЛ" % last_prize_name
         update_ui()
         return true
@@ -8175,6 +8388,25 @@ func finalize_delivered_prize() -> void:
     pending_prize_data.clear()
     save_game()
     update_ui()
+
+func choose_nearest_prize(max_distance: float = 1.28) -> int:
+    var best := -1
+    var best_dist := max_distance
+    var best_y := -100.0
+    for i in range(prize_bodies.size()):
+        var body := prize_bodies[i]
+        if not body or not is_instance_valid(body) or not body.visible or body.freeze:
+            continue
+        if i >= prize_data.size(): continue
+        if String(prize_data[i].get("kind", "toy")) != "toy": continue
+        var dx := body.global_position.x - claw_pos.x
+        var dz := body.global_position.z - claw_pos.z
+        var dist := sqrt(dx * dx + dz * dz)
+        if dist <= best_dist and (dist < best_dist - 0.015 or body.global_position.y > best_y):
+            best = i
+            best_dist = dist
+            best_y = body.global_position.y
+    return best
 
 func find_top_layer_drop_y() -> float:
     var best_y := 3.50
@@ -8772,25 +9004,49 @@ func rarity_color(rarity: String) -> Color:
         _: return Color.WHITE
 
 func build_upgrade_sound_system() -> void:
-    # Компактная процедурная звуковая система: не требует внешних аудиофайлов.
-    for key in ["button", "coin", "grab", "win", "fail", "level", "chest"]:
+    # Отдельные короткие SFX: интерфейс, захват, успех, срыв, монеты и выдача.
+    var files := {
+        "button":"res://audio/ui_click.wav",
+        "open":"res://audio/ui_open.wav",
+        "close":"res://audio/ui_close.wav",
+        "coin":"res://audio/coin.wav",
+        "grab":"res://audio/grab_close.wav",
+        "win":"res://audio/grab_success.wav",
+        "fail":"res://audio/grab_fail.wav",
+        "drop":"res://audio/prize_drop.wav"
+    }
+    for key in files.keys():
         var player := AudioStreamPlayer.new()
-        player.name = "SFX_" + key
+        player.name = "SFX_" + String(key)
+        player.stream = load(String(files[key]))
+        player.volume_db = sfx_volume_db
         add_child(player)
         sound_players[key] = player
+    # Движение клешни остаётся отдельным циклическим моторным звуком.
+    sfx_move = make_sfx_player("res://audio/claw_move.wav")
+    if sfx_move.stream is AudioStreamWAV:
+        (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
 
-func play_upgrade_sound(kind: String) -> void:
+func play_ui_sound(kind: String) -> void:
     if not sfx_on: return
     var player: AudioStreamPlayer = sound_players.get(kind, null)
-    if player and is_instance_valid(player):
-        if kind == "grab" and sfx_move and sfx_move.stream:
-            player.stream = sfx_move.stream
-        elif kind == "coin" or kind == "button" or kind == "level" or kind == "chest" or kind == "win" or kind == "fail":
-            if sfx_move and sfx_move.stream:
-                player.stream = sfx_move.stream
-        player.pitch_scale = {"button":1.35,"coin":1.55,"grab":0.82,"win":1.05,"fail":0.65,"level":1.20,"chest":0.92}.get(kind,1.0)
+    if player and is_instance_valid(player) and player.stream:
         player.volume_db = sfx_volume_db
         player.play()
+
+func play_upgrade_sound(kind: String) -> void:
+    if kind == "grab":
+        play_ui_sound("grab")
+    elif kind == "win":
+        play_ui_sound("win")
+    elif kind == "fail":
+        play_ui_sound("fail")
+    elif kind == "coin":
+        play_ui_sound("coin")
+    elif kind == "drop":
+        play_ui_sound("drop")
+    elif kind == "level" or kind == "chest" or kind == "button":
+        play_ui_sound("button")
 
 func get_profile_summary() -> String:
     var collections_done := completed_collections.size()
