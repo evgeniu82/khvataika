@@ -716,7 +716,20 @@ func _ready() -> void:
     # начинается только после первого кадра.
     randomize()
     startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
-    create_loading_screen()
+    # When launched through Bootstrap, reuse its single loading screen.
+    # This prevents a second loading/splash layer from being created while the
+    # heavy Main scene is being prepared.
+    var bootstrap_loading = get_parent().get_node_or_null("LoadingScreen") if get_parent() else null
+    if bootstrap_loading and is_instance_valid(bootstrap_loading):
+        loading_screen = bootstrap_loading as Control
+        loading_status = loading_screen.get_node_or_null("LoadingStatus") as Label
+        loading_progress = loading_screen.get_node_or_null("LoadingProgress") as ProgressBar
+        loading_percent = loading_screen.get_node_or_null("LoadingPercent") as Label
+        loading_stage = loading_screen.get_node_or_null("LoadingStage") as Label
+        loading_tip = loading_screen.get_node_or_null("LoadingTip") as Label
+        loading_ring = loading_screen.get_node_or_null("LoadingRing") as Panel
+    else:
+        create_loading_screen()
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
     await get_tree().process_frame
@@ -2482,16 +2495,6 @@ func create_loading_screen() -> void:
     card_style.set_corner_radius_all(34)
     card.add_theme_stylebox_override("panel", card_style)
     loading_screen.add_child(card)
-
-    var loading_image := TextureRect.new()
-    loading_image.name = "LoadingMiniature"
-    loading_image.texture = load("res://assets/loading_miniature_small.png") as Texture2D
-    loading_image.position = Vector2(300, 255)
-    loading_image.size = Vector2(480, 360)
-    loading_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-    loading_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-    loading_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    loading_screen.add_child(loading_image)
 
     var top_label := Label.new()
     top_label.text = "АРКАДНЫЙ АВТОМАТ  •  ХВАТАЙКА"
