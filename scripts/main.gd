@@ -1674,6 +1674,19 @@ func _apply_remote_config(config: Dictionary) -> void:
     refresh_vip_panel()
     update_ui()
 
+func _abort_server_claw_attempt(message: String) -> void:
+    server_attempt_ready = false
+    server_attempt_success = false
+    server_attempt_toy_id = ""
+    server_attempt_reward = {}
+    if drop_state != 0:
+        claw_move_target = CLAW_HOME
+        claw_target = CLAW_HOME
+        drop_state = 8
+        drop_time = 0.0
+    current_result = message
+    update_ui()
+
 func _on_remote_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
     var kind := remote_request_kind
     remote_request_kind = ""
@@ -1690,6 +1703,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             remote_action_name = ""
             if kind == "action:promo_redeem":
                 remote_promo_request_active = false
+            if kind == "action:game_start":
+                _abort_server_claw_attempt("Сервер временно недоступен. Повторяем подключение…")
+                return
             current_result = "Сервер временно недоступен. Повторяем подключение…"
             update_ui()
         return
@@ -1716,6 +1732,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             remote_action_name = ""
             if kind == "action:promo_redeem":
                 remote_promo_request_active = false
+            if kind == "action:game_start":
+                _abort_server_claw_attempt("Сервер отклонил попытку захвата (HTTP %d)" % response_code)
+                return
             current_result = "Сервер отклонил запрос (HTTP %d)" % response_code
             update_ui()
         return
@@ -1730,6 +1749,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 remote_action_name = ""
                 if kind == "action:promo_redeem":
                     remote_promo_request_active = false
+                if kind == "action:game_start":
+                    _abort_server_claw_attempt("Сервер вернул некорректный ответ")
+                    return
                 current_result = "Сервер вернул некорректный ответ"
                 update_ui()
             return
@@ -1757,6 +1779,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             current_result = String(data.get("message", "Сервер отклонил действие"))
         else:
             match kind:
+                "action:daily_login":
+                    # После успешного получения серверной награды этот день
+                    # сразу становится закрытым в интерфейсе.
+                    daily_claim_available = false
+                    setup_login_streak()
+                    update_daily_login_ui()
                 "action:game_start":
                     server_attempt_ready = false
                     server_attempt_success = false
@@ -4440,7 +4468,7 @@ func claim_login_reward_for_day(day: int) -> void:
         if day < 1 or day > 7: return
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
-        if _server_action("daily_login", {"day":day}):
+        if _server_action("daily_login", {"day":day, "local_date":Time.get_date_string_from_system()}):
             current_result = "ЕЖЕДНЕВНАЯ НАГРАДА ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; update_ui()
         return
     # Обработчик намеренно идемпотентный: повторное касание после получения
