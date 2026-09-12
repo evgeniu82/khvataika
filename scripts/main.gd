@@ -709,16 +709,11 @@ func _achievement_exists(id: String) -> bool:
     return false
 
 func _ready() -> void:
-    # Сначала создаём собственный загрузочный экран и отдаём движку кадр.
-    # Системная картинка splash отключена: Android показывает только свой
-    # короткий системный фон, после чего Main сразу показывает ЕДИНСТВЕННУЮ
-    # миниатюру внутри основного загрузочного экрана. Тяжёлая инициализация
-    # начинается только после первого кадра.
+    # Main is intentionally lightweight at startup. Bootstrap owns the single
+    # brown loading screen and loads this heavy scene in the background.
+    # Do not perform world/audio/network construction before the first frame.
     randomize()
     startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
-    # When launched through Bootstrap, reuse its single loading screen.
-    # This prevents a second loading/splash layer from being created while the
-    # heavy Main scene is being prepared.
     var bootstrap_loading = get_parent().get_node_or_null("LoadingScreen") if get_parent() else null
     if bootstrap_loading and is_instance_valid(bootstrap_loading):
         loading_screen = bootstrap_loading as Control
@@ -733,50 +728,7 @@ func _ready() -> void:
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
     await get_tree().process_frame
-
-    add_extended_collections()
-    add_progressive_achievements()
-    add_diverse_achievements()
-    owned_claw_skins.resize(claw_skin_specs.size())
-    owned_toy_skins.resize(toy_skin_specs.size())
-    owned_machine_skins.resize(machine_skin_specs.size())
-    for i in range(owned_claw_skins.size()): owned_claw_skins[i] = (i == 0)
-    for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
-    for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
-    load_save()
-    ensure_player_id()
-    remote_http = HTTPRequest.new()
-    remote_http.name = "RemoteGameHTTP"
-    remote_http.timeout = 3.0
-    add_child(remote_http)
-    remote_http.request_completed.connect(_on_remote_http_completed)
-
-    # Separate HTTP channels for time-critical gameplay and cosmetic selection.
-    # A regular background sync must never delay a claw drop or skin installation.
-    claw_http = HTTPRequest.new()
-    claw_http.name = "ClawActionHTTP"
-    claw_http.timeout = 1.5
-    add_child(claw_http)
-    claw_http.request_completed.connect(_on_claw_http_completed)
-    cosmetic_http = HTTPRequest.new()
-    cosmetic_http.name = "CosmeticActionHTTP"
-    cosmetic_http.timeout = 2.0
-    add_child(cosmetic_http)
-    cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
-    # Android permission responses are delivered by MainLoop/SceneTree.
-    # Without this connection, the first notification test could remain
-    # waiting forever after Android shows the permission dialog.
-    if get_tree().has_signal("on_request_permissions_result"):
-        var permission_callable := Callable(self, "_on_notification_permission_result")
-        if not get_tree().is_connected("on_request_permissions_result", permission_callable):
-            get_tree().connect("on_request_permissions_result", permission_callable)
-    update_return_bonus_state()
-    # Сеть и Android-уведомления никогда не должны быть частью первого кадра.
-    call_deferred("setup_android_notifications")
-    call_deferred("register_player_remote")
-    call_deferred("sync_remote_config")
     call_deferred("initialize_game_async")
-    call_deferred("build_upgrade_sound_system")
 
 func _is_android_runtime_available() -> bool:
     return OS.has_feature("android") and not Engine.is_editor_hint() and Engine.has_singleton("AndroidRuntime")
@@ -2679,54 +2631,102 @@ func set_loading_progress(value: float, text: String) -> void:
     await get_tree().process_frame
 
 func initialize_game_async() -> void:
+    # All expensive Main initialization starts only after the loading screen
+    # has rendered. This prevents Android from being stuck on the boot image.
+    await get_tree().process_frame
+
+    await set_loading_status("ПОДГОТАВЛИВАЕМ ПРОФИЛЬ И СОХРАНЕНИЕ...")
+    add_extended_collections()
+    add_progressive_achievements()
+    add_diverse_achievements()
+    owned_claw_skins.resize(claw_skin_specs.size())
+    owned_toy_skins.resize(toy_skin_specs.size())
+    owned_machine_skins.resize(machine_skin_specs.size())
+    for i in range(owned_claw_skins.size()): owned_claw_skins[i] = (i == 0)
+    for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
+    for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
+    load_save()
+    ensure_player_id()
+    await get_tree().process_frame
+
+    remote_http = HTTPRequest.new()
+    remote_http.name = "RemoteGameHTTP"
+    remote_http.timeout = 3.0
+    add_child(remote_http)
+    remote_http.request_completed.connect(_on_remote_http_completed)
+    claw_http = HTTPRequest.new()
+    claw_http.name = "ClawActionHTTP"
+    claw_http.timeout = 1.5
+    add_child(claw_http)
+    claw_http.request_completed.connect(_on_claw_http_completed)
+    cosmetic_http = HTTPRequest.new()
+    cosmetic_http.name = "CosmeticActionHTTP"
+    cosmetic_http.timeout = 2.0
+    add_child(cosmetic_http)
+    cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
+    if get_tree().has_signal("on_request_permissions_result"):
+        var permission_callable := Callable(self, "_on_notification_permission_result")
+        if not get_tree().is_connected("on_request_permissions_result", permission_callable):
+            get_tree().connect("on_request_permissions_result", permission_callable)
+    update_return_bonus_state()
+    call_deferred("setup_android_notifications")
+    call_deferred("register_player_remote")
+    call_deferred("sync_remote_config")
+    call_deferred("build_upgrade_sound_system")
+
     # Реальный последовательный загрузчик: процент продвигается только после
     # фактического завершения соответствующей операции. Между тяжёлыми этапами
     # обязательно отдаём кадр движку, чтобы загрузочный экран оставался живым.
-    await get_tree().process_frame
 
     await set_loading_status("ЗАГРУЖАЕМ ПРОФИЛЬ И РЕФЕРАЛЬНЫЕ ДАННЫЕ...")
     ensure_referral_code()
     process_incoming_referral()
-    await set_loading_progress(5.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
-    await set_loading_status("СОЗДАЁМ ИГРОВОЙ МИР И ПРИМЕНЯЕМ КАЧЕСТВО...")
-    build_world()
+    await set_loading_progress(78.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
+    await set_loading_status("СОЗДАЁМ ОСНОВУ МИРА...")
+    await build_world()
+    await set_loading_progress(79.5, "ОКРУЖЕНИЕ ГОТОВО")
     apply_quality_settings()
-    await set_loading_progress(15.0, "МИР СОЗДАН")
-    await set_loading_status("СОЗДАЁМ АВТОМАТ И АКТИВИРУЕМ СОБЫТИЕ...")
-    build_machine()
+    await get_tree().process_frame
+    await set_loading_progress(80.5, "КАЧЕСТВО ГРАФИКИ НАСТРОЕНО")
+    await set_loading_status("СОБИРАЕМ КОРПУС АВТОМАТА ПО ЧАСТЯМ...")
+    await build_machine()
     activate_calendar_event()
-    await set_loading_progress(30.0, "АВТОМАТ СОЗДАН")
-    await set_loading_status("СОЗДАЁМ РЕЛЬСЫ, КЛЕШНЮ И ПРИЦЕЛ...")
-    build_overhead_rails()
-    await get_tree().process_frame
-    build_claw()
-    await get_tree().process_frame
+    await set_loading_progress(85.0, "КОРПУС АВТОМАТА ГОТОВ")
+    await set_loading_status("СОЗДАЁМ РЕЛЬСЫ...")
+    await build_overhead_rails()
+    await set_loading_progress(86.5, "РЕЛЬСЫ ГОТОВЫ")
+    await set_loading_status("СОЗДАЁМ КЛЕШНЮ...")
+    await build_claw()
+    await set_loading_progress(88.5, "КЛЕШНЯ ГОТОВА")
+    await set_loading_status("СОЗДАЁМ ПРИЦЕЛ И ТОЧКУ ЗАХВАТА...")
     build_aim_marker()
     await get_tree().process_frame
-    await set_loading_progress(43.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
+    await set_loading_progress(90.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
     await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКИ...")
     await build_prizes_async()
     await get_tree().process_frame
-    await set_loading_progress(62.0, "ИГРУШКИ ЗАГРУЖЕНЫ")
+    await set_loading_progress(93.0, "ИГРУШКИ ЗАГРУЖЕНЫ")
 
     # В проекте GPUParticles3D сейчас намеренно отключены. Поэтому не делаем
     # фиктивный тяжёлый этап: здесь только фиксируем реальное состояние эффектов.
     await set_loading_status("ПРОВЕРЯЕМ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И ОСВЕЩЕНИЕ...")
     sparkle_particles = null
     await get_tree().process_frame
-    await set_loading_progress(72.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
+    await set_loading_progress(94.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
     await get_tree().process_frame
 
+    await set_loading_status("СОЗДАЁМ ИНТЕРФЕЙС ПО ЧАСТЯМ...")
     await build_ui()
+    await set_loading_progress(95.5, "ИНТЕРФЕЙС ГОТОВ")
 
     await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
     build_audio()
     await get_tree().process_frame
-    await set_loading_progress(97.0, "ЗВУК ПОДГОТОВЛЕН")
+    await set_loading_progress(96.0, "ЗВУК ПОДГОТОВЛЕН")
     await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
     apply_shop_visuals()
     await get_tree().process_frame
-    await set_loading_progress(98.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
+    await set_loading_progress(97.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     setup_daily_systems()
     await get_tree().process_frame
@@ -2990,10 +2990,12 @@ func build_world() -> void:
     add_child(reflection)
 
     var floor_mat := make_mat(Color("#2A211B"), 0.55, 0.30)
+    await get_tree().process_frame
     make_box(self, Vector3(24, 0.3, 22), Vector3(0, -0.3, 0), floor_mat, "PolishedFloor")
     make_box(self, Vector3(24, 9, 0.2), Vector3(0, 4.2, -7.8), make_mat(Color("#24211E"), 0.05, 0.72), "BackWall")
     make_box(self, Vector3(0.12, 9, 22), Vector3(-11.8, 4.2, 0), make_mat(Color("#302B27"), 0.12, 0.62), "LeftWall")
     make_box(self, Vector3(0.12, 9, 22), Vector3(11.8, 4.2, 0), make_mat(Color("#302B27"), 0.12, 0.62), "RightWall")
+    await get_tree().process_frame
 
     for z in [-5.5, -2.0, 1.5, 5.0]:
         make_box(self, Vector3(21.0, 0.025, 0.035), Vector3(0, -0.13, z), make_mat(Color("#4B3525"), 0.10, 0.45), "FloorInlay")
@@ -3020,8 +3022,8 @@ func build_world() -> void:
     fill2.omni_range = 15.0
     fill2.light_color = Color("#F2E4D0")
     add_child(fill2)
+    await get_tree().process_frame
     scene_lights.append(fill2)
-
 
 func build_machine() -> void:
     machine = Node3D.new()
@@ -3044,6 +3046,7 @@ func build_machine() -> void:
     make_box(machine, Vector3(0.42, 8.45, 0.42), Vector3(-3.55, 6.12, 2.35), wood_mid, "WoodFrontLeft")
     make_box(machine, Vector3(0.42, 8.45, 0.42), Vector3(3.55, 6.12, 2.35), wood_mid, "WoodFrontRight")
     make_box(machine, Vector3(7.25, 0.42, 0.42), Vector3(0, 10.20, 2.35), wood_light, "WoodTopFront")
+    await get_tree().process_frame
     make_box(machine, Vector3(7.25, 0.38, 0.38), Vector3(0, 2.98, 2.35), wood_dark, "WoodLowerFront")
     make_box(machine, Vector3(0.34, 7.2, 0.34), Vector3(-3.58, 5.95, -2.35), wood_dark, "WoodBackLeft")
     make_box(machine, Vector3(0.34, 7.2, 0.34), Vector3(3.58, 5.95, -2.35), wood_dark, "WoodBackRight")
@@ -3058,6 +3061,7 @@ func build_machine() -> void:
     make_box(machine, Vector3(6.9, 8.10, 0.08), Vector3(0, 6.20, -2.18), glass, "BackGlass")
     make_box(machine, Vector3(0.08, 8.10, 4.35), Vector3(-3.45, 6.20, 0), glass, "LeftGlass")
     make_box(machine, Vector3(0.08, 8.10, 4.35), Vector3(3.45, 6.20, 0), glass, "RightGlass")
+    await get_tree().process_frame
 
     # Усиленные невидимые физические стенки прямо внутри стекла.
     # Они толще самого стекла, имеют большой запас по высоте и закрывают
@@ -3090,6 +3094,7 @@ func build_machine() -> void:
     # Interior LED bars.
     for x in [-3.0, 0.0, 3.0]:
         make_box(machine, Vector3(0.07, 0.05, 4.4), Vector3(x, 9.60, 0), make_mat(Color("#E6D7C2"), 0.0, 0.55), "CeilingLight")
+        await get_tree().process_frame
     # Пол камеры разделён вокруг отверстия: под игрушками есть реальная физическая опора,
     # а в зоне выдачи нет пола — игрушка действительно проваливается в шахту.
     var prize_floor_mat := make_mat(Color("#3B3027"), 0.35, 0.42)
@@ -3130,6 +3135,7 @@ func build_machine() -> void:
     var opening_d := 0.96
     make_box(machine, Vector3(guard_t, guard_h, guard_d), Vector3(PRIZE_HOLE.x - (opening_w * 0.5 + guard_t * 0.5), guard_y, PRIZE_HOLE.z), hole_guard_mat, "PrizeHoleGuardLeft")
     make_box(machine, Vector3(guard_t, guard_h, guard_d), Vector3(PRIZE_HOLE.x + (opening_w * 0.5 + guard_t * 0.5), guard_y, PRIZE_HOLE.z), hole_guard_mat, "PrizeHoleGuardRight")
+    await get_tree().process_frame
     make_box(machine, Vector3(guard_w, guard_h, guard_t), Vector3(PRIZE_HOLE.x, guard_y, PRIZE_HOLE.z - (opening_d * 0.5 + guard_t * 0.5)), hole_guard_mat, "PrizeHoleGuardBack")
     make_box(machine, Vector3(guard_w, guard_h, guard_t), Vector3(PRIZE_HOLE.x, guard_y, PRIZE_HOLE.z + (opening_d * 0.5 + guard_t * 0.5)), hole_guard_mat, "PrizeHoleGuardFront")
     make_collision_box(machine, Vector3(guard_t, guard_h, guard_d), Vector3(PRIZE_HOLE.x - (opening_w * 0.5 + guard_t * 0.5), guard_y, PRIZE_HOLE.z), "PrizeHoleGuardCollisionLeft")
@@ -3145,6 +3151,7 @@ func build_machine() -> void:
     # Control deck.
     make_box(machine, Vector3(7.15, 0.27, 1.08), Vector3(0, 2.48, 3.30), dark_mat, "ControlDeck")
     make_box(machine, Vector3(2.0, 0.13, 0.72), Vector3(-2.0, 2.68, 3.30), chrome_dark, "JoystickPlate")
+    await get_tree().process_frame
     make_cylinder(machine, 0.075, 0.65, Vector3(-2.0, 2.98, 3.30), chrome, "JoystickStem")
     make_sphere(machine, 0.22, Vector3(-2.0, 3.32, 3.30), make_mat(Color("#8A5A36"), 0.15, 0.32), "JoystickBall")
     make_box(machine, Vector3(1.28, 0.13, 0.72), Vector3(1.35, 2.68, 3.30), chrome_dark, "ButtonPlate")
@@ -3172,6 +3179,7 @@ func build_machine() -> void:
         make_box(machine, Vector3(0.95, 0.08, 0.34), Vector3(x, 1.18, 3.02), chrome_dark, "Vent")
         for k in range(5):
             make_box(machine, Vector3(0.055, 0.05, 0.25), Vector3(x - 0.30 + float(k) * 0.15, 1.19, 3.18), chrome, "VentSlot")
+            await get_tree().process_frame
 
     # Lighting inside the cabinet: four small warm corner lights.
     for pos in [Vector3(-3.05, 8.65, 1.55), Vector3(3.05, 8.65, 1.55), Vector3(-3.05, 3.75, 1.55), Vector3(3.05, 3.75, 1.55)]:
@@ -3183,7 +3191,6 @@ func build_machine() -> void:
         add_child(corner_light)
         machine_lights.append(corner_light)
         scene_lights.append(corner_light)
-
 func build_overhead_rails() -> void:
     var rails := Node3D.new()
     rails.name = "OverheadMetalRails"
@@ -3196,13 +3203,13 @@ func build_overhead_rails() -> void:
         rails.get_child(rails.get_child_count() - 1).rotation.z = PI * 0.5
     # Поперечная каретка, по которой движется узел клешни по глубине.
     make_cylinder(rails, 0.075, 2.55, Vector3(0, 9.08, 0), dark_rail, "Z_Carriage")
+    await get_tree().process_frame
     rails.get_child(rails.get_child_count() - 1).rotation.x = PI * 0.5
     rail_carriage = Node3D.new()
     rail_carriage.name = "MovingCarriage"
     rail_carriage.position = Vector3(claw_pos.x, 8.98, claw_pos.z)
     rails.add_child(rail_carriage)
     make_box(rail_carriage, Vector3(0.52, 0.18, 0.52), Vector3.ZERO, dark_rail, "CarriageBlock")
-
 func build_claw() -> void:
     claw = Node3D.new()
     claw.name = "CinematicClaw"
@@ -3219,6 +3226,7 @@ func build_claw() -> void:
     make_cylinder(claw, 0.20, 0.10, Vector3(0, -0.04, 0), metal, "RotaryHub")
     make_sphere(claw, 0.17, Vector3(0, -0.12, 0), metal, "Hub")
     cable = make_cylinder(claw, 0.035, 2.0, Vector3(0, 1.45, 0), make_mat(Color("#3B3C39"), 0.9, 0.22), "Cable")
+    await get_tree().process_frame
     cable_glow = null
 
     # Настоящая трёхкогтевая конструкция: три одинаковых полукруглых
@@ -3237,11 +3245,11 @@ func build_claw() -> void:
         make_tube(arm, p0, p1, 0.085, metal, "FingerSegment01")
         make_tube(arm, p1, p2, 0.080, metal, "FingerSegment02")
         make_tube(arm, p2, p3, 0.075, metal, "FingerSegment03")
+        await get_tree().process_frame
         make_tube(arm, p3, p4, 0.070, metal, "FingerSegment04")
         make_tube(arm, p4, p5, 0.065, metal, "FingerTip")
         make_sphere(arm, 0.082, p5, metal, "GripPad")
         claw_arms.append(arm)
-
 func build_aim_marker() -> void:
     aim_marker = MeshInstance3D.new()
     aim_marker.name = "ClawAimMarker"
@@ -4018,6 +4026,7 @@ func build_ui() -> void:
     main_menu_controls.append(subtitle)
 
     var play := make_menu_button("▶  ИГРАТЬ", Vector2(75, 265), Vector2(930, 92), Color("#A8754A"), true)
+    await get_tree().process_frame
     play.pressed.connect(start_game)
     start_button = play
     menu_layer.add_child(play); main_menu_controls.append(play)
@@ -4044,6 +4053,7 @@ func build_ui() -> void:
     menu_layer.add_child(coll); main_menu_controls.append(coll); decorate_main_menu_button(coll)
 
     var achievements := make_menu_button("🏆  ДОСТИЖЕНИЯ", Vector2(left_x, y2), Vector2(col_w, row_h), Color("#8A684C"))
+    await get_tree().process_frame
     achievements.pressed.connect(func(): open_panel("achievements"))
     menu_layer.add_child(achievements); main_menu_controls.append(achievements); decorate_main_menu_button(achievements)
 
@@ -4056,6 +4066,7 @@ func build_ui() -> void:
     menu_layer.add_child(promo); main_menu_controls.append(promo); decorate_main_menu_button(promo)
 
     var rating := make_menu_button("🏆  РЕЙТИНГ", Vector2(right_x, y3), Vector2(col_w, row_h), Color("#76583F"))
+    await get_tree().process_frame
     rating.pressed.connect(func(): open_panel("rating"))
     menu_layer.add_child(rating); main_menu_controls.append(rating); decorate_main_menu_button(rating)
 
@@ -4068,6 +4079,7 @@ func build_ui() -> void:
     menu_layer.add_child(settings); main_menu_controls.append(settings); decorate_main_menu_button(settings)
 
     var help := make_menu_button("❓  ПОМОЩЬ", Vector2(left_x, y4 + row_h + gap), Vector2(930, row_h), Color("#76583F"))
+    await get_tree().process_frame
     help.pressed.connect(func(): open_panel("help"))
     menu_layer.add_child(help); main_menu_controls.append(help); decorate_main_menu_button(help)
     await set_loading_progress(82.0, "ГЛАВНОЕ МЕНЮ ГОТОВО")
@@ -4186,7 +4198,6 @@ func build_ui() -> void:
     setup_android_scrolls()
     await get_tree().process_frame
     await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
-
 func setup_android_scrolls() -> void:
     # Единая настройка прокрутки для всех длинных окон под Android.
     # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
