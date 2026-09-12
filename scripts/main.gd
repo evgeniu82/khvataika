@@ -719,6 +719,8 @@ func _ready() -> void:
     randomize()
     startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
     var bootstrap_loading = get_parent().get_node_or_null("LoadingScreen") if get_parent() else null
+    if bootstrap_loading == null:
+        bootstrap_loading = get_tree().root.find_child("LoadingScreen", true, false)
     if bootstrap_loading and is_instance_valid(bootstrap_loading):
         loading_screen = bootstrap_loading as Control
         loading_status = loading_screen.get_node_or_null("LoadingStatus") as Label

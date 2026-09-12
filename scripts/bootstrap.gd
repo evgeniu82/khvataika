@@ -1,36 +1,19 @@
 extends Control
 
-# Лёгкий стартовый загрузчик. Коричневый экран ниже НЕ меняем.
-# Главная сцена больше не загружается целиком: сначала отдельно загружается
-# только runtime-скрипт, затем создаётся пустой Node3D и уже после кадра
-# запускается последовательная инициализация игры.
-var main_scene_path := "res://scenes/Main.tscn"
-var main_scene_load_started := false
-var main_scene_attaching := false
-var main_scene: PackedScene = null
-var main_instance: Node3D = null
+# FINAL STARTUP: Bootstrap loads the real GameCore directly. Main.tscn is no
+# longer part of the handoff chain, so there is no 15% Main-entry bottleneck.
+# The brown loading screen below is kept unchanged.
+const GAME_CORE_PATH := "res://scenes/GameCore.tscn"
+var core_load_started := false
+var core_scene: PackedScene = null
+var core_instance: Node3D = null
 var loading_screen: Control
 var loading_progress: ProgressBar
 var loading_status: Label
 var loading_stage: Label
 var loading_percent: Label
 var loading_tip: Label
-var loading_elapsed: float = 0.0
-var loading_tip_index: int = 0
-var handoff_started: bool = false
-var handoff_elapsed: float = 0.0
-var handoff_wait_frames: int = 0
-
-var tips := [
-    "СОВЕТ: РЕДКИЕ ИГРУШКИ ПОЯВЛЯЮТСЯ НЕ СЛУЧАЙНО.",
-    "СОВЕТ: НАВОДИ КЛЕШНЮ ТОЧНЕЕ — ТАК ПРОЩЕ ЗАХВАТИТЬ ПРИЗ.",
-    "СОВЕТ: СОБИРАЙ КОЛЛЕКЦИИ — ЗА ДОСТИЖЕНИЯ ПОЛАГАЮТСЯ НАГРАДЫ.",
-    "СОВЕТ: МАСТЕРСКАЯ ПОМОГАЕТ ПРОКАЧИВАТЬ ВОЗМОЖНОСТИ АППАРАТА.",
-    "СОВЕТ: ПРОВЕРЯЙ СУНДУКИ И СЕЗОННЫЕ НАГРАДЫ.",
-    "СОВЕТ: ПРАЗДНИЧНЫЕ СОБЫТИЯ МОГУТ ДАТЬ ОСОБЫЕ БОНУСЫ.",
-    "СОВЕТ: ПРОМОКОДЫ МОГУТ ОТКРЫТЬ ДОПОЛНИТЕЛЬНЫЕ НАГРАДЫ.",
-    "СОВЕТ: ЗАБИРАЙ ЕЖЕДНЕВНЫЙ БОНУС, ЧТОБЫ НЕ ПРОПУСКАТЬ НАГРАДЫ."
-]
+var loading_elapsed := 0.0
 
 func _ready() -> void:
     create_loading_screen()
@@ -38,111 +21,79 @@ func _ready() -> void:
     await get_tree().process_frame
     _set_progress(2.0, "ЗАПУСКАЕМ ПОСЛЕДОВАТЕЛЬНУЮ ЗАГРУЗКУ...", "ШАГ 1 • СТАРТ")
     await get_tree().process_frame
-    # Load the tiny Main scene as one threaded resource. Main.tscn contains
-    # only a Node3D + main.gd; the script itself performs NO heavy work in _ready.
-    # This avoids the fragile set_script() handoff that previously stopped at 15%.
-    ResourceLoader.load_threaded_request(main_scene_path, "PackedScene", true)
-    main_scene_load_started = true
-    _set_progress(5.0, "ЗАГРУЖАЕМ ОСНОВУ ИГРОВОГО МОДУЛЯ...", "ШАГ 2 • ОСНОВА ИГРЫ")
+    _set_progress(5.0, "ЗАГРУЖАЕМ ИГРОВОЙ МОДУЛЬ ПО ЧАСТЯМ...", "ШАГ 2 • ИГРОВОЙ МОДУЛЬ")
+    await get_tree().process_frame
+    ResourceLoader.load_threaded_request(GAME_CORE_PATH, "PackedScene", true)
+    core_load_started = true
     set_process(true)
 
 func _process(delta: float) -> void:
     loading_elapsed += delta
     _update_tip()
-    if handoff_started:
-        handoff_elapsed += delta
-
-    if main_instance and is_instance_valid(main_instance):
-        if bool(main_instance.get("game_initialized")):
-            set_process(false)
-            return
-
-    if handoff_started:
-        # Give Main two completely clean engine frames, then invoke its startup
-        # method directly. We do not use a property handshake or depend on
-        # Main._process(), because that was the exact 15% failure point.
-        if main_instance and is_instance_valid(main_instance):
-            if bool(main_instance.get("game_initialized")):
-                set_process(false)
-                return
-            handoff_wait_frames -= 1
-            if handoff_wait_frames <= 0:
-                handoff_started = false
-                main_instance.call("begin_sequential_initialization")
-                set_process(true)
+    if not core_load_started:
         return
-
-    if not main_scene_load_started or main_scene_attaching:
-        return
-
     var progress := []
-    var status := ResourceLoader.load_threaded_get_status(main_scene_path, progress)
+    var status := ResourceLoader.load_threaded_get_status(GAME_CORE_PATH, progress)
     if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
         var raw := 0.0
         if progress.size() > 0:
             raw = clampf(float(progress[0]), 0.0, 1.0)
-        var value := 5.0 + raw * 7.0
-        _set_progress(value, "ЗАГРУЖАЕМ ОСНОВУ ИГРОВОГО МОДУЛЯ...", "ШАГ 2 • ОСНОВА ИГРЫ")
+        _set_progress(5.0 + raw * 15.0, "ЗАГРУЖАЕМ ИГРОВОЙ МОДУЛЬ ПО ЧАСТЯМ...", "ШАГ 3 • ИГРОВОЙ МОДУЛЬ")
         return
-
     if status == ResourceLoader.THREAD_LOAD_LOADED:
-        main_scene_attaching = true
-        main_scene_load_started = false
-        main_scene = ResourceLoader.load_threaded_get(main_scene_path) as PackedScene
-        if main_scene == null:
-            _fail("ОШИБКА ЗАГРУЗКИ ОСНОВНОЙ СЦЕНЫ")
+        core_load_started = false
+        core_scene = ResourceLoader.load_threaded_get(GAME_CORE_PATH) as PackedScene
+        if core_scene == null:
+            _fail("ОШИБКА ЗАГРУЗКИ ИГРОВОГО МОДУЛЯ")
+            set_process(false)
             return
-
-        _set_progress(12.0, "ОСНОВА ИГРОВОГО МОДУЛЯ ЗАГРУЖЕНА", "ШАГ 3 • ОСНОВА ГОТОВА")
-
-        # Instantiate the already-loaded tiny scene. Main._ready only connects
-        # to the existing loading screen and returns immediately.
-        main_instance = main_scene.instantiate() as Node3D
-        if main_instance == null:
+        _set_progress(20.0, "ИГРОВОЙ МОДУЛЬ ЗАГРУЖЕН", "ШАГ 4 • ПОДГОТОВКА ИГРЫ")
+        await get_tree().process_frame
+        core_instance = core_scene.instantiate() as Node3D
+        if core_instance == null:
             _fail("ОШИБКА СОЗДАНИЯ ИГРОВОГО МОДУЛЯ")
+            set_process(false)
             return
-        main_instance.name = "ClawNeonReal3D"
-        add_child(main_instance)
-        _set_progress(15.0, "ИГРОВОЙ МОДУЛЬ ЗАПУЩЕН", "ШАГ 5 • ПЕРЕДАЁМ УПРАВЛЕНИЕ ИГРЕ")
-        main_scene_attaching = false
-
-        # No coroutine call here. Give Main one clean engine frame, then let
-        # Main's own _process start the sequential initialization.
-        handoff_started = true
-        handoff_elapsed = 0.0
-        handoff_wait_frames = 2
+        core_instance.name = "ClawNeonReal3D"
+        add_child(core_instance)
+        await get_tree().process_frame
+        await get_tree().process_frame
+        _set_progress(25.0, "ОСНОВНОЙ МОДУЛЬ ПОДКЛЮЧЕН", "ШАГ 5 • ПЕРЕДАЧА ЗАВЕРШЕНА")
+        if is_instance_valid(core_instance) and core_instance.has_method("begin_sequential_initialization"):
+            core_instance.call("begin_sequential_initialization")
+            set_process(false)
+        else:
+            _fail("ОШИБКА ЗАПУСКА ОСНОВНОГО МОДУЛЯ")
+            set_process(false)
         return
-
     if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-        _fail("НЕ УДАЛОСЬ ЗАГРУЗИТЬ ОСНОВНОЙ КОД")
+        _fail("НЕ УДАЛОСЬ ЗАГРУЗИТЬ ИГРОВОЙ МОДУЛЬ")
+        set_process(false)
 
-func _set_progress(value: float, status_text: String, stage_text: String) -> void:
-    var safe := clampf(value, 0.0, 100.0)
+func _set_progress(value: float, text: String, stage: String) -> void:
     if loading_progress:
-        loading_progress.value = safe
-    if loading_percent:
-        loading_percent.text = "%d%%" % int(safe)
-    if loading_status:
-        loading_status.text = status_text
-    if loading_stage:
-        loading_stage.text = stage_text
+        loading_progress.value = maxf(float(loading_progress.value), value)
+    var safe := int(loading_progress.value) if loading_progress else int(value)
+    if loading_percent: loading_percent.text = "%d%%" % safe
+    if loading_status: loading_status.text = text
+    if loading_stage: loading_stage.text = stage
 
 func _update_tip() -> void:
     if loading_tip and is_instance_valid(loading_tip):
-        var next_tip := int(loading_elapsed / 2.5) % tips.size()
-        if next_tip != loading_tip_index:
-            loading_tip_index = next_tip
-            loading_tip.text = tips[loading_tip_index]
+        var tips := [
+            "СОВЕТ: ТЩАТЕЛЬНО НАВОДИ КЛЕШНЮ — РЕДКИЕ ИГРУШКИ СТОЯТ ТОГО.",
+            "СОВЕТ: СОБИРАЙ КОЛЛЕКЦИИ — ЗА ДОСТИЖЕНИЯ ПОЛАГАЮТСЯ НАГРАДЫ.",
+            "СОВЕТ: ПРОКАЧИВАЙ АППАРАТ — УЛУЧШЕНИЯ ПОМОГАЮТ ЛОВИТЬ ПРИЗЫ.",
+            "СОВЕТ: ПРОВЕРЯЙ ЕЖЕДНЕВНЫЕ НАГРАДЫ И СОБЫТИЯ.",
+            "СОВЕТ: ТОЧНОСТЬ И ТЕРПЕНИЕ — ЛУЧШИЕ ПОМОЩНИКИ В ХВАТАЙКЕ.",
+            "СОВЕТ: СОБИРАЙ ИГРУШКИ • ОТКРЫВАЙ СУНДУКИ • ПОЛУЧАЙ БОНУСЫ."
+        ]
+        loading_tip.text = tips[int(loading_elapsed / 2.5) % tips.size()]
 
 func _fail(message: String) -> void:
-    main_scene_load_started = false
-    main_scene_attaching = false
-    if loading_status:
-        loading_status.text = message
-    if loading_stage:
-        loading_stage.text = "ПЕРЕЗАПУСТИТЕ ПРИЛОЖЕНИЕ"
-    if loading_percent:
-        loading_percent.text = "!"
+    if loading_status: loading_status.text = message
+    if loading_stage: loading_stage.text = "ПЕРЕЗАПУСТИТЕ ПРИЛОЖЕНИЕ"
+    if loading_percent: loading_percent.text = "!"
 
 func create_loading_screen() -> void:
     # Полноэкранный загрузочный экран в коричневой стилистике игры.
