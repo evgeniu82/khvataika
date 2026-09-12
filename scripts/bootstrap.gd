@@ -4,10 +4,10 @@ extends Control
 # Главная сцена больше не загружается целиком: сначала отдельно загружается
 # только runtime-скрипт, затем создаётся пустой Node3D и уже после кадра
 # запускается последовательная инициализация игры.
-var runtime_path := "res://scripts/main.gd"
-var runtime_load_started := false
-var runtime_attaching := false
-var runtime_script: Script = null
+var main_scene_path := "res://scenes/Main.tscn"
+var main_scene_load_started := false
+var main_scene_attaching := false
+var main_scene: PackedScene = null
 var main_instance: Node3D = null
 var loading_screen: Control
 var loading_progress: ProgressBar
@@ -19,6 +19,7 @@ var loading_elapsed: float = 0.0
 var loading_tip_index: int = 0
 var handoff_started: bool = false
 var handoff_elapsed: float = 0.0
+var handoff_wait_frames: int = 0
 
 var tips := [
     "СОВЕТ: РЕДКИЕ ИГРУШКИ ПОЯВЛЯЮТСЯ НЕ СЛУЧАЙНО.",
@@ -37,9 +38,12 @@ func _ready() -> void:
     await get_tree().process_frame
     _set_progress(2.0, "ЗАПУСКАЕМ ПОСЛЕДОВАТЕЛЬНУЮ ЗАГРУЗКУ...", "ШАГ 1 • СТАРТ")
     await get_tree().process_frame
-    ResourceLoader.load_threaded_request(runtime_path, "Script", true)
-    runtime_load_started = true
-    _set_progress(5.0, "ЗАГРУЖАЕМ ОСНОВНОЙ КОД ИГРЫ...", "ШАГ 2 • КОД ИГРЫ")
+    # Load the tiny Main scene as one threaded resource. Main.tscn contains
+    # only a Node3D + main.gd; the script itself performs NO heavy work in _ready.
+    # This avoids the fragile set_script() handoff that previously stopped at 15%.
+    ResourceLoader.load_threaded_request(main_scene_path, "PackedScene", true)
+    main_scene_load_started = true
+    _set_progress(5.0, "ЗАГРУЖАЕМ ОСНОВУ ИГРОВОГО МОДУЛЯ...", "ШАГ 2 • ОСНОВА ИГРЫ")
     set_process(true)
 
 func _process(delta: float) -> void:
@@ -54,61 +58,59 @@ func _process(delta: float) -> void:
             return
 
     if handoff_started:
-        # If the first coroutine did not get scheduled on a particular Android
-        # frame, explicitly retry once. This is only a startup safety net and
-        # does not change the loading screen.
+        # Pure frame-based handoff: no await/coroutine is used inside Bootstrap
+        # _process. This is deliberately boring and robust on Android.
         if main_instance and is_instance_valid(main_instance):
             if bool(main_instance.get("game_initialized")):
                 set_process(false)
                 return
-            if handoff_elapsed >= 0.75:
-                handoff_started = false
+            handoff_wait_frames -= 1
+            if handoff_wait_frames <= 0:
+                main_instance.set("startup_initialization_requested", true)
+                handoff_wait_frames = 30
                 handoff_elapsed = 0.0
-                main_instance.begin_sequential_initialization()
+            # Retry the flag periodically until Main confirms initialization.
         return
 
-    if not runtime_load_started or runtime_attaching:
+    if not main_scene_load_started or main_scene_attaching:
         return
 
     var progress := []
-    var status := ResourceLoader.load_threaded_get_status(runtime_path, progress)
+    var status := ResourceLoader.load_threaded_get_status(main_scene_path, progress)
     if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
         var raw := 0.0
         if progress.size() > 0:
             raw = clampf(float(progress[0]), 0.0, 1.0)
         var value := 5.0 + raw * 7.0
-        _set_progress(value, "ЗАГРУЖАЕМ ОСНОВНОЙ КОД ИГРЫ...", "ШАГ 2 • КОД ИГРЫ")
+        _set_progress(value, "ЗАГРУЖАЕМ ОСНОВУ ИГРОВОГО МОДУЛЯ...", "ШАГ 2 • ОСНОВА ИГРЫ")
         return
 
     if status == ResourceLoader.THREAD_LOAD_LOADED:
-        runtime_attaching = true
-        runtime_load_started = false
-        runtime_script = ResourceLoader.load_threaded_get(runtime_path) as Script
-        if runtime_script == null:
-            _fail("ОШИБКА ЗАГРУЗКИ ОСНОВНОГО КОДА")
+        main_scene_attaching = true
+        main_scene_load_started = false
+        main_scene = ResourceLoader.load_threaded_get(main_scene_path) as PackedScene
+        if main_scene == null:
+            _fail("ОШИБКА ЗАГРУЗКИ ОСНОВНОЙ СЦЕНЫ")
             return
 
-        _set_progress(12.0, "ОСНОВНОЙ КОД ЗАГРУЖЕН", "ШАГ 3 • КОД ГОТОВ")
-        await get_tree().process_frame
+        _set_progress(12.0, "ОСНОВА ИГРОВОГО МОДУЛЯ ЗАГРУЖЕНА", "ШАГ 3 • ОСНОВА ГОТОВА")
 
-        # ВАЖНО: здесь создаётся только пустой Node3D. Никаких тяжёлых
-        # игрушек, UI, света или физики до следующего этапа.
-        main_instance = Node3D.new()
+        # Instantiate the already-loaded tiny scene. Main._ready only connects
+        # to the existing loading screen and returns immediately.
+        main_instance = main_scene.instantiate() as Node3D
+        if main_instance == null:
+            _fail("ОШИБКА СОЗДАНИЯ ИГРОВОГО МОДУЛЯ")
+            return
         main_instance.name = "ClawNeonReal3D"
-        main_instance.set_script(runtime_script)
-        _set_progress(14.0, "ЗАПУСКАЕМ ИГРОВОЙ МОДУЛЬ...", "ШАГ 4 • ИГРОВОЙ МОДУЛЬ")
-        await get_tree().process_frame
         add_child(main_instance)
         _set_progress(15.0, "ИГРОВОЙ МОДУЛЬ ЗАПУЩЕН", "ШАГ 5 • ПЕРЕДАЁМ УПРАВЛЕНИЕ ИГРЕ")
-        runtime_attaching = false
-        # Запускаем тяжёлую инициализацию ЯВНО после передачи Main в дерево.
-        # Не полагаемся на call_deferred из Main._ready(): это устраняет
-        # зависание на 15% на Android.
-        await get_tree().process_frame
-        if main_instance and is_instance_valid(main_instance):
-            handoff_started = true
-            handoff_elapsed = 0.0
-            main_instance.begin_sequential_initialization()
+        main_scene_attaching = false
+
+        # No coroutine call here. Give Main one clean engine frame, then let
+        # Main's own _process start the sequential initialization.
+        handoff_started = true
+        handoff_elapsed = 0.0
+        handoff_wait_frames = 1
         return
 
     if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
@@ -133,8 +135,8 @@ func _update_tip() -> void:
             loading_tip.text = tips[loading_tip_index]
 
 func _fail(message: String) -> void:
-    runtime_load_started = false
-    runtime_attaching = false
+    main_scene_load_started = false
+    main_scene_attaching = false
     if loading_status:
         loading_status.text = message
     if loading_stage:

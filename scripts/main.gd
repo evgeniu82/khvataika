@@ -295,6 +295,11 @@ var loading_elapsed: float = 0.0
 var loading_tip_index: int = 0
 var loading_step_index: int = 0
 var game_initialized: bool = false
+# Startup handshake: Bootstrap only asks Main to start. The Main process loop
+# starts the coroutine on its own frame, avoiding cross-script coroutine calls
+# during Android scene handoff.
+var startup_initialization_requested: bool = false
+var startup_initialization_running: bool = false
 var scene_lights: Array[Light3D] = []
 var reflection_probe: ReflectionProbe
 var world_environment: WorldEnvironment
@@ -710,8 +715,7 @@ func _achievement_exists(id: String) -> bool:
 
 func _ready() -> void:
     # Main is intentionally lightweight at startup. Bootstrap owns the single
-    # brown loading screen and loads this heavy scene in the background.
-    # Do not perform world/audio/network construction before the first frame.
+    # brown loading screen. Nothing heavy is created here.
     randomize()
     startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
     var bootstrap_loading = get_parent().get_node_or_null("LoadingScreen") if get_parent() else null
@@ -727,14 +731,13 @@ func _ready() -> void:
         create_loading_screen()
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
-    # Инициализация запускается Bootstrap после того, как Main реально
-    # добавлен в дерево. Здесь НИЧЕГО тяжёлого не выполняем.
+    set_process(true)
 
 func begin_sequential_initialization() -> void:
-    # Start the coroutine directly. Using call_deferred here can leave the
-    # loader parked at 15% on some Android/Godot builds. The coroutine itself
-    # yields on its first operation, so the loading screen remains responsive.
-    initialize_game_async()
+    # Do not call the large coroutine from Bootstrap. Only set a flag; Main's
+    # own _process starts it on a normal engine frame. This is safer on Android.
+    startup_initialization_requested = true
+
 
 func _is_android_runtime_available() -> bool:
     return OS.has_feature("android") and not Engine.is_editor_hint() and Engine.has_singleton("AndroidRuntime")
@@ -7772,6 +7775,15 @@ func update_ui() -> void:
         news_menu_button.text = "📰  НОВОСТИ  !" if news_unread > 0 else "📰  НОВОСТИ"
 
 func _process(delta: float) -> void:
+    # During startup this is deliberately the ONLY work performed by Main.
+    # It prevents network polling, audio settings and gameplay logic from
+    # running while Bootstrap is handing over the scene.
+    if not game_initialized:
+        if startup_initialization_requested and not startup_initialization_running:
+            startup_initialization_running = true
+            initialize_game_async()
+        return
+
     time_alive += delta
     if music_player:
         apply_music_settings()
@@ -7810,10 +7822,6 @@ func _process(delta: float) -> void:
         rarity_flash_timer -= delta
         if result_popup and result_popup.visible:
             result_popup.modulate = Color(1,1,1,1).lerp(rarity_flash_color, 0.16 * maxf(0.0, rarity_flash_timer))
-    # Во время старта загрузочным экраном управляет Bootstrap.
-    # Это не дублирует таймер советов и не создаёт дополнительную работу.
-    if not game_initialized:
-        return
     if aim_marker and is_instance_valid(aim_marker):
         aim_marker.position.x = claw_pos.x
         aim_marker.position.z = claw_pos.z
