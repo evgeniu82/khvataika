@@ -221,6 +221,7 @@ var remote_auth_retry_timer: float = 2.0
 var remote_http: HTTPRequest
 var remote_request_kind: String = ""
 var remote_sync_pending: bool = false
+var remote_action_queue: Array[Dictionary] = []
 var remote_pending_promo: String = ""
 var remote_pending_referral: String = ""
 var pending_incoming_referral: String = ""
@@ -1425,7 +1426,15 @@ func _remote_headers() -> PackedStringArray:
     return h
 
 func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
-    if not _server_ready() or player_token == "" or remote_request_kind != "":
+    if not _server_ready() or player_token == "":
+        return false
+    if remote_request_kind != "":
+        # Не теряем важные действия, если в этот момент идёт обычная синхронизация.
+        # Особенно это важно для ЗАХВАТА и выбора скина на Android.
+        if action_name in ["game_start", "cosmetic_buy", "daily_login"]:
+            var queued := {"name": action_name, "payload": payload.duplicate(true)}
+            remote_action_queue.append(queued)
+            return true
         return false
     var data := payload.duplicate(true)
     data["type"] = action_name
@@ -1841,7 +1850,11 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     build_prizes()
                     refresh_shop()
                     refresh_vip_panel()
-                    current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
+                    var cosmetic_item: Variant = data.get("item", {})
+                    if cosmetic_item is Dictionary:
+                        current_result = "УСТАНОВЛЕН СКИН: %s" % String(cosmetic_item.get("name", "ГОТОВО"))
+                    else:
+                        current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
                 "action:daily_login":
                     setup_login_streak()
@@ -4359,8 +4372,8 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Компактная карточка, привязанная к правому кругу. На Android она
     # полностью помещается в экран и раскрывается влево от кнопки.
-    daily_login_panel.position = Vector2(636, 341)
-    daily_login_panel.size = Vector2(300, 150)
+    daily_login_panel.position = Vector2(500, 330)
+    daily_login_panel.size = Vector2(420, 205)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     hud_layer.add_child(daily_login_panel)
@@ -4374,13 +4387,13 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 15)
+    title.add_theme_font_size_override("font_size", 14)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    detail.add_theme_font_size_override("font_size", 10)
+    detail.add_theme_font_size_override("font_size", 9)
     v.add_child(detail)
 
     daily_days_container = GridContainer.new()
@@ -4395,7 +4408,7 @@ func build_daily_login_panel() -> void:
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(78, 31)
+        day_button.custom_minimum_size = Vector2(128, 43)
         day_button.add_theme_font_size_override("font_size", 8)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
@@ -4410,7 +4423,7 @@ func build_daily_login_panel() -> void:
     hint.name = "DailyLoginHint"
     hint.text = "Нажми на день, который доступен сейчас"
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    hint.add_theme_font_size_override("font_size", 8)
+    hint.add_theme_font_size_override("font_size", 7)
     v.add_child(hint)
 
 func update_daily_login_ui() -> void:
@@ -4459,8 +4472,8 @@ func toggle_daily_login() -> void:
     daily_login_panel.visible = true
     # Небольшое появление от точки правого круга: окно выглядит как часть той же навигации.
     # Центр карточки совпадает с центром правого круга; раскрытие идёт строго влево.
-    var final_pos := Vector2(636, 341)
-    daily_login_panel.position = Vector2(948, 341)
+    var final_pos := Vector2(500, 330)
+    daily_login_panel.position = Vector2(920, 330)
     daily_login_panel.modulate.a = 0.0
     var tween := create_tween()
     tween.set_parallel(true)
@@ -5102,6 +5115,22 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return selected
         var item_id := "claw_skin_%d" % index if specs == claw_skin_specs else ("toy_skin_%d" % index if specs == toy_skin_specs else "machine_skin_%d" % index)
+        # Уже купленный скин можно установить сразу, не дожидаясь ответа HTTP.
+        # Сервер всё равно подтверждает выбор и сохраняет его.
+        if owned[index]:
+            selected = index
+            if specs == claw_skin_specs:
+                selected_claw_skin = index
+            elif specs == toy_skin_specs:
+                selected_toy_skin = index
+            else:
+                selected_machine_skin = index
+            apply_shop_visuals()
+            if specs == toy_skin_specs:
+                build_prizes()
+            refresh_shop()
+            current_result = "УСТАНОВЛЕН СКИН: %s" % String(specs[index].get("name", "ГОТОВО"))
+            update_ui()
         _server_action("cosmetic_buy", {"item_id":item_id})
         return selected
     if owned[index]:
@@ -7384,6 +7413,12 @@ func _process(delta: float) -> void:
                 notification_pending_test = false
                 _send_pending_test_notification()
     server_settings_sync_timer -= delta
+    if remote_request_kind == "" and _server_ready() and player_token != "" and not remote_action_queue.is_empty():
+        var queued_action: Dictionary = remote_action_queue.pop_front()
+        var queued_name := String(queued_action.get("name", ""))
+        var queued_payload: Variant = queued_action.get("payload", {})
+        if queued_payload is Dictionary and queued_name != "":
+            _server_action(queued_name, queued_payload)
     if server_settings_dirty and server_settings_sync_timer <= 0.0 and _server_ready() and player_token != "" and remote_request_kind == "":
         var settings_payload := {"music":music_on,"sfx":sfx_on,"sfx_volume_db":sfx_volume_db,"music_volume_db":music_volume_db,"vibration_on":vibration_on,"energy_saving_on":energy_saving_on,"confirm_purchases_on":confirm_purchases_on,"confirm_rare_chests_on":confirm_rare_chests_on,"fps_limit":fps_limit,"joystick_sensitivity":joystick_sensitivity,"grab_button_scale":grab_button_scale,"auto_tips_on":auto_tips_on,"notifications_on":notifications_on,"notify_rewards_on":notify_rewards_on,"notify_streak_on":notify_streak_on,"notify_events_on":notify_events_on,"notify_workshop_on":notify_workshop_on,"notify_chests_on":notify_chests_on,"quality_level":quality_level,"language":language}
         if _server_action("settings_update", {"settings":settings_payload}):
