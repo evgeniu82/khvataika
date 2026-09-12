@@ -709,14 +709,13 @@ func _achievement_exists(id: String) -> bool:
     return false
 
 func _ready() -> void:
-    # Показываем собственный загрузочный экран как можно раньше.
-    # Раньше перед ним выполнялись локальная инициализация и чтение сохранения,
-    # из-за чего на Android мог появляться серый кадр между boot splash и игрой.
+    # Сначала создаём собственный загрузочный экран и отдаём движку кадр.
+    # Это гарантирует, что Android не останется на системном splash во время
+    # тяжёлой инициализации игры. Системная картинка splash отключена в
+    # project.godot, поэтому второго экрана с миниатюрой нет.
     randomize()
     startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
     create_loading_screen()
-    # The static StartupSplash in Main.tscn covers the gap before the first
-    # rendered frame. Once the real loading UI exists, it can be hidden safely.
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
     await get_tree().process_frame
