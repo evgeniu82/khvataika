@@ -203,9 +203,9 @@ const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
 const SERVER_AUTHORITATIVE: bool = true
 # CONTROL TEST: keep the five recently added feature groups out of startup.
 # Their code remains in the project; this switch only isolates the startup path.
-const STARTUP_CONTROL_TEST: bool = true
+const STARTUP_CONTROL_TEST: bool = false
 # TEST 1: daily login/mission systems only. All other new startup features remain isolated.
-const DAILY_ONLY_TEST: bool = true
+const DAILY_ONLY_TEST: bool = false
 var server_url: String = DEFAULT_SERVER_URL
 var player_id: String = ""
 var player_token: String = ""
@@ -327,6 +327,13 @@ var server_attempt_ready: bool = false
 var server_attempt_success: bool = false
 var server_attempt_toy_id: String = ""
 var server_attempt_reward: Dictionary = {}
+var claw_server_wait_timer: float = 0.0
+var connection_http: HTTPRequest
+var connection_check_timer: float = 0.0
+var internet_connection_ok: bool = false
+var server_connection_ok: bool = false
+var connection_status_label: Label
+var shop_feedback_timer: float = 0.0
 var vip_panel: PanelContainer
 var seasons_panel: PanelContainer
 var vip_owned: Array[bool] = []
@@ -731,8 +738,10 @@ func _ready() -> void:
         ensure_player_id()
         remote_http = HTTPRequest.new()
         remote_http.name = "RemoteGameHTTP"
+        remote_http.timeout = 3.0
         add_child(remote_http)
         remote_http.request_completed.connect(_on_remote_http_completed)
+        _ensure_connection_http()
         if get_tree().has_signal("on_request_permissions_result"):
             var permission_callable := Callable(self, "_on_notification_permission_result")
             if not get_tree().is_connected("on_request_permissions_result", permission_callable):
@@ -1083,10 +1092,15 @@ func start_workshop_job() -> void:
 
 func process_workshop_job() -> void:
     if SERVER_AUTHORITATIVE:
+        if not workshop_job_active:
+            return
+        if int(Time.get_unix_time_from_system()) < workshop_job_end_unix:
+            return
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
-        if _server_action("workshop_job_claim", {}):
-            current_result = "ОПЕРАЦИЯ ПРОВЕРЯЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
+        if remote_request_kind == "":
+            if _server_action("workshop_job_claim", {}):
+                current_result = "МАСТЕРСКАЯ ЗАВЕРШАЕТСЯ СЕРВЕРОМ"; refresh_workshop_panel(); update_ui()
         return
     if not workshop_job_active:
         return
@@ -1353,10 +1367,34 @@ func apply_server_game_state(data: Dictionary) -> void:
         season_pass_level = clampi(int(season_data.get("level", season_pass_level)), 1, SEASON_PASS_MAX_LEVEL)
     var server_settings: Variant = data.get("settings", {})
     if server_settings is Dictionary:
-        if server_settings.has("language"): language = String(server_settings.get("language"))
-        if server_settings.has("quality_level"): quality_level = clampi(int(server_settings.get("quality_level")), 0, 4)
-        if server_settings.has("fps_limit"): fps_limit = maxi(30, int(server_settings.get("fps_limit")))
+        if server_settings.has("music"): music_on = bool(server_settings.get("music"))
+        if server_settings.has("sfx"): sfx_on = bool(server_settings.get("sfx"))
+        if server_settings.has("sfx_volume_db"): sfx_volume_db = clampf(float(server_settings.get("sfx_volume_db")), -24.0, 3.0)
+        if server_settings.has("music_volume_db"): music_volume_db = clampf(float(server_settings.get("music_volume_db")), -30.0, 3.0)
+        if server_settings.has("vibration_on"): vibration_on = bool(server_settings.get("vibration_on"))
+        if server_settings.has("energy_saving_on"): energy_saving_on = bool(server_settings.get("energy_saving_on"))
+        if server_settings.has("confirm_purchases_on"): confirm_purchases_on = bool(server_settings.get("confirm_purchases_on"))
+        if server_settings.has("confirm_rare_chests_on"): confirm_rare_chests_on = bool(server_settings.get("confirm_rare_chests_on"))
+        if server_settings.has("fps_limit"):
+            var server_fps := int(server_settings.get("fps_limit"))
+            fps_limit = server_fps if server_fps in [30, 60, 90, 120] else 60
+        if server_settings.has("joystick_sensitivity"): joystick_sensitivity = clampf(float(server_settings.get("joystick_sensitivity")), 0.5, 1.5)
+        if server_settings.has("grab_button_scale"): grab_button_scale = clampf(float(server_settings.get("grab_button_scale")), 0.8, 1.3)
+        if server_settings.has("auto_tips_on"): auto_tips_on = bool(server_settings.get("auto_tips_on"))
         if server_settings.has("notifications_on"): notifications_on = bool(server_settings.get("notifications_on"))
+        if server_settings.has("notify_rewards_on"): notify_rewards_on = bool(server_settings.get("notify_rewards_on"))
+        if server_settings.has("notify_streak_on"): notify_streak_on = bool(server_settings.get("notify_streak_on"))
+        if server_settings.has("notify_events_on"): notify_events_on = bool(server_settings.get("notify_events_on"))
+        if server_settings.has("notify_workshop_on"): notify_workshop_on = bool(server_settings.get("notify_workshop_on"))
+        if server_settings.has("notify_chests_on"): notify_chests_on = bool(server_settings.get("notify_chests_on"))
+        if server_settings.has("quality_level"): quality_level = clampi(int(server_settings.get("quality_level")), 0, 4)
+        if server_settings.has("language"): language = String(server_settings.get("language"))
+        Engine.max_fps = 30 if energy_saving_on else fps_limit
+        apply_quality_settings()
+        apply_grab_button_scale()
+        apply_sfx_volume_settings()
+        apply_music_settings()
+        apply_language()
     if data.has("owned_items") and data["owned_items"] is Array:
         var owned_server: Array = data.get("owned_items")
         for i in range(owned_claws.size()): owned_claws[i] = owned_server.has("claw_%d" % (i + 1))
@@ -1436,7 +1474,7 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
         return false
     # Быстрые действия не ждут фоновые config/sync/notifications/rating/register.
     if remote_request_kind != "":
-        if action_name in ["game_start", "game_finish", "cosmetic_buy", "daily_login", "workshop_upgrade", "workshop_blueprint", "workshop_calibrate"]:
+        if action_name in ["game_start", "game_finish", "game_cancel", "shop_buy", "shop_select", "cosmetic_buy", "daily_login", "workshop_upgrade", "workshop_blueprint", "workshop_calibrate"]:
             if remote_request_kind in ["config", "sync", "notifications", "rating", "register"]:
                 if remote_http and is_instance_valid(remote_http):
                     remote_http.cancel_request()
@@ -1457,6 +1495,48 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
         remote_action_name = ""
         return false
     return true
+func _ensure_connection_http() -> void:
+    if connection_http and is_instance_valid(connection_http):
+        return
+    connection_http = HTTPRequest.new()
+    connection_http.name = "ConnectionHealthHTTP"
+    connection_http.timeout = 3.0
+    add_child(connection_http)
+    connection_http.request_completed.connect(_on_connection_http_completed)
+
+func _check_server_connection() -> void:
+    if not _server_ready() or not connection_http or not is_instance_valid(connection_http):
+        return
+    if connection_http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+        return
+    var err := connection_http.request(_normalized_server_url() + "/health")
+    if err != OK:
+        internet_connection_ok = false
+        server_connection_ok = false
+        remote_sync_status = "НЕТ СВЯЗИ С СЕРВЕРОМ"
+        update_connection_status_ui()
+
+func _on_connection_http_completed(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+    internet_connection_ok = result == HTTPRequest.RESULT_SUCCESS
+    server_connection_ok = internet_connection_ok and response_code >= 200 and response_code < 300
+    if server_connection_ok:
+        remote_sync_status = "СЕРВЕР ПОДКЛЮЧЕН"
+    elif internet_connection_ok:
+        remote_sync_status = "ИНТЕРНЕТ ЕСТЬ • СЕРВЕР НЕДОСТУПЕН"
+    else:
+        remote_sync_status = "НЕТ ИНТЕРНЕТА / СЕРВЕР НЕДОСТУПЕН"
+    update_connection_status_ui()
+
+func update_connection_status_ui() -> void:
+    if not connection_status_label or not is_instance_valid(connection_status_label):
+        return
+    if server_connection_ok:
+        connection_status_label.text = "● СЕТЬ: OK   •   СЕРВЕР: OK"
+    elif internet_connection_ok:
+        connection_status_label.text = "● ИНТЕРНЕТ: OK   •   СЕРВЕР: НЕТ СВЯЗИ"
+    else:
+        connection_status_label.text = "● ИНТЕРНЕТ: НЕТ   •   СЕРВЕР: НЕТ СВЯЗИ"
+
 func register_device_remote() -> void:
     if not _server_ready() or not _is_android_runtime_available() or remote_device_registered:
         return
@@ -1513,19 +1593,11 @@ func sync_player_to_server() -> void:
     if remote_request_kind != "":
         remote_sync_pending = true
         return
+    # Старый клиентский state больше не отправляем как источник истины.
+    # Сервер возвращает свой snapshot; клиент хранит только визуальный/cache state.
     var payload := {
         "player_id": player_id,
-            "player_token": player_token,
-        "name": player_name,
-        "score": int(get_player_online_score()),
-        "level": player_level,
-        "coins": coins,
-        "games": total_games,
-        "prizes": total_prizes_won,
-        "best_streak": best_win_streak,
-        "referral_code": referral_code,
-        "referral_invites": referral_invites,
-        "game_state": get_server_game_state()
+        "name": player_name
     }
     remote_request_kind = "sync"
     var headers := _remote_headers()
@@ -1709,7 +1781,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             if kind == "action:promo_redeem":
                 remote_promo_request_active = false
             current_result = "Сервер временно недоступен. Повторяем подключение…"
-            if kind == "action:cosmetic_buy":
+            if kind in ["action:cosmetic_buy", "action:shop_select", "action:shop_buy"]:
+                show_shop_feedback("⚠ СЕРВЕР НЕДОСТУПЕН", 2.4)
                 refresh_shop()
             update_ui()
         return
@@ -1737,7 +1810,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             if kind == "action:promo_redeem":
                 remote_promo_request_active = false
             current_result = "Сервер отклонил запрос (HTTP %d)" % response_code
-            if kind == "action:cosmetic_buy":
+            if kind in ["action:cosmetic_buy", "action:shop_select", "action:shop_buy"]:
+                show_shop_feedback("⚠ СЕРВЕР ОТКЛОНИЛ ОПЕРАЦИЮ", 2.4)
                 refresh_shop()
             update_ui()
         return
@@ -1753,13 +1827,17 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 if kind == "action:promo_redeem":
                     remote_promo_request_active = false
                 current_result = "Сервер вернул некорректный ответ"
-                if kind == "action:cosmetic_buy":
+                if kind in ["action:cosmetic_buy", "action:shop_select", "action:shop_buy"]:
+                    show_shop_feedback("⚠ СЕРВЕР ВЕРНУЛ НЕКОРРЕКТНЫЙ ОТВЕТ", 2.4)
                     refresh_shop()
                 update_ui()
             return
     else:
         remote_sync_status = "ПУСТОЙ ОТВЕТ СЕРВЕРА"
         return
+    server_connection_ok = true
+    internet_connection_ok = true
+    update_connection_status_ui()
     if data.has("token") and String(data.get("token", "")) != "":
         player_token = String(data.get("token"))
         save_game()
@@ -1778,12 +1856,25 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             if not pending_new_achievements.is_empty():
                 current_result = "🏆 НОВЫЕ ДОСТИЖЕНИЯ: " + " • ".join(pending_new_achievements)
         if not bool(data.get("ok", false)):
+            if kind == "action:game_start":
+                server_attempt_ready = false
+                claw_server_wait_timer = 0.0
+                claw_move_target = CLAW_HOME
+                claw_target = CLAW_HOME
+                drop_state = 8
+                drop_time = 0.0
+            if kind == "action:game_finish":
+                claw_server_wait_timer = 0.0
             current_result = String(data.get("message", "Сервер отклонил действие"))
-            if kind == "action:cosmetic_buy":
+            if kind in ["action:cosmetic_buy", "action:shop_select", "action:shop_buy"]:
+                var shop_error := String(data.get("message", "ОПЕРАЦИЯ ОТКЛОНЕНА"))
+                if String(data.get("code", "")) == "INSUFFICIENT_FUNDS": shop_error = "💰 НЕДОСТАТОЧНО СРЕДСТВ"
+                show_shop_feedback(shop_error, 2.4)
                 refresh_shop()
         else:
             match kind:
                 "action:game_start":
+                    claw_server_wait_timer = 0.0
                     server_attempt_ready = false
                     server_attempt_success = false
                     server_attempt_toy_id = ""
@@ -1802,13 +1893,21 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     if bool(data.get("success", false)) and not sr.is_empty():
                         last_prize_name = String(sr.get("name", last_prize_name))
                         last_prize_rarity = String(sr.get("rarity", last_prize_rarity))
+                        last_prize_collection = String(sr.get("collection", last_prize_collection))
                         last_reward_rubles = int((data.get("reward", {}) as Dictionary).get("amount", last_reward_rubles)) if data.get("reward", null) is Dictionary else last_reward_rubles
+                        var finish_xp := 0
+                        if data.has("xp_gain"):
+                            finish_xp = int(data.get("xp_gain", 0))
+                        last_prize_xp = finish_xp
+                        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles)
                         if bool(data.get("duplicate", false)):
                             sale_name = last_prize_name
                             sale_rarity = last_prize_rarity
                             sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
                             sale_available = true
                             show_sale_offer()
+                    elif not bool(data.get("success", false)):
+                        current_result = "НЕ УДЕРЖАЛА 😅 • РЕЗУЛЬТАТ ПОДТВЕРЖДЁН СЕРВЕРОМ"
                 "action:promo_redeem":
                     promo_status = "Промокод успешно активирован"
                     refresh_promo_panel()
@@ -1821,19 +1920,22 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                         selected_claw = clampi(int((bought.get("effect", {}) as Dictionary).get("claw_index", selected_claw)), 0, claw_specs.size()-1)
                     apply_shop_visuals()
                     refresh_shop()
+                    show_shop_feedback("✓ ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ", 2.8)
                     current_result = "ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:cosmetic_buy":
                     apply_shop_visuals()
                     build_prizes()
                     refresh_shop()
                     refresh_vip_panel()
-                    current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
+                    show_shop_feedback("✓ СКИН КУПЛЕН И ПРИМЕНЁН", 2.8)
+                    current_result = "СКИН ПРИМЕНЁН • ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:shop_select":
                     apply_shop_visuals()
                     build_prizes()
                     refresh_shop()
                     refresh_vip_panel()
-                    current_result = "СКИН ВЫБРАН И СОХРАНЁН НА СЕРВЕРЕ"
+                    show_shop_feedback("✓ СКИН ПРИМЕНЁН И СОХРАНЁН", 2.8)
+                    current_result = "СКИН ПРИМЕНЁН • СОХРАНЁН НА СЕРВЕРЕ"
                 "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
                 "action:daily_login":
                     setup_login_streak()
@@ -2627,7 +2729,9 @@ func activate_extra_features_after_startup() -> void:
         remote_http.timeout = 3.0
         add_child(remote_http)
         remote_http.request_completed.connect(_on_remote_http_completed)
+    _ensure_connection_http()
     update_return_bonus_state()
+    connection_check_timer = 0.1
     call_deferred("register_player_remote")
     call_deferred("sync_remote_config")
     # All audio resources are loaded after the first playable frame.
@@ -4767,6 +4871,13 @@ func build_audio() -> void:
             music_player.play()
     )
     apply_music_settings()
+func apply_sfx_volume_settings() -> void:
+    if sfx_move and is_instance_valid(sfx_move):
+        sfx_move.volume_db = sfx_volume_db
+    for player in sound_players.values():
+        if player is AudioStreamPlayer and is_instance_valid(player):
+            player.volume_db = sfx_volume_db
+
 func apply_music_settings() -> void:
     if not music_player or not is_instance_valid(music_player):
         return
@@ -4817,6 +4928,15 @@ func build_hud() -> void:
     top.position = Vector2(0, 0)
     top.size = Vector2(1080, 138)
     hud_layer.add_child(top)
+    connection_status_label = Label.new()
+    connection_status_label.name = "ConnectionStatusLabel"
+    connection_status_label.position = Vector2(505, 112)
+    connection_status_label.size = Vector2(350, 20)
+    connection_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    connection_status_label.add_theme_font_size_override("font_size", 11)
+    connection_status_label.modulate = Color("#D8C3AA")
+    hud_layer.add_child(connection_status_label)
+    update_connection_status_ui()
 
     # Верхний левый информационный блок: только рубли и уровень.
     var info_panel := PanelContainer.new()
@@ -4954,6 +5074,7 @@ func build_hud() -> void:
     hud_layer.add_child(pass_btn)
 
     var grab := Button.new()
+    grab.name = "GrabButton"
     grab.text = "⦿\nЗАХВАТ"
     grab.position = Vector2(700, 1580)
     grab.size = Vector2(330, 190)
@@ -5048,7 +5169,7 @@ func build_shop_panel() -> PanelContainer:
     var tabs := HBoxContainer.new()
     tabs.add_theme_constant_override("separation", 7)
     root.add_child(tabs)
-    var tab_specs := [["⚙  УЛУЧШЕНИЯ", "upgrades"], ["🦾  СКИНЫ КЛЕШНИ", "claw_skins"], ["🧸  СКИНЫ ИГРУШЕК", "toy_skins"], ["🏪  СКИНЫ АППАРАТА", "machine_skins"]]
+    var tab_specs := [["⚙  УЛУЧШЕНИЯ", "upgrades"], ["🦾  КЛЕШНИ", "claws"], ["🎨  СКИНЫ КЛЕШНИ", "claw_skins"], ["🧸  СКИНЫ ИГРУШЕК", "toy_skins"], ["🏪  СКИНЫ АППАРАТА", "machine_skins"]]
     for spec in tab_specs:
         var b := Button.new()
         b.text = String(spec[0])
@@ -5092,16 +5213,25 @@ func build_shop_panel() -> PanelContainer:
     root.add_child(close)
     return p
 
+func show_shop_feedback(message: String, seconds: float = 2.4) -> void:
+    if not shop_feedback_label or not is_instance_valid(shop_feedback_label):
+        return
+    shop_feedback_label.text = message
+    shop_feedback_label.visible = true
+    shop_feedback_timer = maxf(0.5, seconds)
+
 func refresh_shop() -> void:
     if not shop_content: return
     for child in shop_content.get_children(): child.queue_free()
     var wallet := shop_panel.get_node_or_null("VBoxContainer/ShopWallet")
     if wallet: wallet.text = "💰  БАЛАНС: %d ₽" % coins
-    if shop_feedback_label and is_instance_valid(shop_feedback_label):
-        shop_feedback_label.text = "" if current_result == "ГОТОВ К ИГРЕ" else current_result
+    if shop_feedback_label and is_instance_valid(shop_feedback_label) and shop_feedback_timer <= 0.0:
+        shop_feedback_label.text = ""
+        shop_feedback_label.visible = false
 
     match shop_category:
         "upgrades": build_shop_upgrades()
+        "claws": build_shop_claws()
         "claw_skins": build_shop_claw_skins()
         "toy_skins": build_shop_toy_skins()
         "machine_skins": build_shop_machine_skins()
@@ -5139,7 +5269,7 @@ func shop_upgrade_preview(i: int, level: int) -> String:
     return "Было: уровень %d • Станет: уровень %d • бонус +%.1f%%" % [level, level + 1, bonus * 100.0]
 
 func build_shop_upgrades() -> void:
-    shop_section("⚙  ИГРОВЫЕ УЛУЧШЕНИЯ", "Улучшения за рубли напрямую меняют характеристики игры: захват, точность, удачу и скорость. Мастерская на эти характеристики не влияет.")
+    shop_section("⚙  ИГРОВЫЕ УЛУЧШЕНИЯ", "Улучшения за рубли усиливают базовые характеристики. Мастерская дополнительно усиливает силу, точность, стабильность, скорость и удержание клешни — всё учитывается сервером в каждом захвате.")
     for i in range(upgrade_specs.size()):
         var level: int = upgrade_levels[i]
         var maxed := level >= 5
@@ -5149,6 +5279,15 @@ func build_shop_upgrades() -> void:
         if not maxed:
             desc += "\n" + shop_upgrade_preview(i, level)
         shop_item_button("%02d  %s" % [i + 1, String(upgrade_specs[i]["name"])], desc, state, CYAN, func(idx: int = i): buy_upgrade(idx); refresh_shop())
+
+func build_shop_claws() -> void:
+    shop_section("🦾  КЛЕШНИ", "Купленная клешня становится доступной навсегда. Её базовый бонус к захвату складывается с улучшениями магазина и мастерской, а итоговый шанс каждый раз рассчитывает сервер.")
+    for i in range(claw_specs.size()):
+        var owned := i < owned_claws.size() and owned_claws[i]
+        var equipped := selected_claw == i
+        var state := "✓ ПРИМЕНЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ ПРИМЕНИТЬ" if owned else "%d ₽" % int(claw_specs[i]["price"]))
+        var bonus_text := "Базовый шанс захвата: +%d%%" % int(float(claw_specs[i]["bonus"]) * 100.0)
+        shop_item_button("%02d  🦾 %s" % [i + 1, String(claw_specs[i]["name"])], bonus_text, state, claw_specs[i]["color"], func(idx: int = i): buy_claw(idx); refresh_shop())
 
 func build_shop_claw_skins() -> void:
     shop_section("🦾  СКИНЫ КЛЕШНИ", "Только внешний вид. Выберите стиль после покупки — клешня сразу изменит оформление.")
@@ -5177,44 +5316,26 @@ func build_shop_machine_skins() -> void:
         var accent: Color = machine_skin_specs[i]["light"]
         shop_item_button("%02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], "Корпус + фирменная подсветка", state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
 
-func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int) -> int:
+func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
     if index < 0 or index >= specs.size(): return selected
+    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on and not owned[index]:
+        confirm_purchase("Покупка скина", "Купить «%s» за %d ₽?" % [String(specs[index]["name"]), int(specs[index]["price"])], func(): buy_cosmetic(index, specs, owned, selected, true))
+        return selected
     if SERVER_AUTHORITATIVE:
         if not _server_ready() or player_token == "":
-            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return selected
-        var item_id := "claw_skin_%d" % index if specs == claw_skin_specs else ("toy_skin_%d" % index if specs == toy_skin_specs else "machine_skin_%d" % index)
-        # Если предмет уже куплен, это именно ВЫБОР, а не повторная покупка.
-        # Не отправляем cosmetic_buy повторно: используем отдельный shop_select,
-        # чтобы сервер сохранил выбранный скин без списания рублей.
-        if owned[index]:
-            selected = index
-            if specs == claw_skin_specs:
-                selected_claw_skin = index
-            elif specs == toy_skin_specs:
-                selected_toy_skin = index
-            else:
-                selected_machine_skin = index
-            apply_shop_visuals()
-            if specs == toy_skin_specs:
-                build_prizes()
-            current_result = "СКИН ВЫБРАН: %s" % String(specs[index].get("name", "ГОТОВО"))
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
             update_ui()
-            refresh_shop()
-            if _server_action("shop_select", {"item_id":item_id}):
-                current_result = "СКИН ВЫБРАН И СОХРАНЯЕТСЯ НА СЕРВЕРЕ"
-            else:
-                current_result = "СКИН ВЫБРАН • СЕРВЕР ЗАНЯТ, ПОВТОРИТЕ ЧУТЬ ПОЗЖЕ"
-            update_ui()
-            refresh_shop()
             return selected
-
-        # Новый скин покупается через авторитетный сервер.
-        if _server_action("cosmetic_buy", {"item_id":item_id}):
-            current_result = "ПОКУПКА СКИНА ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
+        var item_id := "claw_skin_%d" % index if specs == claw_skin_specs else ("toy_skin_%d" % index if specs == toy_skin_specs else "machine_skin_%d" % index)
+        var action_name := "shop_select" if owned[index] else "cosmetic_buy"
+        if _server_action(action_name, {"item_id":item_id}):
+            current_result = "ВЫБОР СКИНА ПРОВЕРЯЕТСЯ СЕРВЕРОМ…" if action_name == "shop_select" else "ПОКУПКА СКИНА ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
+            show_shop_feedback(current_result, 3.0)
         else:
-            current_result = "ОПЕРАЦИЯ ЗАНЯТА — ПОДОЖДИТЕ"
+            current_result = "ОПЕРАЦИЯ УЖЕ ВЫПОЛНЯЕТСЯ"
+            show_shop_feedback("⏳ ОДНА ОПЕРАЦИЯ УЖЕ ВЫПОЛНЯЕТСЯ")
         update_ui()
-        refresh_shop()
         return selected
     if owned[index]:
         selected = index
@@ -5225,6 +5346,7 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
         save_game()
     else:
         current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
+        show_shop_feedback("💰 НЕДОСТАТОЧНО СРЕДСТВ")
         update_ui()
         return selected
     save_game()
@@ -5559,8 +5681,13 @@ func award_chest_for_win(rarity: String) -> void:
         chest_keys += 1
         total_keys_earned += 1
 
-func open_chest(kind: String) -> void:
+func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     if chest_opening: return
+    if not skip_confirmation and confirm_rare_chests_on and kind in ["rare", "epic", "legendary", "vip"]:
+        var names := {"rare":"РЕДКИЙ", "epic":"ЭПИЧЕСКИЙ", "legendary":"ЛЕГЕНДАРНЫЙ", "vip":"VIP"}
+        var need := int(chest_key_costs.get(kind, 1))
+        confirm_purchase("Открытие редкого сундука", "Открыть «%s» за %d ключей?" % [String(names.get(kind, kind.to_upper())), need], func(): open_chest(kind, true), "ОТКРЫТЬ")
+        return
     if _server_ready() and player_token != "":
         if _server_action("chest_open", {"kind":kind}):
             chest_opening = true
@@ -5978,15 +6105,15 @@ func refresh_workshop_panel() -> void:
     list.add_child(job)
 
     var desc := Label.new()
-    desc.text = "МАГАЗИН улучшает непосредственно клешню: силу, стабилизацию, точность, удачу и скорость. МАСТЕРСКАЯ отвечает за инженерные ресурсы, обслуживание, детали, XP, ключи и награды. Системы не дублируют друг друга."
+    desc.text = "МАГАЗИН задаёт базовый уровень клешни и постоянные улучшения. МАСТЕРСКАЯ усиливает механику поверх него: сила и точность повышают шанс захвата, мотор и скорость ускоряют движение, сервопривод ускоряет хват, трос и демпфер повышают стабильность, контроллер добавляет точность, охлаждение усиливает оверклок. Итоговый шанс каждый раз считает сервер."
     desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     desc.add_theme_font_size_override("font_size", 14)
     desc.modulate = Color("#CDBBA7")
     list.add_child(desc)
 
 func workshop_module_effect_text(stat: String, level: int) -> String:
-    var effects := {"claw_power":"+0.1 детали из каждого открытого сундука за уровень", "speed":"+0.15 XP за выигрыш за уровень", "precision":"+0.8% шанс получить дополнительный ключ", "luck":"+0.8% шанс бонусной награды из сундука", "motor":"+0.1 детали из сундуков за уровень", "servo":"+0.15 XP за выигрыш за уровень", "cable":"+0.8% шанс дополнительного ключа", "damper":"снижает стоимость обслуживания инженерных систем", "cooling":"+0.1 детали из сундуков за уровень", "controller":"+0.15 XP за выигрыш за уровень"}
-    return String(effects.get(stat, "Инженерный бонус мастерской")) + " • НЕ влияет на силу, точность, скорость или удачу клешни из магазина"
+    var effects := {"claw_power":"+1.5% к шансу захвата за уровень", "speed":"+0.8% к скорости движения клешни", "precision":"+1.0% к шансу захвата и лучше учитывает наведение", "luck":"+0.6% к шансу успешного захвата", "motor":"+1.5% к скорости движения клешни", "servo":"ускоряет закрытие и открытие клешни", "cable":"+0.3% к стабильности захвата за уровень", "damper":"+0.3% к стабильности и меньше срывов", "cooling":"усиливает эффект оверклока", "controller":"+0.4% к шансу захвата и точности"}
+    return String(effects.get(stat, "Инженерный бонус мастерской"))
 
 func workshop_buy_next_blueprint(stat: String) -> void:
     var order := {"none":0,"basic":1,"advanced":2,"elite":3}
@@ -7057,13 +7184,13 @@ func build_settings_panel() -> PanelContainer:
 
     var sep1 := Label.new(); sep1.text = "ЗВУК"; sep1.add_theme_font_size_override("font_size", 22); sep1.modulate = GOLD; v.add_child(sep1)
     var music := CheckButton.new(); music.text = "Фоновая музыка"; music.button_pressed = music_on; music.add_theme_font_size_override("font_size", 21)
-    music.toggled.connect(func(on: bool): music_on = on; save_game()); v.add_child(music)
+    music.toggled.connect(func(on: bool): music_on = on; apply_music_settings(); save_game()); v.add_child(music)
     var music_vol := HSlider.new(); music_vol.min_value = -30; music_vol.max_value = 3; music_vol.step = 1; music_vol.value = music_volume_db; music_vol.custom_minimum_size = Vector2(0, 42)
-    music_vol.value_changed.connect(func(value: float): music_volume_db = value; save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
+    music_vol.value_changed.connect(func(value: float): music_volume_db = value; apply_music_settings(); save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
     var sfx := CheckButton.new(); sfx.text = "Звуки игры и интерфейса"; sfx.button_pressed = sfx_on; sfx.add_theme_font_size_override("font_size", 21)
-    sfx.toggled.connect(func(on: bool): sfx_on = on; save_game()); v.add_child(sfx)
+    sfx.toggled.connect(func(on: bool): sfx_on = on; apply_sfx_volume_settings(); save_game()); v.add_child(sfx)
     var volume := HSlider.new(); volume.min_value = -24; volume.max_value = 3; volume.step = 1; volume.value = sfx_volume_db; volume.custom_minimum_size = Vector2(0, 42)
-    volume.value_changed.connect(func(value: float): sfx_volume_db = value; if sfx_move: sfx_move.volume_db = value; save_game()); v.add_child(make_labeled_control("Громкость эффектов", volume))
+    volume.value_changed.connect(func(value: float): sfx_volume_db = value; apply_sfx_volume_settings(); save_game()); v.add_child(make_labeled_control("Громкость эффектов", volume))
 
     var sep2 := Label.new(); sep2.text = "ГРАФИКА"; sep2.add_theme_font_size_override("font_size", 22); sep2.modulate = GOLD; v.add_child(sep2)
     quality_option = OptionButton.new(); ["ПЛОХО","НИЗКО","СРЕДНЕ","ВЫСОКО","УЛЬТРА"].map(func(x): quality_option.add_item(x))
@@ -7077,7 +7204,7 @@ func build_settings_panel() -> PanelContainer:
 
     var sep3 := Label.new(); sep3.text = "УПРАВЛЕНИЕ"; sep3.add_theme_font_size_override("font_size",22); sep3.modulate = GOLD; v.add_child(sep3)
     var sens := HSlider.new(); sens.min_value=0.5; sens.max_value=1.5; sens.step=0.05; sens.value=joystick_sensitivity; sens.custom_minimum_size=Vector2(0,42)
-    sens.value_changed.connect(func(x:float): joystick_sensitivity=x; save_game()); v.add_child(make_labeled_control("Чувствительность управления", sens))
+    sens.value_changed.connect(func(x:float): joystick_sensitivity=clampf(x, 0.5, 1.5); save_game()); v.add_child(make_labeled_control("Чувствительность управления", sens))
     var grab := HSlider.new(); grab.min_value=0.8; grab.max_value=1.3; grab.step=0.05; grab.value=grab_button_scale; grab.custom_minimum_size=Vector2(0,42)
     grab.value_changed.connect(func(x:float): grab_button_scale=x; save_game(); apply_grab_button_scale()); v.add_child(make_labeled_control("Размер кнопки «ЗАХВАТ»", grab))
     var vibration := CheckButton.new(); vibration.text="Вибрация при захвате"; vibration.button_pressed=vibration_on; vibration.add_theme_font_size_override("font_size",21)
@@ -7093,7 +7220,7 @@ func build_settings_panel() -> PanelContainer:
 
     var sep_notifications := Label.new(); sep_notifications.text="УВЕДОМЛЕНИЯ"; sep_notifications.add_theme_font_size_override("font_size",22); sep_notifications.modulate=GOLD; v.add_child(sep_notifications)
     var notifications := CheckButton.new(); notifications.text="Уведомления игры"; notifications.button_pressed=notifications_on; notifications.add_theme_font_size_override("font_size",21)
-    notifications.toggled.connect(func(on:bool): notifications_on=on; save_game(); cancel_background_notifications(); if on: schedule_background_notifications()); v.add_child(notifications)
+    notifications.toggled.connect(func(on:bool): notifications_on=on; save_game(); cancel_background_notifications(); if on: schedule_background_notifications(); update_ui()); v.add_child(notifications)
     var notify_items := [["notify_rewards_on","🎁 Награды"],["notify_streak_on","🔥 Серия входов"],["notify_events_on","🎪 События и сезон"],["notify_workshop_on","🔧 Мастерская"],["notify_chests_on","📦 Сундуки"]]
     for item in notify_items:
         var ncb := CheckButton.new()
@@ -7151,6 +7278,8 @@ func reset_settings_defaults() -> void:
     language = "ru"
     Engine.max_fps = fps_limit
     apply_quality_settings()
+    apply_sfx_volume_settings()
+    apply_music_settings()
     apply_grab_button_scale()
     save_game()
     current_result = "⚙ НАСТРОЙКИ ВОССТАНОВЛЕНЫ"
@@ -7249,13 +7378,34 @@ func get_capture_preview() -> float:
         return 0.0
     var body := prize_bodies[chosen]
     var bonus: float = float(claw_specs[selected_claw]["bonus"])
-    var upgrade_bonus: float = float(upgrade_levels[0] + upgrade_levels[1] + upgrade_levels[2]) * 0.028
-    var base := clampf(0.28 + bonus + upgrade_bonus, 0.0, 0.95)
+    var chance := 0.28 + bonus
+    chance += float(shop_upgrade_level(0)) * 0.035
+    chance += float(shop_upgrade_level(1)) * 0.025
+    chance += float(shop_upgrade_level(2)) * 0.030
+    chance += float(shop_upgrade_level(3)) * 0.020
+    chance += float(shop_upgrade_level(5)) * 0.025
+    chance += float(shop_upgrade_level(6)) * 0.030
+    chance += float(shop_upgrade_level(9)) * 0.045
+    chance += float(workshop_claw_power) * 0.015
+    chance += float(workshop_precision) * 0.010
+    chance += float(workshop_luck) * 0.006
+    chance += float(workshop_controller) * 0.004
+    chance += float(workshop_calibration) * 0.010
+    chance += float(workshop_cable + workshop_damper) * 0.003
+    chance += workshop_blueprint_bonus("grip") * 0.50 + workshop_blueprint_bonus("precision") * 0.35
+    var distance := Vector2(claw_pos.x - body.global_position.x, claw_pos.z - body.global_position.z).length()
+    chance += clampf((0.82 - distance) * 0.12, 0.0, 0.10) + float(shop_upgrade_level(8)) * 0.004
+    chance += active_event_bonus + event_rarity_weight_bonus(String(prize_data[chosen].get("rarity", "ОБЫЧНАЯ")))
+    if workshop_overclock and workshop_overclock_games > 0:
+        chance += 0.04 + float(workshop_cooling) * 0.002
     var weight := float(body.get_meta("toy_weight", 38.0))
-    var heavy_penalty := clampf((weight - 35.0) / 180.0, -0.08, 0.30)
-    var slippery_penalty := 0.12 if bool(body.get_meta("slippery", false)) else 0.0
-    var lucky_bonus := 0.10 if int(prize_data[chosen].get("index", -1)) == lucky_toy_index else 0.0
-    return clampf(base - heavy_penalty - slippery_penalty + lucky_bonus, 0.08, 0.95)
+    chance -= clampf((weight - 35.0) / 180.0, -0.08, 0.30)
+    if bool(body.get_meta("slippery", false)):
+        chance -= 0.12
+    if not SERVER_AUTHORITATIVE:
+        var lucky_bonus := 0.10 if int(prize_data[chosen].get("index", -1)) == lucky_toy_index else 0.0
+        chance += lucky_bonus
+    return clampf(chance, 0.08, 0.90)
 
 func apply_language() -> void:
     if language_option:
@@ -7498,11 +7648,21 @@ func _process(delta: float) -> void:
                 notification_pending_test = false
                 _send_pending_test_notification()
     server_settings_sync_timer -= delta
+    connection_check_timer -= delta
+    if connection_check_timer <= 0.0:
+        connection_check_timer = 20.0
+        _check_server_connection()
+    if shop_feedback_timer > 0.0:
+        shop_feedback_timer -= delta
+        if shop_feedback_timer <= 0.0 and shop_feedback_label and is_instance_valid(shop_feedback_label):
+            shop_feedback_label.text = ""
+            shop_feedback_label.visible = false
     if server_settings_dirty and server_settings_sync_timer <= 0.0 and _server_ready() and player_token != "" and remote_request_kind == "":
         var settings_payload := {"music":music_on,"sfx":sfx_on,"sfx_volume_db":sfx_volume_db,"music_volume_db":music_volume_db,"vibration_on":vibration_on,"energy_saving_on":energy_saving_on,"confirm_purchases_on":confirm_purchases_on,"confirm_rare_chests_on":confirm_rare_chests_on,"fps_limit":fps_limit,"joystick_sensitivity":joystick_sensitivity,"grab_button_scale":grab_button_scale,"auto_tips_on":auto_tips_on,"notifications_on":notifications_on,"notify_rewards_on":notify_rewards_on,"notify_streak_on":notify_streak_on,"notify_events_on":notify_events_on,"notify_workshop_on":notify_workshop_on,"notify_chests_on":notify_chests_on,"quality_level":quality_level,"language":language}
         if _server_action("settings_update", {"settings":settings_payload}):
             server_settings_dirty = false
             server_settings_sync_timer = 30.0
+    update_connection_status_ui()
     remote_auth_retry_timer -= delta
     if _server_ready() and player_token == "" and remote_request_kind == "":
         if remote_auth_retry_timer <= 0.0:
@@ -7662,7 +7822,7 @@ func process_claw(delta: float) -> void:
     if drop_state == 1:
         # Опускаемся только до верхнего слоя игрушек под клешнёй.
         # Если сверху уже лежит игрушка, клешня не пытается пробиться к нижним слоям.
-        claw_pos.y = move_toward(claw_pos.y, claw_drop_target_y, delta * 5.0)
+        claw_pos.y = move_toward(claw_pos.y, claw_drop_target_y, delta * claw_lower_speed())
         animate_grip(0.0)
         if claw_pos.y <= claw_drop_target_y + 0.02:
             # Контакт клешни слегка сдвигает соседние игрушки — они физически
@@ -7680,14 +7840,30 @@ func process_claw(delta: float) -> void:
 
     elif drop_state == 2:
         drop_time += delta
-        animate_grip(clampf(drop_time / 0.35, 0.0, 1.0))
-        if drop_time >= 0.48:
+        animate_grip(clampf(drop_time / claw_grip_close_time(), 0.0, 1.0))
+        if drop_time >= claw_grip_close_time():
             if _server_ready() and player_token != "" and not server_attempt_ready:
-                # Ждём ответ game_start, чтобы физика клешни никогда не расходилась
-                # с решением сервера.
-                drop_time = 0.30
+                # Ждём только ограниченное время. Если сеть зависла, клешня
+                # безопасно возвращается домой и новый раунд не запускается.
+                claw_server_wait_timer -= delta
+                if claw_server_wait_timer <= 0.0:
+                    current_result = "СЕРВЕР НЕ ОТВЕТИЛ • КЛЕШНЯ ВОЗВРАЩАЕТСЯ"
+                    _server_action("game_cancel")
+                    grabbed_toy = null
+                    grabbed_index = -1
+                    pending_prize_data.clear()
+                    claw_move_target = CLAW_HOME
+                    claw_target = CLAW_HOME
+                    drop_state = 8
+                    drop_time = 0.0
+                    animate_grip(0.0)
+                    save_game()
+                    update_ui()
+                else:
+                    drop_time = 0.30
                 return
             var grabbed := resolve_grab()
+            claw_server_wait_timer = 0.0
             drop_time = 0.0
             if grabbed:
                 drop_state = 3
@@ -7708,7 +7884,7 @@ func process_claw(delta: float) -> void:
 
     elif drop_state == 3:
         # Сначала поднимаем клешню вертикально, игрушка жёстко следует за ней.
-        claw_pos.y = move_toward(claw_pos.y, CLAW_HOME.y, delta * 4.5)
+        claw_pos.y = move_toward(claw_pos.y, CLAW_HOME.y, delta * claw_raise_speed())
         animate_grip(0.0)
         follow_grabbed_toy()
         if claw_pos.y >= CLAW_HOME.y - 0.03:
@@ -7738,7 +7914,7 @@ func process_claw(delta: float) -> void:
     elif drop_state == 4:
         # Теперь именно КЛЕШНЯ С ИГРУШКОЙ едет к отверстию.
         var chute_target := Vector3(PRIZE_HOLE.x, CLAW_HOME.y, PRIZE_HOLE.z)
-        var travel_speed := 5.2
+        var travel_speed := claw_travel_speed()
         claw_pos.x = move_toward(claw_pos.x, chute_target.x, delta * travel_speed)
         claw_pos.z = move_toward(claw_pos.z, chute_target.z, delta * travel_speed)
         animate_grip(0.0)
@@ -7762,8 +7938,8 @@ func process_claw(delta: float) -> void:
     elif drop_state == 6:
         # Разжимаем когти и отпускаем игрушку точно над центром шахты.
         drop_time += delta
-        animate_grip(clampf(drop_time / 0.22, 0.0, 1.0))
-        if drop_time >= 0.22:
+        animate_grip(clampf(drop_time / claw_release_time(), 0.0, 1.0))
+        if drop_time >= claw_release_time():
             if grabbed_toy and is_instance_valid(grabbed_toy):
                 var chute_drop := PRIZE_HOLE + Vector3(0, 1.05, 0)
                 grabbed_toy.global_position = chute_drop
@@ -7781,7 +7957,6 @@ func process_claw(delta: float) -> void:
             if grabbed_toy and is_instance_valid(grabbed_toy):
                 remove_delivered_prize()
                 finalize_delivered_prize()
-                show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles)
                 refill_prizes_if_needed()
             grabbed_toy = null
             grabbed_index = -1
@@ -7844,15 +8019,38 @@ func animate_grip(amount: float) -> void:
         arm.rotation.z = lerpf(0.0, -0.42, amount)
         arm.position.y = sin(float(i) + time_alive * 5.0) * 0.008
 
+func shop_upgrade_level(index: int) -> int:
+    if index < 0 or index >= upgrade_levels.size():
+        return 0
+    return clampi(int(upgrade_levels[index]), 0, 5)
+
+func claw_move_multiplier() -> float:
+    return clampf(1.0 + float(workshop_motor) * 0.015 + float(workshop_speed) * 0.008 + float(shop_upgrade_level(4)) * 0.04, 1.0, 1.55)
+
+func claw_lower_speed() -> float:
+    return clampf(5.0 + float(workshop_motor) * 0.08 + float(workshop_speed) * 0.04, 5.0, 6.4)
+
+func claw_raise_speed() -> float:
+    return clampf(4.5 + float(workshop_motor) * 0.07 + float(workshop_speed) * 0.035, 4.5, 5.9)
+
+func claw_travel_speed() -> float:
+    return clampf(5.2 + float(workshop_motor) * 0.08 + float(workshop_speed) * 0.05, 5.2, 7.0)
+
+func claw_grip_close_time() -> float:
+    return clampf(0.48 - float(workshop_servo) * 0.012 - float(shop_upgrade_level(7)) * 0.015, 0.20, 0.48)
+
+func claw_release_time() -> float:
+    return clampf(0.22 - float(workshop_servo) * 0.006 - float(shop_upgrade_level(7)) * 0.008, 0.08, 0.22)
+
 func move_x(amount: float) -> void:
     if drop_state != 0 or not hud_layer.visible: return
     register_game_activity()
-    claw_move_target.x = clampf(claw_move_target.x + amount, CLAW_MIN.x, CLAW_MAX.x)
+    claw_move_target.x = clampf(claw_move_target.x + amount * joystick_sensitivity * claw_move_multiplier(), CLAW_MIN.x, CLAW_MAX.x)
 
 func move_z(amount: float) -> void:
     if drop_state != 0 or not hud_layer.visible: return
     register_game_activity()
-    claw_move_target.z = clampf(claw_move_target.z + amount, CLAW_MIN.z, CLAW_MAX.z)
+    claw_move_target.z = clampf(claw_move_target.z + amount * joystick_sensitivity * claw_move_multiplier(), CLAW_MIN.z, CLAW_MAX.z)
 
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
@@ -7867,7 +8065,17 @@ func drop_claw() -> void:
         server_attempt_success = false
         server_attempt_toy_id = ""
         server_attempt_reward = {}
-        if not _server_action("game_start"):
+        claw_server_wait_timer = 3.5
+        var target_index := choose_top_layer_prize()
+        var target_toy_id := ""
+        var target_distance := 0.82
+        if target_index >= 0 and target_index < prize_bodies.size():
+            var target_body := prize_bodies[target_index]
+            if target_body and is_instance_valid(target_body):
+                target_toy_id = String(prize_data[target_index].get("id", ""))
+                target_distance = Vector2(claw_pos.x - target_body.global_position.x, claw_pos.z - target_body.global_position.z).length()
+        if not _server_action("game_start", {"target_toy_id":target_toy_id, "target_distance":target_distance}):
+            claw_server_wait_timer = 0.0
             current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
             update_ui()
             return
@@ -7906,9 +8114,10 @@ func resolve_grab() -> bool:
                     if pi >= 0 and pi < toys.size() and String(toys[pi].get("id", "")) == server_attempt_toy_id:
                         server_choice = i
                         break
-        var chosen_server := server_choice if server_choice >= 0 else choose_top_layer_prize()
+        var chosen_server := server_choice
         if chosen_server < 0 or chosen_server >= prize_bodies.size():
-            current_result = "ПОД КЛЕШНЁЙ НЕТ ПРИЗА"
+            current_result = "ИГРУШКА СЕРВЕРА НЕ НАЙДЕНА • СИНХРОНИЗАЦИЯ"
+            _server_action("game_cancel")
             update_ui()
             return false
         grabbed_index = chosen_server
@@ -7929,9 +8138,25 @@ func resolve_grab() -> bool:
         return true
 
     var bonus: float = float(claw_specs[selected_claw]["bonus"])
-    var upgrade_bonus: float = float(upgrade_levels[0] + upgrade_levels[1] + upgrade_levels[2]) * 0.028
-    var success_chance: float = clampf(0.28 + bonus + upgrade_bonus, 0.0, 0.95)
-    var empty_chance: float = clampf(0.16 - float(upgrade_levels[1]) * 0.012, 0.015, 0.16)
+    var success_chance: float = 0.28 + bonus
+    success_chance += float(shop_upgrade_level(0)) * 0.035
+    success_chance += float(shop_upgrade_level(1)) * 0.025
+    success_chance += float(shop_upgrade_level(2)) * 0.030
+    success_chance += float(shop_upgrade_level(3)) * 0.020
+    success_chance += float(shop_upgrade_level(5)) * 0.025
+    success_chance += float(shop_upgrade_level(6)) * 0.030
+    success_chance += float(shop_upgrade_level(9)) * 0.045
+    success_chance += float(workshop_claw_power) * 0.015
+    success_chance += float(workshop_precision) * 0.010
+    success_chance += float(workshop_luck) * 0.006
+    success_chance += float(workshop_controller) * 0.004
+    success_chance += float(workshop_calibration) * 0.010
+    success_chance += float(workshop_cable + workshop_damper) * 0.003
+    success_chance += workshop_blueprint_bonus("grip") * 0.50 + workshop_blueprint_bonus("precision") * 0.35
+    if workshop_overclock and workshop_overclock_games > 0:
+        success_chance += 0.04 + float(workshop_cooling) * 0.002
+    var empty_chance: float = clampf(0.16 - float(shop_upgrade_level(1) + workshop_damper) * 0.012, 0.015, 0.16)
+    var upgrade_aim_bonus := float(shop_upgrade_level(8)) * 0.004
     var chosen := choose_top_layer_prize()
     if chosen < 0:
         current_result = "ПОД КЛЕШНЁЙ НЕТ ПРИЗА"
@@ -7944,7 +8169,7 @@ func resolve_grab() -> bool:
     var horizontal_distance := Vector2(claw_pos.x - selected_body.global_position.x, claw_pos.z - selected_body.global_position.z).length()
     # Точность теперь действительно влияет на захват: чем ближе центр клешни
     # к центру верхней игрушки, тем выше шанс удержать её.
-    var aim_bonus := clampf((0.82 - horizontal_distance) * 0.12, 0.0, 0.10)
+    var aim_bonus := clampf((0.82 - horizontal_distance) * 0.12, 0.0, 0.10) + upgrade_aim_bonus
     var lucky_bonus := 0.0
     if String(prize_data[chosen].get("kind", "toy")) == "toy" and int(prize_data[chosen].get("index", -1)) == lucky_toy_index:
         lucky_bonus = 0.10
@@ -8288,34 +8513,43 @@ func rarity_reward(rarity: String) -> int:
         "ЛЕГЕНДАРНАЯ": return 150
     return 5
 
-func buy_claw(index: int) -> void:
+func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ") -> void:
+    var dialog := ConfirmationDialog.new()
+    dialog.title = title_text
+    dialog.dialog_text = message_text
+    dialog.ok_button_text = ok_text
+    dialog.cancel_button_text = "ОТМЕНА"
+    menu_layer.add_child(dialog)
+    dialog.confirmed.connect(action)
+    dialog.confirmed.connect(func(): dialog.queue_free())
+    dialog.canceled.connect(func(): dialog.queue_free())
+    dialog.close_requested.connect(func(): dialog.queue_free())
+    dialog.popup_centered(Vector2(700, 320))
+
+func buy_claw(index: int, skip_confirmation: bool = false) -> void:
+    if index < 0 or index >= claw_specs.size(): return
+    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on and not (index < owned_claws.size() and owned_claws[index]):
+        confirm_purchase("Покупка клешни", "Купить «%s» за %d ₽?" % [String(claw_specs[index]["name"]), int(claw_specs[index]["price"])], func(): buy_claw(index, true))
+        return
     if SERVER_AUTHORITATIVE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
             update_ui()
             return
-        if _server_action("shop_buy", {"item_id":"claw_%d" % (index + 1)}):
-            current_result = "Покупка проверяется сервером…"
-            update_ui()
-            return
-        return
-    if index >= 0 and index < owned_claws.size() and owned_claws[index]:
-        selected_claw = index
-        current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
-        save_game()
+        var action_name := "shop_select" if index < owned_claws.size() and owned_claws[index] else "shop_buy"
+        if _server_action(action_name, {"item_id":"claw_%d" % (index + 1)}):
+            current_result = "КЛЕШНЯ ВЫБИРАЕТСЯ СЕРВЕРОМ…" if action_name == "shop_select" else "ПОКУПКА КЛЕШНИ ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
+            show_shop_feedback(current_result, 3.0)
+        else:
+            show_shop_feedback("⏳ ОДНА ОПЕРАЦИЯ УЖЕ ВЫПОЛНЯЕТСЯ")
         update_ui()
         return
-    if _server_ready() and player_token != "":
-        if _server_action("shop_buy", {"item_id":"claw_%d" % (index + 1)}):
-            current_result = "Покупка проверяется сервером…"
-            update_ui()
-            return
-    var price := int(claw_specs[index]["price"])
     if owned_claws[index]:
         selected_claw = index
         current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
-    elif coins >= price:
-        coins -= price
+    elif coins >= int(claw_specs[index]["price"]):
+        coins -= int(claw_specs[index]["price"])
         owned_claws[index] = true
         selected_claw = index
         current_result = "КУПЛЕНА: %s" % String(claw_specs[index]["name"])
@@ -8323,18 +8557,29 @@ func buy_claw(index: int) -> void:
         save_game()
     else:
         current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
+        show_shop_feedback("💰 НЕДОСТАТОЧНО СРЕДСТВ")
     update_ui()
 
-func buy_upgrade(index: int) -> void:
+func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
+    if index < 0 or index >= upgrade_specs.size(): return
+    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on:
+        var level := int(upgrade_levels[index])
+        var price := int(upgrade_specs[index]["base_price"]) * (level + 1)
+        if level < 5:
+            confirm_purchase("Покупка улучшения", "Улучшить «%s» до уровня %d за %d ₽?" % [String(upgrade_specs[index]["name"]), level + 1, price], func(): buy_upgrade(index, true))
+            return
     if SERVER_AUTHORITATIVE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
             update_ui()
             return
         if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
             current_result = "Улучшение проверяется сервером…"
+            show_shop_feedback(current_result, 3.0)
             update_ui()
             return
+        show_shop_feedback("⏳ ОДНА ОПЕРАЦИЯ УЖЕ ВЫПОЛНЯЕТСЯ")
         return
     if _server_ready() and player_token != "":
         if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
