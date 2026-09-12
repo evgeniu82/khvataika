@@ -710,9 +710,10 @@ func _achievement_exists(id: String) -> bool:
 
 func _ready() -> void:
     # Сначала создаём собственный загрузочный экран и отдаём движку кадр.
-    # Это гарантирует, что Android не останется на системном splash во время
-    # тяжёлой инициализации игры. Системная картинка splash отключена в
-    # project.godot, поэтому второго экрана с миниатюрой нет.
+    # Системная картинка splash отключена: Android показывает только свой
+    # короткий системный фон, после чего Main сразу показывает ЕДИНСТВЕННУЮ
+    # миниатюру внутри основного загрузочного экрана. Тяжёлая инициализация
+    # начинается только после первого кадра.
     randomize()
     startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
     create_loading_screen()
@@ -2481,6 +2482,16 @@ func create_loading_screen() -> void:
     card_style.set_corner_radius_all(34)
     card.add_theme_stylebox_override("panel", card_style)
     loading_screen.add_child(card)
+
+    var loading_image := TextureRect.new()
+    loading_image.name = "LoadingMiniature"
+    loading_image.texture = load("res://assets/loading_miniature_small.png") as Texture2D
+    loading_image.position = Vector2(300, 255)
+    loading_image.size = Vector2(480, 360)
+    loading_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+    loading_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+    loading_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    loading_screen.add_child(loading_image)
 
     var top_label := Label.new()
     top_label.text = "АРКАДНЫЙ АВТОМАТ  •  ХВАТАЙКА"
