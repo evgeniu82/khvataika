@@ -727,7 +727,10 @@ func _ready() -> void:
         create_loading_screen()
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
-    await get_tree().process_frame
+    # Инициализация запускается Bootstrap после того, как Main реально
+    # добавлен в дерево. Здесь НИЧЕГО тяжёлого не выполняем.
+
+func begin_sequential_initialization() -> void:
     call_deferred("initialize_game_async")
 
 func _is_android_runtime_available() -> bool:
@@ -2633,26 +2636,40 @@ func set_loading_progress(value: float, text: String) -> void:
     await get_tree().process_frame
 
 func initialize_game_async() -> void:
-    # All expensive Main initialization starts only after the loading screen
-    # has rendered. This prevents Android from being stuck on the boot image.
-    await get_tree().process_frame
-
-    await set_loading_status("ПОДГОТАВЛИВАЕМ ПРОФИЛЬ И СОХРАНЕНИЕ...")
+    # Жёстко последовательный старт: каждый крупный блок сначала показывает
+    # свой этап, затем выполняется, затем отдаёт кадр движку.
+    await set_loading_progress(16.0, "НАЧИНАЕМ ПОДГОТОВКУ ПРОФИЛЯ")
+    await set_loading_status("ДОБАВЛЯЕМ КОЛЛЕКЦИИ...")
     add_extended_collections()
-    await get_tree().process_frame
+    await set_loading_progress(17.0, "КОЛЛЕКЦИИ ПОДГОТОВЛЕНЫ")
+
+    await set_loading_status("ПОДГОТАВЛИВАЕМ ДОСТИЖЕНИЯ...")
     add_progressive_achievements()
-    await get_tree().process_frame
+    await set_loading_progress(18.0, "ПРОГРЕССИВНЫЕ ДОСТИЖЕНИЯ ГОТОВЫ")
     add_diverse_achievements()
-    await get_tree().process_frame
+    await set_loading_progress(19.0, "ДОПОЛНИТЕЛЬНЫЕ ДОСТИЖЕНИЯ ГОТОВЫ")
+
+    await set_loading_status("ПОДГОТАВЛИВАЕМ СКИНЫ И ПРОФИЛЬ...")
     owned_claw_skins.resize(claw_skin_specs.size())
     owned_toy_skins.resize(toy_skin_specs.size())
     owned_machine_skins.resize(machine_skin_specs.size())
-    for i in range(owned_claw_skins.size()): owned_claw_skins[i] = (i == 0)
-    for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
-    for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
-    load_save()
-    ensure_player_id()
     await get_tree().process_frame
+    for i in range(owned_claw_skins.size()):
+        owned_claw_skins[i] = (i == 0)
+        if i % 4 == 0: await get_tree().process_frame
+    for i in range(owned_toy_skins.size()):
+        owned_toy_skins[i] = (i == 0)
+        if i % 4 == 0: await get_tree().process_frame
+    for i in range(owned_machine_skins.size()):
+        owned_machine_skins[i] = (i == 0)
+        if i % 4 == 0: await get_tree().process_frame
+    await set_loading_progress(20.0, "СКИНЫ И ПРОФИЛЬ ПОДГОТОВЛЕНЫ")
+
+    await set_loading_status("ЧИТАЕМ СОХРАНЕНИЕ...")
+    load_save()
+    await set_loading_progress(21.0, "СОХРАНЕНИЕ ПРОЧИТАНО")
+    ensure_player_id()
+    await set_loading_progress(22.0, "ПРОФИЛЬ ИДЕНТИФИЦИРОВАН")
 
     remote_http = HTTPRequest.new()
     remote_http.name = "RemoteGameHTTP"
@@ -2669,12 +2686,14 @@ func initialize_game_async() -> void:
     cosmetic_http.timeout = 2.0
     add_child(cosmetic_http)
     cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
+    await set_loading_progress(23.0, "СЕТЕВЫЕ МОДУЛИ ПОДГОТОВЛЕНЫ")
     await get_tree().process_frame
     if get_tree().has_signal("on_request_permissions_result"):
         var permission_callable := Callable(self, "_on_notification_permission_result")
         if not get_tree().is_connected("on_request_permissions_result", permission_callable):
             get_tree().connect("on_request_permissions_result", permission_callable)
     update_return_bonus_state()
+    await set_loading_progress(24.0, "СИСТЕМА БОНУСОВ ПОДГОТОВЛЕНА")
     await get_tree().process_frame
 
     # Реальный последовательный загрузчик: процент продвигается только после
@@ -2686,7 +2705,7 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
     process_incoming_referral()
     await get_tree().process_frame
-    await set_loading_progress(18.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
+    await set_loading_progress(25.0, "ПРОФИЛЬ И РЕФЕРАЛЬНЫЕ ДАННЫЕ ГОТОВЫ")
     await set_loading_status("СОЗДАЁМ ОСНОВУ МИРА...")
     await build_world()
     await set_loading_progress(26.0, "ОКРУЖЕНИЕ ГОТОВО")
@@ -3000,7 +3019,7 @@ func build_world() -> void:
 
     var floor_mat := make_mat(Color("#2A211B"), 0.55, 0.30)
     await get_tree().process_frame
-    await set_loading_progress(21.0, "ОСНОВА СЦЕНЫ ГОТОВА")
+    await set_loading_progress(26.0, "ОСНОВА СЦЕНЫ ГОТОВА")
     make_box(self, Vector3(24, 0.3, 22), Vector3(0, -0.3, 0), floor_mat, "PolishedFloor")
     make_box(self, Vector3(24, 9, 0.2), Vector3(0, 4.2, -7.8), make_mat(Color("#24211E"), 0.05, 0.72), "BackWall")
     make_box(self, Vector3(0.12, 9, 22), Vector3(-11.8, 4.2, 0), make_mat(Color("#302B27"), 0.12, 0.62), "LeftWall")
@@ -3266,11 +3285,12 @@ func build_claw() -> void:
         make_tube(arm, p1, p2, 0.080, metal, "FingerSegment02")
         make_tube(arm, p2, p3, 0.075, metal, "FingerSegment03")
         await get_tree().process_frame
-    await set_loading_progress(46.0, "КЛЕШНЯ: ДВИЖЕНИЕ И ЗАХВАТ ГОТОВ")
         make_tube(arm, p3, p4, 0.070, metal, "FingerSegment04")
         make_tube(arm, p4, p5, 0.065, metal, "FingerTip")
         make_sphere(arm, 0.082, p5, metal, "GripPad")
         claw_arms.append(arm)
+        await get_tree().process_frame
+    await set_loading_progress(46.0, "КЛЕШНЯ: ДВИЖЕНИЕ И ЗАХВАТ ГОТОВ")
 func build_aim_marker() -> void:
     aim_marker = MeshInstance3D.new()
     aim_marker.name = "ClawAimMarker"

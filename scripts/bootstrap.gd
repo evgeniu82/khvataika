@@ -83,6 +83,12 @@ func _process(delta: float) -> void:
         add_child(main_instance)
         _set_progress(15.0, "ИГРОВОЙ МОДУЛЬ ЗАПУЩЕН", "ШАГ 5 • ПЕРЕДАЁМ УПРАВЛЕНИЕ ИГРЕ")
         runtime_attaching = false
+        # Запускаем тяжёлую инициализацию ЯВНО после передачи Main в дерево.
+        # Не полагаемся на call_deferred из Main._ready(): это устраняет
+        # зависание на 15% на Android.
+        await get_tree().process_frame
+        if main_instance and is_instance_valid(main_instance):
+            main_instance.begin_sequential_initialization()
         return
 
     if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
