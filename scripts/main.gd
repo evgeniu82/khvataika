@@ -4506,26 +4506,18 @@ func build_extra_hud() -> void:
     mv.add_child(md)
 
 func animate_panel_in(panel: Control, from_scale: float = 0.94) -> void:
+    # Панели открываются мгновенно: плавные переходы отключены по запросу.
     if not panel or not is_instance_valid(panel):
         return
-    panel.pivot_offset = panel.size * 0.5
-    panel.scale = Vector2(from_scale, from_scale)
-    panel.modulate.a = 0.0
-    var tween := create_tween()
-    tween.set_parallel(true)
-    tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-    tween.tween_property(panel, "scale", Vector2.ONE, 0.18)
-    tween.tween_property(panel, "modulate:a", 1.0, 0.14)
-    play_ui_sound("open")
+    panel.scale = Vector2.ONE
+    panel.modulate.a = 1.0
 
 func animate_panel_out(panel: Control) -> void:
+    # Панели закрываются мгновенно: плавные переходы отключены по запросу.
     if not panel or not is_instance_valid(panel):
         return
-    var tween := create_tween()
-    tween.set_parallel(true)
-    tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-    tween.tween_property(panel, "scale", Vector2(0.96, 0.96), 0.10)
-    tween.tween_property(panel, "modulate:a", 0.0, 0.08)
+    panel.scale = Vector2.ONE
+    panel.modulate.a = 1.0
 
 func close_side_panels(except_name: String = "") -> void:
     var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
@@ -4703,26 +4695,17 @@ func toggle_daily_login() -> void:
     if not daily_login_panel:
         return
     if daily_login_panel.visible:
-        animate_panel_out(daily_login_panel)
-        await get_tree().create_timer(0.10).timeout
-        if is_instance_valid(daily_login_panel): daily_login_panel.visible = false
+        daily_login_panel.visible = false
         return
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
     daily_login_panel.visible = true
-    # Небольшое появление от точки правого круга: окно выглядит как часть той же навигации.
-    # Центр карточки совпадает с центром правого круга; раскрытие идёт строго влево.
-    # Правый край карточки совпадает с внутренним краем правой вертикали кнопок.
+    # Открытие без анимации; положение окна сохраняется из текущей компоновки.
     var right_edge := 1030.0
     var final_x := maxf(8.0, right_edge - daily_login_panel.size.x)
-    var final_pos := Vector2(final_x, 320)
-    daily_login_panel.position = Vector2(final_x + 55.0, 320)
-    daily_login_panel.modulate.a = 0.0
-    var tween := create_tween()
-    tween.set_parallel(true)
-    tween.tween_property(daily_login_panel, "position", final_pos, 0.18).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-    tween.tween_property(daily_login_panel, "modulate:a", 1.0, 0.16)
-    play_ui_sound("open")
+    daily_login_panel.position = Vector2(final_x, 320)
+    daily_login_panel.scale = Vector2.ONE
+    daily_login_panel.modulate.a = 1.0
     update_daily_login_ui()
     update_android_navigation()
 
@@ -7636,7 +7619,6 @@ func open_panel(which: String) -> void:
     elif which == "rating":
         rating_panel.visible = true
         refresh_rating_panel()
-    # Все основные окна меню появляются одинаково плавно.
     for child in menu_layer.get_children():
         if child is PanelContainer and child.visible:
             animate_panel_in(child)
