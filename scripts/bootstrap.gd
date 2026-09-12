@@ -58,18 +58,18 @@ func _process(delta: float) -> void:
             return
 
     if handoff_started:
-        # Pure frame-based handoff: no await/coroutine is used inside Bootstrap
-        # _process. This is deliberately boring and robust on Android.
+        # Give Main two completely clean engine frames, then invoke its startup
+        # method directly. We do not use a property handshake or depend on
+        # Main._process(), because that was the exact 15% failure point.
         if main_instance and is_instance_valid(main_instance):
             if bool(main_instance.get("game_initialized")):
                 set_process(false)
                 return
             handoff_wait_frames -= 1
             if handoff_wait_frames <= 0:
-                main_instance.set("startup_initialization_requested", true)
-                handoff_wait_frames = 30
-                handoff_elapsed = 0.0
-            # Retry the flag periodically until Main confirms initialization.
+                handoff_started = false
+                main_instance.call("begin_sequential_initialization")
+                set_process(true)
         return
 
     if not main_scene_load_started or main_scene_attaching:
@@ -110,7 +110,7 @@ func _process(delta: float) -> void:
         # Main's own _process start the sequential initialization.
         handoff_started = true
         handoff_elapsed = 0.0
-        handoff_wait_frames = 1
+        handoff_wait_frames = 2
         return
 
     if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:

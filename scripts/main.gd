@@ -734,9 +734,14 @@ func _ready() -> void:
     set_process(true)
 
 func begin_sequential_initialization() -> void:
-    # Do not call the large coroutine from Bootstrap. Only set a flag; Main's
-    # own _process starts it on a normal engine frame. This is safer on Android.
+    # Bootstrap calls this directly after Main has received a clean engine frame.
+    # Do NOT rely on Main._process() or a cross-script property handshake here:
+    # on some Android builds that handshake can remain at the 15% handoff point.
+    if startup_initialization_running or game_initialized:
+        return
     startup_initialization_requested = true
+    startup_initialization_running = true
+    initialize_game_async()
 
 
 func _is_android_runtime_available() -> bool:
@@ -2677,27 +2682,11 @@ func initialize_game_async() -> void:
     ensure_player_id()
     await set_loading_progress(22.0, "ПРОФИЛЬ ИДЕНТИФИЦИРОВАН")
 
-    remote_http = HTTPRequest.new()
-    remote_http.name = "RemoteGameHTTP"
-    remote_http.timeout = 3.0
-    add_child(remote_http)
-    remote_http.request_completed.connect(_on_remote_http_completed)
-    claw_http = HTTPRequest.new()
-    claw_http.name = "ClawActionHTTP"
-    claw_http.timeout = 1.5
-    add_child(claw_http)
-    claw_http.request_completed.connect(_on_claw_http_completed)
-    cosmetic_http = HTTPRequest.new()
-    cosmetic_http.name = "CosmeticActionHTTP"
-    cosmetic_http.timeout = 2.0
-    add_child(cosmetic_http)
-    cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
-    await set_loading_progress(23.0, "СЕТЕВЫЕ МОДУЛИ ПОДГОТОВЛЕНЫ")
+    # Network HTTPRequest objects are deliberately NOT created during startup.
+    # They belong to the accelerated-server feature and are initialized only
+    # after the game has reached 100%, so networking can never block loading.
+    await set_loading_progress(23.0, "ПРОПУСКАЕМ СЕТЬ ДО ЗАПУСКА ИГРЫ")
     await get_tree().process_frame
-    if get_tree().has_signal("on_request_permissions_result"):
-        var permission_callable := Callable(self, "_on_notification_permission_result")
-        if not get_tree().is_connected("on_request_permissions_result", permission_callable):
-            get_tree().connect("on_request_permissions_result", permission_callable)
     update_return_bonus_state()
     await set_loading_progress(24.0, "СИСТЕМА БОНУСОВ ПОДГОТОВЛЕНА")
     await get_tree().process_frame
@@ -2749,14 +2738,11 @@ func initialize_game_async() -> void:
     await build_ui()
     await set_loading_progress(92.0, "ИНТЕРФЕЙС ГОТОВ")
 
-    await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
-    build_audio()
+    # Audio and shop-skin systems are part of the five recent feature groups.
+    # They are intentionally initialized after the loading screen reaches 100%.
+    await set_loading_status("ГОТОВИМ ЗВУК И МАГАЗИН ПОСЛЕ ЗАПУСКА...")
     await get_tree().process_frame
-    await set_loading_progress(94.0, "ЗВУК ПОДГОТОВЛЕН")
-    await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
-    apply_shop_visuals()
-    await get_tree().process_frame
-    await set_loading_progress(95.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
+    await set_loading_progress(94.0, "ЗВУК И МАГАЗИН ОТЛОЖЕНЫ ДО ЗАПУСКА")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     setup_daily_systems()
     await get_tree().process_frame
@@ -2792,10 +2778,9 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
-    call_deferred("setup_android_notifications")
-    call_deferred("register_player_remote")
-    call_deferred("sync_remote_config")
-    call_deferred("build_upgrade_sound_system")
+    # Only now enable the five recent feature groups. None of these operations
+    # are allowed to participate in the initial loading path.
+    call_deferred("initialize_post_start_features")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.visible = false
@@ -2810,6 +2795,56 @@ func initialize_game_async() -> void:
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.queue_free()
     loading_screen = null
+
+
+func initialize_post_start_features() -> void:
+    # This function intentionally runs only after game_initialized=true and the
+    # 100% frame has been displayed. It contains the potentially expensive
+    # systems added in the recent feature batches.
+    await get_tree().process_frame
+
+    # 1) accelerated server / online chain
+    if remote_http == null or not is_instance_valid(remote_http):
+        remote_http = HTTPRequest.new()
+        remote_http.name = "RemoteGameHTTP"
+        remote_http.timeout = 3.0
+        add_child(remote_http)
+        remote_http.request_completed.connect(_on_remote_http_completed)
+    if claw_http == null or not is_instance_valid(claw_http):
+        claw_http = HTTPRequest.new()
+        claw_http.name = "ClawActionHTTP"
+        claw_http.timeout = 1.5
+        add_child(claw_http)
+        claw_http.request_completed.connect(_on_claw_http_completed)
+    if cosmetic_http == null or not is_instance_valid(cosmetic_http):
+        cosmetic_http = HTTPRequest.new()
+        cosmetic_http.name = "CosmeticActionHTTP"
+        cosmetic_http.timeout = 2.0
+        add_child(cosmetic_http)
+        cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
+    if get_tree().has_signal("on_request_permissions_result"):
+        var permission_callable := Callable(self, "_on_notification_permission_result")
+        if not get_tree().is_connected("on_request_permissions_result", permission_callable):
+            get_tree().connect("on_request_permissions_result", permission_callable)
+    await get_tree().process_frame
+
+    # 2) interface/game sounds
+    build_audio()
+    await get_tree().process_frame
+    build_upgrade_sound_system()
+    await get_tree().process_frame
+
+    # 3) shop skins / visual variants
+    apply_shop_visuals()
+    await get_tree().process_frame
+
+    # 4) daily/events and smooth-window systems are already represented in the
+    # UI; their runtime refresh/animation is enabled only after initialization.
+    setup_android_notifications()
+    await get_tree().process_frame
+    register_player_remote()
+    await get_tree().process_frame
+    sync_remote_config()
 
 
 func _notification(what: int) -> void:
@@ -7775,13 +7810,11 @@ func update_ui() -> void:
         news_menu_button.text = "📰  НОВОСТИ  !" if news_unread > 0 else "📰  НОВОСТИ"
 
 func _process(delta: float) -> void:
-    # During startup this is deliberately the ONLY work performed by Main.
-    # It prevents network polling, audio settings and gameplay logic from
-    # running while Bootstrap is handing over the scene.
+    # During startup Main does no gameplay/network/audio work. Bootstrap starts
+    # the sequential coroutine explicitly via begin_sequential_initialization().
+    # Keeping _process passive here prevents a second startup path from racing
+    # with the loader.
     if not game_initialized:
-        if startup_initialization_requested and not startup_initialization_running:
-            startup_initialization_running = true
-            initialize_game_async()
         return
 
     time_alive += delta
