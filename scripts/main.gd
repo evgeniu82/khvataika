@@ -220,6 +220,10 @@ var remote_device_registered: bool = false
 var remote_sync_retry_count: int = 0
 var remote_auth_retry_timer: float = 2.0
 var remote_http: HTTPRequest
+var claw_http: HTTPRequest
+var cosmetic_http: HTTPRequest
+var claw_http_busy: bool = false
+var cosmetic_http_busy: bool = false
 var remote_request_kind: String = ""
 var remote_sync_pending: bool = false
 var remote_action_queue: Array[Dictionary] = []
@@ -727,6 +731,17 @@ func _ready() -> void:
     remote_http.name = "RemoteGameHTTP"
     add_child(remote_http)
     remote_http.request_completed.connect(_on_remote_http_completed)
+
+    # Separate HTTP channels for time-critical gameplay and cosmetic selection.
+    # A regular background sync must never delay a claw drop or skin installation.
+    claw_http = HTTPRequest.new()
+    claw_http.name = "ClawActionHTTP"
+    add_child(claw_http)
+    claw_http.request_completed.connect(_on_claw_http_completed)
+    cosmetic_http = HTTPRequest.new()
+    cosmetic_http.name = "CosmeticActionHTTP"
+    add_child(cosmetic_http)
+    cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
     # Android permission responses are delivered by MainLoop/SceneTree.
     # Without this connection, the first notification test could remain
     # waiting forever after Android shows the permission dialog.
@@ -1683,6 +1698,84 @@ func _apply_remote_config(config: Dictionary) -> void:
     refresh_shop()
     refresh_achievements_panel()
     refresh_vip_panel()
+    update_ui()
+
+func _on_claw_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+    claw_http_busy = false
+    var text := body.get_string_from_utf8().strip_edges()
+    if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300 or text == "":
+        server_attempt_ready = false
+        server_attempt_success = false
+        server_attempt_toy_id = ""
+        server_attempt_toy_name = ""
+        server_attempt_reward = {}
+        # The physical cycle may already be running; it will safely return home.
+        if drop_state == 1 or drop_state == 2:
+            current_result = "СЕРВЕР НЕ ОТВЕТИЛ — КЛЕШНЬ ВОЗВРАЩАЕТСЯ"
+        update_ui()
+        return
+    var parsed: Variant = JSON.parse_string(text)
+    if not (parsed is Dictionary) or not bool(parsed.get("ok", false)):
+        server_attempt_ready = false
+        server_attempt_success = false
+        server_attempt_toy_id = ""
+        server_attempt_toy_name = ""
+        server_attempt_reward = {}
+        if drop_state == 1 or drop_state == 2:
+            current_result = String(parsed.get("message", "Сервер отклонил попытку")) if parsed is Dictionary else "Сервер вернул ошибку"
+        update_ui()
+        return
+    var data: Dictionary = parsed
+    if data.has("token") and String(data.get("token", "")) != "":
+        player_token = String(data.get("token"))
+    if data.has("game_state") and data["game_state"] is Dictionary:
+        apply_server_game_state(data["game_state"])
+    var start_attempt: Variant = data.get("attempt", {})
+    server_attempt_ready = start_attempt is Dictionary
+    if server_attempt_ready:
+        server_attempt_success = bool(start_attempt.get("success", false))
+        server_attempt_toy_id = String(start_attempt.get("toy_id", ""))
+        server_attempt_toy_name = String(start_attempt.get("toy_name", ""))
+        var reward: Variant = start_attempt.get("reward", {})
+        server_attempt_reward = reward.duplicate(true) if reward is Dictionary else {}
+    update_ui()
+
+func _on_cosmetic_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+    cosmetic_http_busy = false
+    var text := body.get_string_from_utf8().strip_edges()
+    if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300 or text == "":
+        current_result = "НЕ УДАЛОСЬ УСТАНОВИТЬ СКИН — ПРОВЕРЬТЕ СЕРВЕР"
+        update_ui()
+        return
+    var parsed: Variant = JSON.parse_string(text)
+    if not (parsed is Dictionary) or not bool(parsed.get("ok", false)):
+        current_result = String(parsed.get("message", "Сервер отклонил установку скина")) if parsed is Dictionary else "Сервер вернул ошибку"
+        update_ui()
+        return
+    var data: Dictionary = parsed
+    if data.has("game_state") and data["game_state"] is Dictionary:
+        apply_server_game_state(data["game_state"])
+    var item: Variant = data.get("item", {})
+    if item is Dictionary:
+        var effect: Variant = item.get("effect", {})
+        var category := String(item.get("category", ""))
+        if effect is Dictionary and effect.has("skin_index"):
+            var idx := int(effect.get("skin_index", 0))
+            if category == "claw_skins":
+                selected_claw_skin = clampi(idx, 0, maxi(0, claw_skin_specs.size() - 1))
+                if selected_claw_skin < owned_claw_skins.size(): owned_claw_skins[selected_claw_skin] = true
+            elif category == "toy_skins":
+                selected_toy_skin = clampi(idx, 0, maxi(0, toy_skin_specs.size() - 1))
+                if selected_toy_skin < owned_toy_skins.size(): owned_toy_skins[selected_toy_skin] = true
+            elif category == "machine_skins":
+                selected_machine_skin = clampi(idx, 0, maxi(0, machine_skin_specs.size() - 1))
+                if selected_machine_skin < owned_machine_skins.size(): owned_machine_skins[selected_machine_skin] = true
+        apply_shop_visuals()
+        if category == "toy_skins": build_prizes()
+        current_result = "УСТАНОВЛЕН СКИН: %s" % String(item.get("name", "ГОТОВО"))
+    refresh_shop()
+    refresh_vip_panel()
+    save_game()
     update_ui()
 
 func _abort_server_claw_attempt(message: String) -> void:
@@ -4397,8 +4490,8 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Компактная карточка, привязанная к правому кругу. На Android она
     # полностью помещается в экран и раскрывается влево от кнопки.
-    daily_login_panel.position = Vector2(390, 330)
-    daily_login_panel.size = Vector2(350, 180)
+    daily_login_panel.position = Vector2(180, 320)
+    daily_login_panel.size = Vector2(190, 92)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     hud_layer.add_child(daily_login_panel)
@@ -4412,18 +4505,18 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 11)
+    title.add_theme_font_size_override("font_size", 7)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    detail.add_theme_font_size_override("font_size", 8)
+    detail.add_theme_font_size_override("font_size", 6)
     v.add_child(detail)
 
     daily_days_container = GridContainer.new()
     daily_days_container.name = "DailyDaysGrid"
-    daily_days_container.columns = 3
+    daily_days_container.columns = 4
     daily_days_container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
     daily_days_container.add_theme_constant_override("h_separation", 2)
     daily_days_container.add_theme_constant_override("v_separation", 2)
@@ -4433,8 +4526,8 @@ func build_daily_login_panel() -> void:
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(105, 38)
-        day_button.add_theme_font_size_override("font_size", 7)
+        day_button.custom_minimum_size = Vector2(43, 22)
+        day_button.add_theme_font_size_override("font_size", 4)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
         day_button.set_meta("day_index", day)
@@ -4448,7 +4541,7 @@ func build_daily_login_panel() -> void:
     hint.name = "DailyLoginHint"
     hint.text = "Нажми на день, который доступен сейчас"
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    hint.add_theme_font_size_override("font_size", 6)
+    hint.add_theme_font_size_override("font_size", 4)
     v.add_child(hint)
 
 func update_daily_login_ui() -> void:
@@ -4497,8 +4590,8 @@ func toggle_daily_login() -> void:
     daily_login_panel.visible = true
     # Небольшое появление от точки правого круга: окно выглядит как часть той же навигации.
     # Центр карточки совпадает с центром правого круга; раскрытие идёт строго влево.
-    var final_pos := Vector2(390, 330)
-    daily_login_panel.position = Vector2(740, 330)
+    var final_pos := Vector2(180, 320)
+    daily_login_panel.position = Vector2(450, 320)
     daily_login_panel.modulate.a = 0.0
     var tween := create_tween()
     tween.set_parallel(true)
@@ -5173,7 +5266,9 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
             refresh_shop()
             current_result = "УСТАНОВЛЕН СКИН: %s" % String(specs[index].get("name", "ГОТОВО"))
             update_ui()
-        _server_action("cosmetic_buy", {"item_id":item_id})
+        if not _start_fast_cosmetic_server_request(item_id):
+            current_result = "СЕРВЕР ЗАНЯТ — НЕ УДАЛОСЬ ОТПРАВИТЬ СКИН"
+            update_ui()
         return selected
     if owned[index]:
         selected = index
@@ -5199,44 +5294,42 @@ func buy_toy_skin(index: int) -> void:
 func buy_machine_skin(index: int) -> void:
     selected_machine_skin = buy_cosmetic(index, machine_skin_specs, owned_machine_skins, selected_machine_skin)
 
+func _recolor_mesh_tree(root: Node, color: Color, skip_names: Array[String] = []) -> void:
+    if not root or not is_instance_valid(root):
+        return
+    if root is MeshInstance3D:
+        var mesh_node := root as MeshInstance3D
+        if String(mesh_node.name) not in skip_names:
+            var material := mesh_node.material_override
+            if material is StandardMaterial3D:
+                (material as StandardMaterial3D).albedo_color = color
+            elif material is ShaderMaterial:
+                var shader_mat := material as ShaderMaterial
+                # Плюшевая игрушка использует ShaderMaterial, поэтому изменение
+                # только albedo_color раньше вообще не влияло на её внешний вид.
+                if shader_mat.get_shader_parameter("base_color") != null:
+                    shader_mat.set_shader_parameter("base_color", color)
+    for child in root.get_children():
+        _recolor_mesh_tree(child, color, skip_names)
+
 func apply_shop_visuals() -> void:
     var current_machine: Node3D = get_node_or_null("PremiumClawMachine") as Node3D
-    if claw and selected_claw_skin < claw_skin_specs.size():
-        var c: Color = claw_skin_specs[selected_claw_skin]["color"]
-        for node in claw.get_children():
-            if node is MeshInstance3D and node.name != "MotorHousing":
-                var mat := node.material_override as StandardMaterial3D
-                if mat: mat.albedo_color = c
-            elif node is Node3D:
-                for part in node.get_children():
-                    if part is MeshInstance3D:
-                        var pm := part.material_override as StandardMaterial3D
-                        if pm: pm.albedo_color = c
-    if selected_machine_skin < machine_skin_specs.size():
+    if claw and selected_claw_skin >= 0 and selected_claw_skin < claw_skin_specs.size():
+        _recolor_mesh_tree(claw, claw_skin_specs[selected_claw_skin]["color"], ["MotorHousing"])
+
+    if current_machine and selected_machine_skin >= 0 and selected_machine_skin < machine_skin_specs.size():
         var ms: Dictionary = machine_skin_specs[selected_machine_skin]
-        if current_machine == null:
-            return
-        for node in current_machine.get_children():
-            if node is MeshInstance3D:
-                var node_name := String(node.name)
-                # Перекрашиваем реальные элементы корпуса, а стекло/отверстие
-                # оставляем прозрачными и нейтральными.
-                if not node_name.contains("Glass") and not node_name.contains("Hole") and not node_name.contains("Light"):
-                    var mm := node.material_override as StandardMaterial3D
-                    if mm: mm.albedo_color = ms["frame"]
+        _recolor_mesh_tree(current_machine, ms["frame"], ["FrontGlass", "BackGlass", "LeftGlass", "RightGlass", "PrizeHole", "PrizeHoleDepth", "PrizeHoleFrame", "PrizeHoleTrim"])
         for light in machine_lights:
             if light: light.light_color = ms["light"]
-    # Скин игрушек должен менять внешний вид уже созданных призов сразу после выбора.
-    if selected_toy_skin < toy_skin_specs.size():
+
+    # Скин игрушек должен менять и уже созданные игрушки. У плюша материал
+    # является ShaderMaterial, поэтому цвет задаётся через base_color.
+    if selected_toy_skin >= 0 and selected_toy_skin < toy_skin_specs.size():
         var tint: Color = toy_skin_specs[selected_toy_skin]["tint"]
         for body in prize_bodies:
             if body and is_instance_valid(body):
-                var meshes := body.find_children("", "MeshInstance3D", true, false)
-                for mesh_node in meshes:
-                    var toy_mesh := mesh_node as MeshInstance3D
-                    if toy_mesh:
-                        var toy_mat := toy_mesh.material_override as StandardMaterial3D
-                        if toy_mat: toy_mat.albedo_color = tint
+                _recolor_mesh_tree(body, tint)
 
 func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
@@ -7655,7 +7748,7 @@ func process_claw(delta: float) -> void:
                 # Не оставляем клешню навсегда внизу, если HTTP-ответ задержался.
                 # Сервер всё равно остаётся источником истины; при нормальном ответе
                 # этот таймер сбрасывается сразу в resolve_grab().
-                if drop_time < 4.0:
+                if drop_time < 0.75:
                     return
                 _abort_server_claw_attempt("Сервер слишком долго отвечает — клешня возвращается")
                 return
@@ -7826,8 +7919,47 @@ func move_z(amount: float) -> void:
     register_game_activity()
     claw_move_target.z = clampf(claw_move_target.z + amount, CLAW_MIN.z, CLAW_MAX.z)
 
+func _start_fast_claw_server_attempt() -> bool:
+    if not _server_ready() or player_token == "":
+        return false
+    if claw_http_busy or not claw_http:
+        return false
+    server_attempt_ready = false
+    server_attempt_success = false
+    server_attempt_toy_id = ""
+    server_attempt_toy_name = ""
+    server_attempt_reward = {}
+    var payload := {"type":"game_start", "action_id":"game_start_%s_%s" % [player_id, str(Time.get_ticks_msec())]}
+    claw_http_busy = true
+    var err := claw_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(payload))
+    if err != OK:
+        claw_http_busy = false
+        return false
+    return true
+
+func _start_fast_cosmetic_server_request(item_id: String) -> bool:
+    if not _server_ready() or player_token == "" or cosmetic_http_busy or not cosmetic_http:
+        return false
+    cosmetic_http_busy = true
+    var payload := {"type":"cosmetic_buy", "action_id":"cosmetic_%s_%s" % [player_id, str(Time.get_ticks_msec())], "item_id":item_id}
+    var err := cosmetic_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(payload))
+    if err != OK:
+        cosmetic_http_busy = false
+        return false
+    return true
+
+func _claw_is_over_chute() -> bool:
+    var dx := claw_pos.x - PRIZE_HOLE.x
+    var dz := claw_pos.z - PRIZE_HOLE.z
+    return sqrt(dx * dx + dz * dz) <= 0.82
+
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
+    # Над шахтой выдачи захват запрещён: это парковочная точка клешни.
+    if _claw_is_over_chute():
+        current_result = "ПЕРЕДВИНЬТЕ КЛЕШНЮ К ИГРУШКАМ"
+        update_ui()
+        return
     play_upgrade_sound("grab")
     register_game_activity()
     if _server_ready():
@@ -7840,7 +7972,7 @@ func drop_claw() -> void:
         server_attempt_toy_id = ""
         server_attempt_toy_name = ""
         server_attempt_reward = {}
-        if not _server_action("game_start"):
+        if not _start_fast_claw_server_attempt():
             current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
             update_ui()
             return
