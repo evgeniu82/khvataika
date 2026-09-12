@@ -6,7 +6,7 @@ config_version=5
 config/name="Хватайка"
 config/version="1.13.6"
 config/icon="res://store/icon_512.png"
-run/main_scene="res://scenes/Bootstrap.tscn"
+run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.05, 0.025, 0.02, 1)
 boot_splash/show_image=true
@@ -14,7 +14,7 @@ boot_splash/minimum_display_time=700
 boot_splash/image="res://assets/loading_miniature.png"
 
 [editor_plugins]
-enabled=PackedStringArray("res://addons/khvataika_background_notifications/plugin.cfg")
+enabled=PackedStringArray()
 
 [display]
 window/size/viewport_width=1080
