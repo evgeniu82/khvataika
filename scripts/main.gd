@@ -227,6 +227,11 @@ var remote_auth_retry_timer: float = 2.0
 var remote_http: HTTPRequest
 var remote_request_kind: String = ""
 var remote_sync_pending: bool = false
+# Очередь единственного серверного действия: фоновые запросы рейтинга/config
+# никогда не блокируют покупку, выбор скина или игровую попытку.
+var remote_queued_action_name: String = ""
+var remote_queued_action_payload: Dictionary = {}
+var remote_rating_pending: bool = false
 var remote_pending_promo: String = ""
 var remote_pending_referral: String = ""
 var pending_incoming_referral: String = ""
@@ -1334,6 +1339,25 @@ func apply_server_game_state(data: Dictionary) -> void:
     if d is Dictionary: completed_collections = d
     arr = data.get("upgrades", upgrade_levels)
     upgrade_levels = _int_array_from_variant(arr, upgrade_levels)
+    # Список серверно купленных предметов нужен магазину как источник истины.
+    # Храним его локально в виде cache, если поле существует в snapshot.
+    var owned_items_remote: Variant = data.get("owned_items", null)
+    if owned_items_remote is Array:
+        for item_id in owned_items_remote:
+            if item_id is String:
+                var sid := String(item_id)
+                if sid.begins_with("claw_skin_"):
+                    var skin_index := clampi(int(sid.trim_prefix("claw_skin_")), 0, maxi(0, owned_claw_skins.size() - 1))
+                    if skin_index >= 0 and skin_index < owned_claw_skins.size():
+                        owned_claw_skins[skin_index] = true
+                elif sid.begins_with("toy_skin_"):
+                    var toy_skin_index := clampi(int(sid.trim_prefix("toy_skin_")), 0, maxi(0, owned_toy_skins.size() - 1))
+                    if toy_skin_index >= 0 and toy_skin_index < owned_toy_skins.size():
+                        owned_toy_skins[toy_skin_index] = true
+                elif sid.begins_with("machine_skin_"):
+                    var machine_skin_index := clampi(int(sid.trim_prefix("machine_skin_")), 0, maxi(0, owned_machine_skins.size() - 1))
+                    if machine_skin_index >= 0 and machine_skin_index < owned_machine_skins.size():
+                        owned_machine_skins[machine_skin_index] = true
     d = data.get("promo_codes_used", promo_codes_used)
     if d is Dictionary: promo_codes_used = d
     return_bonus_days = maxi(0, int(data.get("return_bonus_days", return_bonus_days)))
@@ -1472,18 +1496,17 @@ func _remote_headers() -> PackedStringArray:
 func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
     if not _server_ready() or player_token == "":
         return false
-    # Быстрые действия не ждут фоновые config/sync/notifications/rating/register.
+    # HTTPRequest допускает только один активный запрос. Поэтому фоновые
+    # запросы никогда не отменяем перед покупкой: действие ставится в короткую
+    # очередь и отправляется сразу после ответа фонового запроса.
     if remote_request_kind != "":
-        if action_name in ["game_start", "game_finish", "game_cancel", "shop_buy", "shop_select", "cosmetic_buy", "daily_login", "workshop_upgrade", "workshop_blueprint", "workshop_calibrate"]:
+        if action_name in ["game_start", "game_finish", "game_cancel", "shop_buy", "shop_select", "cosmetic_buy", "daily_login", "workshop_upgrade", "workshop_blueprint", "workshop_calibrate", "sell_duplicate"]:
             if remote_request_kind in ["config", "sync", "notifications", "rating", "register"]:
-                if remote_http and is_instance_valid(remote_http):
-                    remote_http.cancel_request()
-                remote_request_kind = ""
-                remote_action_name = ""
-            else:
-                return false
-        else:
+                remote_queued_action_name = action_name
+                remote_queued_action_payload = payload.duplicate(true)
+                return true
             return false
+        return false
     var data := payload.duplicate(true)
     data["type"] = action_name
     data["action_id"] = "%s_%s_%s" % [action_name, player_id, str(Time.get_ticks_msec())]
@@ -1495,6 +1518,17 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
         remote_action_name = ""
         return false
     return true
+
+func _flush_queued_server_action() -> void:
+    if remote_request_kind != "" or remote_queued_action_name == "":
+        return
+    var action_name := remote_queued_action_name
+    var payload := remote_queued_action_payload.duplicate(true)
+    remote_queued_action_name = ""
+    remote_queued_action_payload.clear()
+    if not _server_action(action_name, payload):
+        current_result = "НЕ УДАЛОСЬ ОТПРАВИТЬ ОПЕРАЦИЮ НА СЕРВЕР"
+        update_ui()
 func _ensure_connection_http() -> void:
     if connection_http and is_instance_valid(connection_http):
         return
@@ -1612,9 +1646,19 @@ func get_player_online_score() -> int:
 func request_global_rating() -> void:
     if not _server_ready():
         return
+    # Не затираем remote_request_kind. Раньше повторный вызов рейтинга во
+    # время другого HTTPRequest мог оставить клиент в вечном состоянии
+    # "Подключаемся..." и блокировать магазин.
+    if remote_request_kind != "":
+        if remote_request_kind == "rating":
+            return
+        remote_rating_pending = true
+        return
+    remote_rating_pending = false
     remote_request_kind = "rating"
     var err := remote_http.request(_normalized_server_url() + "/api/rating?player_id=" + player_id.uri_encode())
     if err != OK:
+        remote_request_kind = ""
         remote_sync_status = "ОШИБКА РЕЙТИНГА"
 
 func apply_referral_remote(code: String) -> void:
@@ -1996,6 +2040,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             call_deferred("apply_referral_remote", incoming_code)
         else:
             call_deferred("sync_player_to_server")
+    elif remote_queued_action_name != "":
+        # Покупка/выбор/игровое действие имеет приоритет над фоновым рейтингом
+        # и синхронизацией.
+        call_deferred("_flush_queued_server_action")
+    elif remote_rating_pending:
+        call_deferred("request_global_rating")
     elif remote_sync_pending:
         remote_sync_pending = false
         call_deferred("sync_player_to_server")
@@ -7577,6 +7627,7 @@ func open_panel(which: String) -> void:
     elif which == "rating":
         rating_panel.visible = true
         refresh_rating_panel()
+        request_global_rating()
     update_android_navigation()
 
 func close_gameplay_overlay() -> void:
