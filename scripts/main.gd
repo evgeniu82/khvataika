@@ -32,6 +32,7 @@ var coins: int = 120
 var selected_claw: int = 0
 var owned_claws: Array[bool] = [true, false, false, false, false, false, false, false, false, false]
 var music_on: bool = true
+var music_player: AudioStreamPlayer
 var sfx_on: bool = true
 var collection: Dictionary = {}
 var toy_inventory_counts: Dictionary = {}
@@ -320,6 +321,7 @@ var selected_machine_skin: int = 0
 var server_attempt_ready: bool = false
 var server_attempt_success: bool = false
 var server_attempt_toy_id: String = ""
+var server_attempt_toy_name: String = ""
 var server_attempt_reward: Dictionary = {}
 var vip_panel: PanelContainer
 var seasons_panel: PanelContainer
@@ -1687,6 +1689,7 @@ func _abort_server_claw_attempt(message: String) -> void:
     server_attempt_ready = false
     server_attempt_success = false
     server_attempt_toy_id = ""
+    server_attempt_toy_name = ""
     server_attempt_reward = {}
     if drop_state != 0:
         claw_move_target = CLAW_HOME
@@ -1798,12 +1801,14 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     server_attempt_ready = false
                     server_attempt_success = false
                     server_attempt_toy_id = ""
+                    server_attempt_toy_name = ""
                     server_attempt_reward = {}
                     var start_attempt: Variant = data.get("attempt", {})
                     if start_attempt is Dictionary:
                         server_attempt_ready = true
                         server_attempt_success = bool(start_attempt.get("success", false))
                         server_attempt_toy_id = String(start_attempt.get("toy_id", ""))
+                        server_attempt_toy_name = String(start_attempt.get("toy_name", ""))
                         var start_reward: Variant = start_attempt.get("reward", {})
                         if start_reward is Dictionary:
                             server_attempt_reward = start_reward.duplicate(true)
@@ -1846,14 +1851,34 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     refresh_shop()
                     current_result = "ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:cosmetic_buy":
-                    apply_shop_visuals()
-                    build_prizes()
-                    refresh_shop()
-                    refresh_vip_panel()
+                    # Не полагаемся только на общий game_state: серверный ответ
+                    # содержит точный выбранный косметический индекс. Применяем его
+                    # сразу, затем обновляем визуал и текст магазина.
                     var cosmetic_item: Variant = data.get("item", {})
                     if cosmetic_item is Dictionary:
+                        var cosmetic_effect: Variant = cosmetic_item.get("effect", {})
+                        var cosmetic_category := String(cosmetic_item.get("category", ""))
+                        if cosmetic_effect is Dictionary and cosmetic_effect.has("skin_index"):
+                            var cosmetic_index := int(cosmetic_effect.get("skin_index", 0))
+                            if cosmetic_category == "claw_skins":
+                                selected_claw_skin = clampi(cosmetic_index, 0, maxi(0, claw_skin_specs.size() - 1))
+                                if selected_claw_skin < owned_claw_skins.size(): owned_claw_skins[selected_claw_skin] = true
+                            elif cosmetic_category == "toy_skins":
+                                selected_toy_skin = clampi(cosmetic_index, 0, maxi(0, toy_skin_specs.size() - 1))
+                                if selected_toy_skin < owned_toy_skins.size(): owned_toy_skins[selected_toy_skin] = true
+                            elif cosmetic_category == "machine_skins":
+                                selected_machine_skin = clampi(cosmetic_index, 0, maxi(0, machine_skin_specs.size() - 1))
+                                if selected_machine_skin < owned_machine_skins.size(): owned_machine_skins[selected_machine_skin] = true
+                        apply_shop_visuals()
+                        if cosmetic_category == "toy_skins":
+                            build_prizes()
+                        refresh_shop()
+                        refresh_vip_panel()
                         current_result = "УСТАНОВЛЕН СКИН: %s" % String(cosmetic_item.get("name", "ГОТОВО"))
                     else:
+                        apply_shop_visuals()
+                        refresh_shop()
+                        refresh_vip_panel()
                         current_result = "СКИН УСТАНОВЛЕН / ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ"
                 "action:chest_open": current_result = "СУНДУК ОТКРЫТ СЕРВЕРОМ"
                 "action:daily_login":
@@ -4372,8 +4397,8 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Компактная карточка, привязанная к правому кругу. На Android она
     # полностью помещается в экран и раскрывается влево от кнопки.
-    daily_login_panel.position = Vector2(500, 330)
-    daily_login_panel.size = Vector2(420, 205)
+    daily_login_panel.position = Vector2(390, 330)
+    daily_login_panel.size = Vector2(350, 180)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     hud_layer.add_child(daily_login_panel)
@@ -4387,13 +4412,13 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 14)
+    title.add_theme_font_size_override("font_size", 11)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    detail.add_theme_font_size_override("font_size", 9)
+    detail.add_theme_font_size_override("font_size", 8)
     v.add_child(detail)
 
     daily_days_container = GridContainer.new()
@@ -4408,8 +4433,8 @@ func build_daily_login_panel() -> void:
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(128, 43)
-        day_button.add_theme_font_size_override("font_size", 8)
+        day_button.custom_minimum_size = Vector2(105, 38)
+        day_button.add_theme_font_size_override("font_size", 7)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
         day_button.set_meta("day_index", day)
@@ -4423,7 +4448,7 @@ func build_daily_login_panel() -> void:
     hint.name = "DailyLoginHint"
     hint.text = "Нажми на день, который доступен сейчас"
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    hint.add_theme_font_size_override("font_size", 7)
+    hint.add_theme_font_size_override("font_size", 6)
     v.add_child(hint)
 
 func update_daily_login_ui() -> void:
@@ -4472,8 +4497,8 @@ func toggle_daily_login() -> void:
     daily_login_panel.visible = true
     # Небольшое появление от точки правого круга: окно выглядит как часть той же навигации.
     # Центр карточки совпадает с центром правого круга; раскрытие идёт строго влево.
-    var final_pos := Vector2(500, 330)
-    daily_login_panel.position = Vector2(920, 330)
+    var final_pos := Vector2(390, 330)
+    daily_login_panel.position = Vector2(740, 330)
     daily_login_panel.modulate.a = 0.0
     var tween := create_tween()
     tween.set_parallel(true)
@@ -4716,10 +4741,27 @@ func toggle_event_panel() -> void:
     update_android_navigation()
 
 func build_audio() -> void:
-    # По просьбе оставлен только звук движения клешни.
+    # Звук движения клешни + отдельная фоновая мелодия без авторских сэмплов.
     sfx_move = make_sfx_player("res://audio/claw_move.wav")
     if sfx_move.stream is AudioStreamWAV:
         (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+    music_player = make_sfx_player("res://audio/background_music.ogg")
+    music_player.volume_db = music_volume_db
+    music_player.finished.connect(func():
+        if music_on and music_player and is_instance_valid(music_player):
+            music_player.play()
+    )
+    apply_music_settings()
+
+func apply_music_settings() -> void:
+    if not music_player or not is_instance_valid(music_player):
+        return
+    music_player.volume_db = music_volume_db
+    if music_on:
+        if not music_player.playing:
+            music_player.play()
+    elif music_player.playing:
+        music_player.stop()
 
 func make_sfx_player(path: String) -> AudioStreamPlayer:
     var player := AudioStreamPlayer.new()
@@ -5175,9 +5217,13 @@ func apply_shop_visuals() -> void:
         if current_machine == null:
             return
         for node in current_machine.get_children():
-            if node is MeshInstance3D and (String(node.name).contains("Marquee") or String(node.name).contains("Control") or String(node.name).contains("Chrome")):
-                var mm := node.material_override as StandardMaterial3D
-                if mm: mm.albedo_color = ms["frame"]
+            if node is MeshInstance3D:
+                var node_name := String(node.name)
+                # Перекрашиваем реальные элементы корпуса, а стекло/отверстие
+                # оставляем прозрачными и нейтральными.
+                if not node_name.contains("Glass") and not node_name.contains("Hole") and not node_name.contains("Light"):
+                    var mm := node.material_override as StandardMaterial3D
+                    if mm: mm.albedo_color = ms["frame"]
         for light in machine_lights:
             if light: light.light_color = ms["light"]
     # Скин игрушек должен менять внешний вид уже созданных призов сразу после выбора.
@@ -6972,9 +7018,9 @@ func build_settings_panel() -> PanelContainer:
 
     var sep1 := Label.new(); sep1.text = "ЗВУК"; sep1.add_theme_font_size_override("font_size", 22); sep1.modulate = GOLD; v.add_child(sep1)
     var music := CheckButton.new(); music.text = "Фоновая музыка"; music.button_pressed = music_on; music.add_theme_font_size_override("font_size", 21)
-    music.toggled.connect(func(on: bool): music_on = on; save_game()); v.add_child(music)
+    music.toggled.connect(func(on: bool): music_on = on; apply_music_settings(); save_game()); v.add_child(music)
     var music_vol := HSlider.new(); music_vol.min_value = -30; music_vol.max_value = 3; music_vol.step = 1; music_vol.value = music_volume_db; music_vol.custom_minimum_size = Vector2(0, 42)
-    music_vol.value_changed.connect(func(value: float): music_volume_db = value; save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
+    music_vol.value_changed.connect(func(value: float): music_volume_db = value; apply_music_settings(); save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
     var sfx := CheckButton.new(); sfx.text = "Звуки игры и интерфейса"; sfx.button_pressed = sfx_on; sfx.add_theme_font_size_override("font_size", 21)
     sfx.toggled.connect(func(on: bool): sfx_on = on; save_game()); v.add_child(sfx)
     var volume := HSlider.new(); volume.min_value = -24; volume.max_value = 3; volume.step = 1; volume.value = sfx_volume_db; volume.custom_minimum_size = Vector2(0, 42)
@@ -7406,6 +7452,8 @@ func update_ui() -> void:
 
 func _process(delta: float) -> void:
     time_alive += delta
+    if music_player:
+        apply_music_settings()
     if notification_permission_waiting and OS.has_feature("android") and fmod(time_alive, 1.0) < delta:
         if _android_notification_permission_granted():
             notification_permission_waiting = false
@@ -7604,9 +7652,12 @@ func process_claw(delta: float) -> void:
         animate_grip(clampf(drop_time / 0.35, 0.0, 1.0))
         if drop_time >= 0.48:
             if _server_ready() and player_token != "" and not server_attempt_ready:
-                # Ждём ответ game_start, чтобы физика клешни никогда не расходилась
-                # с решением сервера.
-                drop_time = 0.30
+                # Не оставляем клешню навсегда внизу, если HTTP-ответ задержался.
+                # Сервер всё равно остаётся источником истины; при нормальном ответе
+                # этот таймер сбрасывается сразу в resolve_grab().
+                if drop_time < 4.0:
+                    return
+                _abort_server_claw_attempt("Сервер слишком долго отвечает — клешня возвращается")
                 return
             var grabbed := resolve_grab()
             drop_time = 0.0
@@ -7787,6 +7838,7 @@ func drop_claw() -> void:
         server_attempt_ready = false
         server_attempt_success = false
         server_attempt_toy_id = ""
+        server_attempt_toy_name = ""
         server_attempt_reward = {}
         if not _server_action("game_start"):
             current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
@@ -7820,13 +7872,29 @@ func resolve_grab() -> bool:
             update_ui()
             return false
         var server_choice := -1
-        if server_attempt_toy_id != "":
+        if server_attempt_toy_name != "":
+            for i in range(prize_data.size()):
+                if String(prize_data[i].get("kind", "toy")) == "toy" and String(prize_data[i].get("name", "")) == server_attempt_toy_name:
+                    server_choice = i
+                    break
+        if server_choice < 0 and server_attempt_toy_id != "":
             for i in range(prize_data.size()):
                 if String(prize_data[i].get("kind", "toy")) == "toy":
                     var pi := int(prize_data[i].get("index", -1))
                     if pi >= 0 and pi < toys.size() and String(toys[pi].get("id", "")) == server_attempt_toy_id:
                         server_choice = i
                         break
+        # Визуально захватываем только игрушку, которая действительно находится
+        # под клешнёй. Если серверный приз есть, но сейчас далеко от неё, выбираем
+        # ближайшую верхнюю игрушку текущей партии; сервер всё равно остаётся
+        # источником истины для успешности и награды.
+        if server_choice >= 0:
+            var candidate := prize_bodies[server_choice] if server_choice < prize_bodies.size() else null
+            if candidate and is_instance_valid(candidate):
+                var cdx := candidate.global_position.x - claw_pos.x
+                var cdz := candidate.global_position.z - claw_pos.z
+                if sqrt(cdx * cdx + cdz * cdz) > 1.05:
+                    server_choice = -1
         var chosen_server := server_choice if server_choice >= 0 else choose_top_layer_prize()
         if chosen_server < 0 or chosen_server >= prize_bodies.size():
             current_result = "ПОД КЛЕШНЁЙ НЕТ ПРИЗА"
