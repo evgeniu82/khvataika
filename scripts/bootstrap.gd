@@ -1,69 +1,114 @@
 extends Control
 
-# Lightweight launcher. It owns the same brown loading screen that the game
-# used before the startup refactor, then loads the heavy Main scene in a worker.
-var load_path := "res://scenes/Main.tscn"
-var load_started := false
-var main_instance: Node = null
+# Лёгкий стартовый загрузчик. Коричневый экран ниже НЕ меняем.
+# Главная сцена больше не загружается целиком: сначала отдельно загружается
+# только runtime-скрипт, затем создаётся пустой Node3D и уже после кадра
+# запускается последовательная инициализация игры.
+var runtime_path := "res://scripts/main.gd"
+var runtime_load_started := false
+var runtime_attaching := false
+var runtime_script: Script = null
+var main_instance: Node3D = null
 var loading_screen: Control
 var loading_progress: ProgressBar
 var loading_status: Label
 var loading_stage: Label
 var loading_percent: Label
 var loading_tip: Label
-var loading_ring: Panel
+var loading_elapsed: float = 0.0
 var loading_tip_index: int = 0
-var loading_step_index: int = 0
+
+var tips := [
+    "СОВЕТ: РЕДКИЕ ИГРУШКИ ПОЯВЛЯЮТСЯ НЕ СЛУЧАЙНО.",
+    "СОВЕТ: НАВОДИ КЛЕШНЮ ТОЧНЕЕ — ТАК ПРОЩЕ ЗАХВАТИТЬ ПРИЗ.",
+    "СОВЕТ: СОБИРАЙ КОЛЛЕКЦИИ — ЗА ДОСТИЖЕНИЯ ПОЛАГАЮТСЯ НАГРАДЫ.",
+    "СОВЕТ: МАСТЕРСКАЯ ПОМОГАЕТ ПРОКАЧИВАТЬ ВОЗМОЖНОСТИ АППАРАТА.",
+    "СОВЕТ: ПРОВЕРЯЙ СУНДУКИ И СЕЗОННЫЕ НАГРАДЫ.",
+    "СОВЕТ: ПРАЗДНИЧНЫЕ СОБЫТИЯ МОГУТ ДАТЬ ОСОБЫЕ БОНУСЫ.",
+    "СОВЕТ: ПРОМОКОДЫ МОГУТ ОТКРЫТЬ ДОПОЛНИТЕЛЬНЫЕ НАГРАДЫ.",
+    "СОВЕТ: ЗАБИРАЙ ЕЖЕДНЕВНЫЙ БОНУС, ЧТОБЫ НЕ ПРОПУСКАТЬ НАГРАДЫ."
+]
 
 func _ready() -> void:
     create_loading_screen()
-    if loading_progress:
-        loading_progress.value = 0.0
-    if loading_percent:
-        loading_percent.text = "0%"
+    _set_progress(0.0, "ПОДГОТАВЛИВАЕМ АВТОМАТ...", "ШАГ 0 • ПОДГОТОВКА")
     await get_tree().process_frame
-    ResourceLoader.load_threaded_request(load_path, "PackedScene", true)
-    load_started = true
+    _set_progress(2.0, "ЗАПУСКАЕМ ПОСЛЕДОВАТЕЛЬНУЮ ЗАГРУЗКУ...", "ШАГ 1 • СТАРТ")
+    await get_tree().process_frame
+    ResourceLoader.load_threaded_request(runtime_path, "Script", true)
+    runtime_load_started = true
+    _set_progress(5.0, "ЗАГРУЖАЕМ ОСНОВНОЙ КОД ИГРЫ...", "ШАГ 2 • КОД ИГРЫ")
     set_process(true)
 
-func _process(_delta: float) -> void:
-    if not load_started:
-        return
-    var progress := []
-    var status := ResourceLoader.load_threaded_get_status(load_path, progress)
-    var value := 5.0
-    if progress.size() > 0:
-        value = 5.0 + clampf(float(progress[0]) * 70.0, 0.0, 70.0)
-    if loading_progress:
-        loading_progress.value = value
-    if loading_percent:
-        loading_percent.text = "%d%%" % int(value)
-    if loading_stage:
-        loading_stage.text = "ЗАГРУЖАЕМ ОСНОВНУЮ ИГРУ"
-    if status == ResourceLoader.THREAD_LOAD_LOADED:
-        var packed := ResourceLoader.load_threaded_get(load_path) as PackedScene
-        if packed == null:
-            _fail("ОШИБКА ЗАГРУЗКИ ИГРЫ")
+func _process(delta: float) -> void:
+    loading_elapsed += delta
+    _update_tip()
+
+    if main_instance and is_instance_valid(main_instance):
+        if bool(main_instance.get("game_initialized")):
+            set_process(false)
             return
-        load_started = false
-        if loading_progress:
-            loading_progress.value = 75.0
-        if loading_percent:
-            loading_percent.text = "75%"
-        if loading_status:
-            loading_status.text = "ПОДГОТАВЛИВАЕМ АВТОМАТ..."
-        if loading_stage:
-            loading_stage.text = "MAIN.TSCN ЗАГРУЖЕН"
+
+    if not runtime_load_started or runtime_attaching:
+        return
+
+    var progress := []
+    var status := ResourceLoader.load_threaded_get_status(runtime_path, progress)
+    if status == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+        var raw := 0.0
+        if progress.size() > 0:
+            raw = clampf(float(progress[0]), 0.0, 1.0)
+        var value := 5.0 + raw * 7.0
+        _set_progress(value, "ЗАГРУЖАЕМ ОСНОВНОЙ КОД ИГРЫ...", "ШАГ 2 • КОД ИГРЫ")
+        return
+
+    if status == ResourceLoader.THREAD_LOAD_LOADED:
+        runtime_attaching = true
+        runtime_load_started = false
+        runtime_script = ResourceLoader.load_threaded_get(runtime_path) as Script
+        if runtime_script == null:
+            _fail("ОШИБКА ЗАГРУЗКИ ОСНОВНОГО КОДА")
+            return
+
+        _set_progress(12.0, "ОСНОВНОЙ КОД ЗАГРУЖЕН", "ШАГ 3 • КОД ГОТОВ")
         await get_tree().process_frame
-        main_instance = packed.instantiate()
+
+        # ВАЖНО: здесь создаётся только пустой Node3D. Никаких тяжёлых
+        # игрушек, UI, света или физики до следующего этапа.
+        main_instance = Node3D.new()
         main_instance.name = "ClawNeonReal3D"
+        main_instance.set_script(runtime_script)
+        _set_progress(14.0, "ЗАПУСКАЕМ ИГРОВОЙ МОДУЛЬ...", "ШАГ 4 • ИГРОВОЙ МОДУЛЬ")
+        await get_tree().process_frame
         add_child(main_instance)
-        # Main reuses this exact loading screen and continues from 75% to 100%.
-    elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-        _fail("НЕ УДАЛОСЬ ЗАГРУЗИТЬ ИГРУ")
+        _set_progress(15.0, "ИГРОВОЙ МОДУЛЬ ЗАПУЩЕН", "ШАГ 5 • ПЕРЕДАЁМ УПРАВЛЕНИЕ ИГРЕ")
+        runtime_attaching = false
+        return
+
+    if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+        _fail("НЕ УДАЛОСЬ ЗАГРУЗИТЬ ОСНОВНОЙ КОД")
+
+func _set_progress(value: float, status_text: String, stage_text: String) -> void:
+    var safe := clampf(value, 0.0, 100.0)
+    if loading_progress:
+        loading_progress.value = safe
+    if loading_percent:
+        loading_percent.text = "%d%%" % int(safe)
+    if loading_status:
+        loading_status.text = status_text
+    if loading_stage:
+        loading_stage.text = stage_text
+
+func _update_tip() -> void:
+    if loading_tip and is_instance_valid(loading_tip):
+        var next_tip := int(loading_elapsed / 2.5) % tips.size()
+        if next_tip != loading_tip_index:
+            loading_tip_index = next_tip
+            loading_tip.text = tips[loading_tip_index]
 
 func _fail(message: String) -> void:
-    load_started = false
+    runtime_load_started = false
+    runtime_attaching = false
     if loading_status:
         loading_status.text = message
     if loading_stage:

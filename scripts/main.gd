@@ -2618,7 +2618,9 @@ func set_loading_status(text: String) -> void:
 func set_loading_progress(value: float, text: String) -> void:
     # Процент показывает только ЗАВЕРШЁННУЮ операцию. Пока операция выполняется,
     # индикатор остаётся на предыдущем подтверждённом значении.
-    var safe_value := clampf(value, 0.0, 100.0)
+    var requested_value := clampf(value, 0.0, 100.0)
+    var current_value := float(loading_progress.value) if loading_progress else 0.0
+    var safe_value := maxf(current_value, requested_value)
     loading_step_index += 1
     if loading_progress:
         loading_progress.value = safe_value
@@ -2637,8 +2639,11 @@ func initialize_game_async() -> void:
 
     await set_loading_status("ПОДГОТАВЛИВАЕМ ПРОФИЛЬ И СОХРАНЕНИЕ...")
     add_extended_collections()
+    await get_tree().process_frame
     add_progressive_achievements()
+    await get_tree().process_frame
     add_diverse_achievements()
+    await get_tree().process_frame
     owned_claw_skins.resize(claw_skin_specs.size())
     owned_toy_skins.resize(toy_skin_specs.size())
     owned_machine_skins.resize(machine_skin_specs.size())
@@ -2664,15 +2669,13 @@ func initialize_game_async() -> void:
     cosmetic_http.timeout = 2.0
     add_child(cosmetic_http)
     cosmetic_http.request_completed.connect(_on_cosmetic_http_completed)
+    await get_tree().process_frame
     if get_tree().has_signal("on_request_permissions_result"):
         var permission_callable := Callable(self, "_on_notification_permission_result")
         if not get_tree().is_connected("on_request_permissions_result", permission_callable):
             get_tree().connect("on_request_permissions_result", permission_callable)
     update_return_bonus_state()
-    call_deferred("setup_android_notifications")
-    call_deferred("register_player_remote")
-    call_deferred("sync_remote_config")
-    call_deferred("build_upgrade_sound_system")
+    await get_tree().process_frame
 
     # Реальный последовательный загрузчик: процент продвигается только после
     # фактического завершения соответствующей операции. Между тяжёлыми этапами
@@ -2680,53 +2683,55 @@ func initialize_game_async() -> void:
 
     await set_loading_status("ЗАГРУЖАЕМ ПРОФИЛЬ И РЕФЕРАЛЬНЫЕ ДАННЫЕ...")
     ensure_referral_code()
+    await get_tree().process_frame
     process_incoming_referral()
-    await set_loading_progress(78.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
+    await get_tree().process_frame
+    await set_loading_progress(18.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
     await set_loading_status("СОЗДАЁМ ОСНОВУ МИРА...")
     await build_world()
-    await set_loading_progress(79.5, "ОКРУЖЕНИЕ ГОТОВО")
+    await set_loading_progress(26.0, "ОКРУЖЕНИЕ ГОТОВО")
     apply_quality_settings()
     await get_tree().process_frame
-    await set_loading_progress(80.5, "КАЧЕСТВО ГРАФИКИ НАСТРОЕНО")
+    await set_loading_progress(28.0, "КАЧЕСТВО ГРАФИКИ НАСТРОЕНО")
     await set_loading_status("СОБИРАЕМ КОРПУС АВТОМАТА ПО ЧАСТЯМ...")
     await build_machine()
     activate_calendar_event()
-    await set_loading_progress(85.0, "КОРПУС АВТОМАТА ГОТОВ")
+    await set_loading_progress(42.0, "КОРПУС АВТОМАТА ГОТОВ")
     await set_loading_status("СОЗДАЁМ РЕЛЬСЫ...")
     await build_overhead_rails()
-    await set_loading_progress(86.5, "РЕЛЬСЫ ГОТОВЫ")
+    await set_loading_progress(44.0, "РЕЛЬСЫ ГОТОВЫ")
     await set_loading_status("СОЗДАЁМ КЛЕШНЮ...")
     await build_claw()
-    await set_loading_progress(88.5, "КЛЕШНЯ ГОТОВА")
+    await set_loading_progress(46.0, "КЛЕШНЯ ГОТОВА")
     await set_loading_status("СОЗДАЁМ ПРИЦЕЛ И ТОЧКУ ЗАХВАТА...")
     build_aim_marker()
     await get_tree().process_frame
-    await set_loading_progress(90.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
+    await set_loading_progress(48.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
     await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКИ...")
     await build_prizes_async()
     await get_tree().process_frame
-    await set_loading_progress(93.0, "ИГРУШКИ ЗАГРУЖЕНЫ")
+    await set_loading_progress(70.0, "ИГРУШКИ ЗАГРУЖЕНЫ")
 
     # В проекте GPUParticles3D сейчас намеренно отключены. Поэтому не делаем
     # фиктивный тяжёлый этап: здесь только фиксируем реальное состояние эффектов.
     await set_loading_status("ПРОВЕРЯЕМ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И ОСВЕЩЕНИЕ...")
     sparkle_particles = null
     await get_tree().process_frame
-    await set_loading_progress(94.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
+    await set_loading_progress(72.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
     await get_tree().process_frame
 
     await set_loading_status("СОЗДАЁМ ИНТЕРФЕЙС ПО ЧАСТЯМ...")
     await build_ui()
-    await set_loading_progress(95.5, "ИНТЕРФЕЙС ГОТОВ")
+    await set_loading_progress(92.0, "ИНТЕРФЕЙС ГОТОВ")
 
     await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
     build_audio()
     await get_tree().process_frame
-    await set_loading_progress(96.0, "ЗВУК ПОДГОТОВЛЕН")
+    await set_loading_progress(94.0, "ЗВУК ПОДГОТОВЛЕН")
     await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
     apply_shop_visuals()
     await get_tree().process_frame
-    await set_loading_progress(97.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
+    await set_loading_progress(95.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     setup_daily_systems()
     await get_tree().process_frame
@@ -2738,7 +2743,7 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
     apply_quality_settings()
     await get_tree().process_frame
-    await set_loading_progress(99.0, "БОНУСЫ И СОХРАНЕНИЕ ПОДГОТОВЛЕНЫ")
+    await set_loading_progress(98.0, "БОНУСЫ И СОХРАНЕНИЕ ПОДГОТОВЛЕНЫ")
 
     # До этой точки НИ ОДНО пользовательское меню и сам игровой экран не
     # должны быть видимы. Всё подготавливаем скрытым под загрузчиком.
@@ -2762,6 +2767,10 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
+    call_deferred("setup_android_notifications")
+    call_deferred("register_player_remote")
+    call_deferred("sync_remote_config")
+    call_deferred("build_upgrade_sound_system")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.visible = false
@@ -2991,6 +3000,7 @@ func build_world() -> void:
 
     var floor_mat := make_mat(Color("#2A211B"), 0.55, 0.30)
     await get_tree().process_frame
+    await set_loading_progress(21.0, "ОСНОВА СЦЕНЫ ГОТОВА")
     make_box(self, Vector3(24, 0.3, 22), Vector3(0, -0.3, 0), floor_mat, "PolishedFloor")
     make_box(self, Vector3(24, 9, 0.2), Vector3(0, 4.2, -7.8), make_mat(Color("#24211E"), 0.05, 0.72), "BackWall")
     make_box(self, Vector3(0.12, 9, 22), Vector3(-11.8, 4.2, 0), make_mat(Color("#302B27"), 0.12, 0.62), "LeftWall")
@@ -3047,9 +3057,12 @@ func build_machine() -> void:
     make_box(machine, Vector3(0.42, 8.45, 0.42), Vector3(3.55, 6.12, 2.35), wood_mid, "WoodFrontRight")
     make_box(machine, Vector3(7.25, 0.42, 0.42), Vector3(0, 10.20, 2.35), wood_light, "WoodTopFront")
     await get_tree().process_frame
+    await set_loading_progress(30.0, "КОРПУС: ОСНОВА СОЗДАНА")
     make_box(machine, Vector3(7.25, 0.38, 0.38), Vector3(0, 2.98, 2.35), wood_dark, "WoodLowerFront")
     make_box(machine, Vector3(0.34, 7.2, 0.34), Vector3(-3.58, 5.95, -2.35), wood_dark, "WoodBackLeft")
     make_box(machine, Vector3(0.34, 7.2, 0.34), Vector3(3.58, 5.95, -2.35), wood_dark, "WoodBackRight")
+    await get_tree().process_frame
+    await set_loading_progress(33.0, "КОРПУС: РАМА СОЗДАНА")
 
     # Glass panels with low roughness, metallic frames and reflection probe support.
     var glass := StandardMaterial3D.new()
@@ -3071,6 +3084,8 @@ func build_machine() -> void:
     make_collision_box(machine, Vector3(0.34, 7.85, 4.18), Vector3(3.18, 6.45, 0.0), "RightGlassCollision")
     make_collision_box(machine, Vector3(6.35, 7.85, 0.34), Vector3(0.0, 6.45, -1.90), "BackGlassCollision")
     make_collision_box(machine, Vector3(6.35, 7.85, 0.34), Vector3(0.0, 6.45, 1.90), "FrontGlassCollision")
+    await get_tree().process_frame
+    await set_loading_progress(36.0, "КОРПУС: СТЕКЛО И ОГРАЖДЕНИЯ ГОТОВЫ")
 
     for x in [-3.55, 3.55]:
         for z in [-2.32, 2.32]:
@@ -3147,6 +3162,8 @@ func build_machine() -> void:
     make_box(machine, Vector3(1.55, 0.42, 1.05), Vector3(PRIZE_HOLE.x, 2.55, PRIZE_HOLE.z), make_mat(Color("#17120E"), 0.75, 0.20), "PrizeChute")
     make_box(machine, Vector3(1.18, 0.09, 0.07), Vector3(PRIZE_HOLE.x, 2.80, PRIZE_HOLE.z + 0.54), make_mat(Color("#E8E0D6"), 0.55, 0.22), "ChuteTrim")
     make_box(machine, Vector3(1.20, 0.10, 0.55), Vector3(PRIZE_HOLE.x, 2.43, PRIZE_HOLE.z + 0.15), chrome_dark, "ChuteFlap")
+    await get_tree().process_frame
+    await set_loading_progress(39.0, "КОРПУС: ВЫДАЧА И УПРАВЛЕНИЕ ГОТОВЫ")
 
     # Control deck.
     make_box(machine, Vector3(7.15, 0.27, 1.08), Vector3(0, 2.48, 3.30), dark_mat, "ControlDeck")
@@ -3165,6 +3182,8 @@ func build_machine() -> void:
     add_child(grab_light)
     machine_lights.append(grab_light)
     scene_lights.append(grab_light)
+    await get_tree().process_frame
+    await set_loading_progress(41.0, "КОРПУС: ОСВЕЩЕНИЕ И ДЕТАЛИ ГОТОВЫ")
     var grab3d := Label3D.new()
     grab3d.text = "GRAB"
     grab3d.font_size = 32
@@ -3227,6 +3246,7 @@ func build_claw() -> void:
     make_sphere(claw, 0.17, Vector3(0, -0.12, 0), metal, "Hub")
     cable = make_cylinder(claw, 0.035, 2.0, Vector3(0, 1.45, 0), make_mat(Color("#3B3C39"), 0.9, 0.22), "Cable")
     await get_tree().process_frame
+    await set_loading_progress(45.0, "КЛЕШНЯ: МЕХАНИЗМ СОБРАН")
     cable_glow = null
 
     # Настоящая трёхкогтевая конструкция: три одинаковых полукруглых
@@ -3246,6 +3266,7 @@ func build_claw() -> void:
         make_tube(arm, p1, p2, 0.080, metal, "FingerSegment02")
         make_tube(arm, p2, p3, 0.075, metal, "FingerSegment03")
         await get_tree().process_frame
+    await set_loading_progress(46.0, "КЛЕШНЯ: ДВИЖЕНИЕ И ЗАХВАТ ГОТОВ")
         make_tube(arm, p3, p4, 0.070, metal, "FingerSegment04")
         make_tube(arm, p4, p5, 0.065, metal, "FingerTip")
         make_sphere(arm, 0.082, p5, metal, "GripPad")
@@ -3321,7 +3342,7 @@ func build_prizes_async() -> void:
         for i in range(INITIAL_PRIZE_COUNT):
             await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКУ %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
             spawn_one_random_prize(i)
-            var toy_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+            var toy_progress := 50.0 + (20.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
             await set_loading_progress(toy_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
         return
 
@@ -3357,21 +3378,21 @@ func build_prizes_async() -> void:
             body.rotation = rot
             prize_bodies.append(body)
             prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
-        var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
+        var saved_progress := 50.0 + (20.0 * float(loaded_count) / float(valid_saved_count))
         await set_loading_progress(saved_progress, "ИГРУШКА %d ИЗ %d ВОССТАНОВЛЕНА" % [loaded_count, valid_saved_count])
 
     if prize_bodies.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
             await set_loading_status("ДОПОЛНЯЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
             spawn_one_random_prize(i)
-            var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+            var fallback_progress := 50.0 + (20.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
             await set_loading_progress(fallback_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         var missing := TARGET_PRIZE_COUNT - prize_bodies.size()
         for i in range(missing):
             await set_loading_status("ДОЗАГРУЖАЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, missing])
             spawn_one_random_prize(i)
-            var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
+            var refill_progress := 50.0 + (20.0 * float(i + 1) / float(missing))
             await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])
 
 func spawn_one_random_prize(n: int) -> void:
@@ -4037,7 +4058,7 @@ func build_ui() -> void:
     var left_x := 75.0
     var right_x := 555.0
     var col_w := 450.0
-    var row_h := 82.0
+    var row_h := 76.0
     var gap := 16.0
     var y1 := 380.0
     var y2 := y1 + row_h + gap
@@ -4082,7 +4103,7 @@ func build_ui() -> void:
     await get_tree().process_frame
     help.pressed.connect(func(): open_panel("help"))
     menu_layer.add_child(help); main_menu_controls.append(help); decorate_main_menu_button(help)
-    await set_loading_progress(82.0, "ГЛАВНОЕ МЕНЮ ГОТОВО")
+    await set_loading_progress(76.0, "ГЛАВНОЕ МЕНЮ ГОТОВО")
     await get_tree().process_frame
 
     await set_loading_status("HUD ГОТОВ...")
@@ -4102,72 +4123,72 @@ func build_ui() -> void:
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
     await get_tree().process_frame
-    await set_loading_progress(83.0, "HUD ГОТОВ")
+    await set_loading_progress(77.0, "HUD ГОТОВ")
 
     await set_loading_status("МАГАЗИН ГОТОВ...")
     shop_panel = build_shop_panel()
     await get_tree().process_frame
-    await set_loading_progress(84.0, "МАГАЗИН ГОТОВ")
+    await set_loading_progress(78.0, "МАГАЗИН ГОТОВ")
 
     await set_loading_status("КОЛЛЕКЦИЯ ГОТОВА...")
     collection_panel = build_collection_panel()
     await get_tree().process_frame
-    await set_loading_progress(85.0, "КОЛЛЕКЦИЯ ГОТОВА")
+    await set_loading_progress(79.0, "КОЛЛЕКЦИЯ ГОТОВА")
 
     await set_loading_status("НАСТРОЙКИ ГОТОВЫ...")
     settings_panel = build_settings_panel()
     await get_tree().process_frame
     achievements_panel = build_achievements_panel()
     await get_tree().process_frame
-    await set_loading_progress(86.0, "НАСТРОЙКИ И ДОСТИЖЕНИЯ ГОТОВЫ")
+    await set_loading_progress(81.0, "НАСТРОЙКИ И ДОСТИЖЕНИЯ ГОТОВЫ")
 
     await set_loading_status("ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ...")
     profile_panel = build_profile_panel()
     await get_tree().process_frame
     help_panel = build_help_panel()
     await get_tree().process_frame
-    await set_loading_progress(87.0, "ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ")
+    await set_loading_progress(82.0, "ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ")
 
     await set_loading_status("РЕФЕРАЛЫ И VIP ГОТОВЫ...")
     referral_panel = build_referral_panel()
     await get_tree().process_frame
     vip_panel = build_vip_panel()
     await get_tree().process_frame
-    await set_loading_progress(88.0, "РЕФЕРАЛЫ И VIP ГОТОВЫ")
+    await set_loading_progress(83.0, "РЕФЕРАЛЫ И VIP ГОТОВЫ")
 
     await set_loading_status("СЕЗОНЫ И СУНДУКИ ГОТОВЫ...")
     seasons_panel = build_seasons_panel()
     await get_tree().process_frame
     chests_panel = build_chests_panel()
     await get_tree().process_frame
-    await set_loading_progress(89.0, "СЕЗОНЫ И СУНДУКИ ГОТОВЫ")
+    await set_loading_progress(84.0, "СЕЗОНЫ И СУНДУКИ ГОТОВЫ")
 
     await set_loading_status("МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ...")
     workshop_panel = build_workshop_panel()
     await get_tree().process_frame
     season_pass_panel = build_season_pass_panel()
     await get_tree().process_frame
-    await set_loading_progress(90.0, "МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ")
+    await set_loading_progress(85.0, "МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ")
 
     await set_loading_status("ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ...")
     promo_panel = build_promo_panel()
     await get_tree().process_frame
     news_panel = build_news_panel()
     await get_tree().process_frame
-    await set_loading_progress(91.0, "ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ")
+    await set_loading_progress(86.0, "ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ")
 
     await set_loading_status("РЕЙТИНГ И БОНУС ГОТОВЫ...")
     rating_panel = build_rating_panel()
     await get_tree().process_frame
     return_bonus_panel = build_return_bonus_panel()
     await get_tree().process_frame
-    await set_loading_progress(92.0, "РЕЙТИНГ И БОНУС ГОТОВЫ")
+    await set_loading_progress(87.0, "РЕЙТИНГ И БОНУС ГОТОВЫ")
     # Старый объединённый центр больше не показывается: его функции разобраны по разделам.
     live_systems_panel = null
     await set_loading_status("ОКНО РЕЗУЛЬТАТА ГОТОВО...")
     build_result_popup()
     await get_tree().process_frame
-    await set_loading_progress(93.0, "ОКНО РЕЗУЛЬТАТА ГОТОВО")
+    await set_loading_progress(88.0, "ОКНО РЕЗУЛЬТАТА ГОТОВО")
     await set_loading_status("HUD ЗАВЕРШЁН...")
     build_extra_hud()
     await get_tree().process_frame
@@ -4189,15 +4210,15 @@ func build_ui() -> void:
     season_pass_panel.z_index = 30
     return_bonus_panel.z_index = 30
     profile_panel.z_index = 30
-    await set_loading_progress(94.0, "HUD ЗАВЕРШЁН")
+    await set_loading_progress(89.0, "HUD ЗАВЕРШЁН")
     await set_loading_status("НАВИГАЦИЯ ANDROID НАСТРОЕНА...")
     setup_android_ui_navigation()
     await get_tree().process_frame
-    await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
+    await set_loading_progress(90.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
     await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
     setup_android_scrolls()
     await get_tree().process_frame
-    await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
+    await set_loading_progress(91.0, "ПРОКРУТКА НАСТРОЕНА")
 func setup_android_scrolls() -> void:
     # Единая настройка прокрутки для всех длинных окон под Android.
     # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
@@ -7766,26 +7787,9 @@ func _process(delta: float) -> void:
         rarity_flash_timer -= delta
         if result_popup and result_popup.visible:
             result_popup.modulate = Color(1,1,1,1).lerp(rarity_flash_color, 0.16 * maxf(0.0, rarity_flash_timer))
-    # Лёгкая анимация загрузочного экрана работает даже до инициализации игры.
+    # Во время старта загрузочным экраном управляет Bootstrap.
+    # Это не дублирует таймер советов и не создаёт дополнительную работу.
     if not game_initialized:
-        loading_elapsed += delta
-        if loading_ring and is_instance_valid(loading_ring):
-            loading_ring.rotation = sin(loading_elapsed * 0.65) * 0.035
-        if loading_tip and is_instance_valid(loading_tip):
-            var tips := [
-                "СОВЕТ: РЕДКИЕ ИГРУШКИ ПОЯВЛЯЮТСЯ НЕ СЛУЧАЙНО.",
-                "СОВЕТ: НАВОДИ КЛЕШНЮ ТОЧНЕЕ — ТАК ПРОЩЕ ЗАХВАТИТЬ ПРИЗ.",
-                "СОВЕТ: СОБИРАЙ КОЛЛЕКЦИИ — ЗА ДОСТИЖЕНИЯ ПОЛАГАЮТСЯ НАГРАДЫ.",
-                "СОВЕТ: МАСТЕРСКАЯ ПОМОГАЕТ ПРОКАЧИВАТЬ ВОЗМОЖНОСТИ АППАРАТА.",
-                "СОВЕТ: ПРОВЕРЯЙ СУНДУКИ И СЕЗОННЫЕ НАГРАДЫ.",
-                "СОВЕТ: ПРАЗДНИЧНЫЕ СОБЫТИЯ МОГУТ ДАТЬ ОСОБЫЕ БОНУСЫ.",
-                "СОВЕТ: ПРОМОКОДЫ МОГУТ ОТКРЫТЬ ДОПОЛНИТЕЛЬНЫЕ НАГРАДЫ.",
-                "СОВЕТ: ЗАБИРАЙ ЕЖЕДНЕВНЫЙ БОНУС, ЧТОБЫ НЕ ПРОПУСКАТЬ НАГРАДЫ."
-            ]
-            var next_tip := int(loading_elapsed / 2.5) % tips.size()
-            if next_tip != loading_tip_index:
-                loading_tip_index = next_tip
-                loading_tip.text = tips[loading_tip_index]
         return
     if aim_marker and is_instance_valid(aim_marker):
         aim_marker.position.x = claw_pos.x
