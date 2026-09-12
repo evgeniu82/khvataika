@@ -731,7 +731,10 @@ func _ready() -> void:
     # добавлен в дерево. Здесь НИЧЕГО тяжёлого не выполняем.
 
 func begin_sequential_initialization() -> void:
-    call_deferred("initialize_game_async")
+    # Start the coroutine directly. Using call_deferred here can leave the
+    # loader parked at 15% on some Android/Godot builds. The coroutine itself
+    # yields on its first operation, so the loading screen remains responsive.
+    initialize_game_async()
 
 func _is_android_runtime_available() -> bool:
     return OS.has_feature("android") and not Engine.is_editor_hint() and Engine.has_singleton("AndroidRuntime")

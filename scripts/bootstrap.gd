@@ -17,6 +17,8 @@ var loading_percent: Label
 var loading_tip: Label
 var loading_elapsed: float = 0.0
 var loading_tip_index: int = 0
+var handoff_started: bool = false
+var handoff_elapsed: float = 0.0
 
 var tips := [
     "СОВЕТ: РЕДКИЕ ИГРУШКИ ПОЯВЛЯЮТСЯ НЕ СЛУЧАЙНО.",
@@ -43,11 +45,27 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     loading_elapsed += delta
     _update_tip()
+    if handoff_started:
+        handoff_elapsed += delta
 
     if main_instance and is_instance_valid(main_instance):
         if bool(main_instance.get("game_initialized")):
             set_process(false)
             return
+
+    if handoff_started:
+        # If the first coroutine did not get scheduled on a particular Android
+        # frame, explicitly retry once. This is only a startup safety net and
+        # does not change the loading screen.
+        if main_instance and is_instance_valid(main_instance):
+            if bool(main_instance.get("game_initialized")):
+                set_process(false)
+                return
+            if handoff_elapsed >= 0.75:
+                handoff_started = false
+                handoff_elapsed = 0.0
+                main_instance.begin_sequential_initialization()
+        return
 
     if not runtime_load_started or runtime_attaching:
         return
@@ -88,6 +106,8 @@ func _process(delta: float) -> void:
         # зависание на 15% на Android.
         await get_tree().process_frame
         if main_instance and is_instance_valid(main_instance):
+            handoff_started = true
+            handoff_elapsed = 0.0
             main_instance.begin_sequential_initialization()
         return
 
