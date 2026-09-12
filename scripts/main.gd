@@ -733,20 +733,24 @@ func _ready() -> void:
         create_loading_screen()
     if startup_splash and is_instance_valid(startup_splash):
         startup_splash.visible = false
+    # Startup is intentionally launched by a direct awaited continuation.
+    # Do not use call_deferred here: on some Android/Godot builds the deferred
+    # call can be postponed indefinitely while the Bootstrap loader has stopped.
     set_process(true)
-    # GameCore owns its startup. It waits one clean engine frame and then starts
-    # the sequential initializer. Bootstrap only creates this node and never
-    # calls into the huge main script.
-    call_deferred("_begin_startup_after_frame")
+    await get_tree().process_frame
+    await get_tree().process_frame
+    if not game_initialized and not startup_initialization_running:
+        startup_initialization_requested = true
+        startup_initialization_running = true
+        await initialize_game_async()
 
 func _begin_startup_after_frame() -> void:
+    # Compatibility entry point for older builds.
     if startup_initialization_running or game_initialized:
         return
     startup_initialization_requested = true
     startup_initialization_running = true
-    await get_tree().process_frame
-    if not game_initialized:
-        initialize_game_async()
+    await initialize_game_async()
 
 func begin_sequential_initialization() -> void:
     # Compatibility entry point kept for older scenes/builds. The current

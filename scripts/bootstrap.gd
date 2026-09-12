@@ -56,12 +56,23 @@ func _process(delta: float) -> void:
             return
         core_instance.name = "ClawNeonReal3D"
         add_child(core_instance)
-        # GameCore запускает свою последовательную инициализацию самостоятельно
-        # из обычного _ready() после чистого кадра. Bootstrap больше не проверяет
-        # наличие метода и не вызывает main.gd напрямую: это устраняет последний
-        # хрупкий участок передачи управления на Android.
+        # Give GameCore several clean frames, then explicitly start its
+        # sequential initializer. This removes the last dependency on
+        # call_deferred/_process scheduling during the Android handoff.
+        await get_tree().process_frame
         await get_tree().process_frame
         _set_progress(15.0, "ИГРОВОЙ МОДУЛЬ ЗАПУЩЕН", "ШАГ 5 • ПЕРЕДАЧА ЗАВЕРШЕНА")
+        await get_tree().process_frame
+        if core_instance.has_method("begin_sequential_initialization"):
+            core_instance.call("begin_sequential_initialization")
+        elif core_instance.has_method("_begin_startup_after_frame"):
+            core_instance.call("_begin_startup_after_frame")
+        else:
+            _fail("ОШИБКА ЗАПУСКА ПОСЛЕДОВАТЕЛЬНОЙ ЗАГРУЗКИ")
+            set_process(false)
+            return
+        # Keep Bootstrap alive only long enough to let GameCore update the
+        # shared loading screen. It no longer owns the startup loop.
         set_process(false)
         return
     if status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
