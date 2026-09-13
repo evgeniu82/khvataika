@@ -1,11 +1,5 @@
 extends Node3D
 
-# v1.18.6 feature switches: these two requested features are OFF.
-# The game keeps its existing basic prize/collection data so other systems
-# (duplicates, new-toy popup, collection rewards) remain functional.
-const ENABLE_UPDATED_3D_TOYS: bool = false
-const ENABLE_UNIFIED_TOY_CATALOG: bool = false
-
 # ХВАТАЙКА — REALISTIC WOOD / METAL / GLASS EDITION
 # Godot 4.7+
 # Procedural commercial-style arcade scene: wood, metal, glass, realistic lighting,
@@ -13,6 +7,7 @@ const ENABLE_UNIFIED_TOY_CATALOG: bool = false
 
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
+const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
 # 1.14.1 is intentionally a self-contained offline build. The online code remains
 # in the project for the later server phase, but it can never become authoritative
 # while this build is running.
@@ -48,11 +43,6 @@ var sfx_on: bool = true
 var collection: Dictionary = {}
 var toy_inventory_counts: Dictionary = {}
 var completed_collections: Dictionary = {}
-var collection_reward_pending_name: String = ""
-var collection_reward_pending_rubles: int = 0
-var collection_reward_pending_keys: int = 0
-var collection_reward_pending_parts: int = 0
-var collection_reward_pending_timer: float = 0.0
 var upgrade_levels: Array[int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 var player_level: int = 1
 var player_xp: int = 0
@@ -220,6 +210,13 @@ const SERVER_AUTHORITATIVE: bool = false
 const STARTUP_CONTROL_TEST: bool = false
 # TEST 1: daily login/mission systems only. All other new startup features remain isolated.
 const DAILY_ONLY_TEST: bool = false
+
+# Features intentionally removed for this rollback build.
+const ENABLE_UPDATED_3D_TOYS: bool = false
+const ENABLE_UNIFIED_TOY_CATALOG: bool = false
+const ENABLE_DUPLICATE_TOY_POPUP: bool = false
+const ENABLE_NEW_TOY_POPUP: bool = false
+const ENABLE_COLLECTION_COMPLETION_REWARD: bool = false
 var server_url: String = ""
 var player_id: String = ""
 var player_token: String = ""
@@ -313,6 +310,38 @@ var loading_elapsed: float = 0.0
 var loading_tip_index: int = 0
 var loading_step_index: int = 0
 var game_initialized: bool = false
+var startup_diagnostic_previous: String = ""
+var startup_diagnostic_halted: bool = false
+
+func _startup_read_phase() -> String:
+    if not FileAccess.file_exists(STARTUP_DIAGNOSTIC_PATH):
+        return ""
+    var f := FileAccess.open(STARTUP_DIAGNOSTIC_PATH, FileAccess.READ)
+    if f == null:
+        return ""
+    var value := f.get_as_text().strip_edges()
+    f.close()
+    return value
+
+func _startup_write_phase(phase: String) -> void:
+    var f := FileAccess.open(STARTUP_DIAGNOSTIC_PATH, FileAccess.WRITE)
+    if f != null:
+        f.store_string(phase)
+        f.flush()
+        f.close()
+
+func _startup_diag_halt(previous_phase: String) -> void:
+    startup_diagnostic_halted = true
+    var text := "ДИАГНОСТИКА ЗАПУСКА\nПредыдущий запуск остановился на этапе:\n" + previous_phase + "\n\nСделайте скриншот этого экрана и пришлите его."
+    if loading_status:
+        loading_status.text = text
+        loading_status.add_theme_font_size_override("font_size", 24)
+    if loading_stage:
+        loading_stage.text = "ДИАГНОСТИКА • ОШИБКА ПОСЛЕДНЕГО ЗАПУСКА"
+    if loading_percent:
+        loading_percent.text = "СТОП"
+    if loading_progress:
+        loading_progress.value = 0.0
 
 var scene_lights: Array[Light3D] = []
 var reflection_probe: ReflectionProbe
@@ -585,17 +614,65 @@ var toys: Array[Dictionary] = [
 ]
 
 func get_collection_names() -> Array[String]:
-    var result: Array[String] = []
-    for toy in toys:
-        var name := String(toy.get("collection", ""))
-        if name != "" and not result.has(name): result.append(name)
-    if not result.is_empty(): return result
+    # Legacy collection list. The unified/extended catalog UI is disabled.
     return [
         "ЛЕСНЫЕ ДРУЗЬЯ", "МИЛЫЕ МАЛЫШИ", "ДЖУНГЛИ", "ОКЕАН",
-        "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР",
-        "ДИНОЗАВРЫ", "СУПЕРГЕРОИ", "СЛАДКИЙ МИР", "ПИРАТЫ",
-        "РОБОТЫ", "ФАНТАСТИКА", "СПОРТ", "МИР МОНСТРОВ"
+        "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР"
     ]
+
+func add_extended_collections() -> void:
+    var extra_toys: Array[Dictionary] = [
+        # ДИНОЗАВРЫ
+        {"name":"Рекс Рокки","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#6FA45A")},
+        {"name":"Трицератопс Три","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#8C6A4A")},
+        {"name":"Раптор Рэй","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":15.0,"color":Color("#E27A42")},
+        {"name":"Бронто Бум","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":11.0,"color":Color("#4D9A87")},
+        {"name":"Мега-Тиран","collection":"ДИНОЗАВРЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.2,"color":Color("#B53D58")},
+        # СУПЕРГЕРОИ
+        {"name":"Капитан Плюш","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":29.0,"color":Color("#356DDB")},
+        {"name":"Молния Макс","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#F2C23E")},
+        {"name":"Ночной Ниндзя","collection":"СУПЕРГЕРОИ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#4B4D70")},
+        {"name":"Робо-Герой","collection":"СУПЕРГЕРОИ","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#45B7C8")},
+        {"name":"Золотой Герой","collection":"СУПЕРГЕРОИ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.22,"color":Color("#F5B93D")},
+        # СЛАДКИЙ МИР
+        {"name":"Пончик Пинки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":32.0,"color":Color("#F38DB4")},
+        {"name":"Маршмеллоу Мими","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#F2E5D5")},
+        {"name":"Кекс Куки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#B97852")},
+        {"name":"Леденец Лаки","collection":"СЛАДКИЙ МИР","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#68C9E8")},
+        {"name":"Шоколадный Король","collection":"СЛАДКИЙ МИР","rarity":"ЭПИЧЕСКАЯ","weight":2.0,"color":Color("#6E3F32")},
+        # ПИРАТЫ
+        {"name":"Капитан Бакс","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#8B6548")},
+        {"name":"Попугай Пират","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#E44C55")},
+        {"name":"Кракен Крош","collection":"ПИРАТЫ","rarity":"РЕДКАЯ","weight":14.0,"color":Color("#7557B5")},
+        {"name":"Призрак Палубы","collection":"ПИРАТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.5,"color":Color("#B9D9D1")},
+        {"name":"Золотой Капитан","collection":"ПИРАТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.18,"color":Color("#E8B93D")},
+        # РОБОТЫ
+        {"name":"Бот Биби","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#6D8299")},
+        {"name":"Дроид Дэн","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#4FA5B7")},
+        {"name":"Меха-Лис","collection":"РОБОТЫ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#D46D45")},
+        {"name":"Кибер-Гигант","collection":"РОБОТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.7,"color":Color("#4C5DE7")},
+        {"name":"Омега-9000","collection":"РОБОТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.14,"color":Color("#B7C8D8")},
+        # ФАНТАСТИКА
+        {"name":"Дракончик Эмбер","collection":"ФАНТАСТИКА","rarity":"ОБЫЧНАЯ","weight":25.0,"color":Color("#E36A43")},
+        {"name":"Грифон Грей","collection":"ФАНТАСТИКА","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#8B78C9")},
+        {"name":"Феникс Файр","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#EF6B38")},
+        {"name":"Лунный Дух","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":1.8,"color":Color("#8AB5F2")},
+        {"name":"Древний Дракон","collection":"ФАНТАСТИКА","rarity":"ЛЕГЕНДАРНАЯ","weight":0.08,"color":Color("#D7A93D")},
+        # СПОРТ
+        {"name":"Футбольный Боб","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":33.0,"color":Color("#F4F4F0")},
+        {"name":"Баскет-Би","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#E98537")},
+        {"name":"Хоккейный Хаски","collection":"СПОРТ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#6A89C8")},
+        {"name":"Чемпион","collection":"СПОРТ","rarity":"ЭПИЧЕСКАЯ","weight":2.4,"color":Color("#D3A33C")},
+        {"name":"Олимпийский Легендар","collection":"СПОРТ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.10,"color":Color("#7BC6A8")},
+        # МИР МОНСТРОВ
+        {"name":"Монстрик Мио","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#63B76D")},
+        {"name":"Пухлый Буба","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#7D63B8")},
+        {"name":"Зубастик Зик","collection":"МИР МОНСТРОВ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#B84F62")},
+        {"name":"Теневой Монстр","collection":"МИР МОНСТРОВ","rarity":"ЭПИЧЕСКАЯ","weight":2.3,"color":Color("#4B4A67")},
+        {"name":"Король Монстров","collection":"МИР МОНСТРОВ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.07,"color":Color("#B7A143")}
+    ]
+    for toy in extra_toys:
+        toys.append(toy)
 
 func add_progressive_achievements() -> void:
     # Многоуровневые достижения: каждый следующий уровень требует больше предыдущего.
@@ -683,17 +760,25 @@ func _achievement_exists(id: String) -> bool:
     return false
 
 func _ready() -> void:
+    startup_diagnostic_previous = _startup_read_phase()
+    _startup_write_phase("READY")
     # Показываем собственный загрузочный экран как можно раньше.
     # Раньше перед ним выполнялись локальная инициализация и чтение сохранения,
     # из-за чего на Android мог появляться серый кадр между boot splash и игрой.
     randomize()
-    # Hide the static splash before building the real loading UI so a slow
-    # initialization can never look like a frozen splash screen on Android.
+    startup_splash = get_node_or_null("StartupSplash") as CanvasLayer
     create_loading_screen()
+    # The static StartupSplash in Main.tscn covers the gap before the first
+    # rendered frame. Once the real loading UI exists, it can be hidden safely.
+    if startup_splash and is_instance_valid(startup_splash):
+        startup_splash.visible = false
     await get_tree().process_frame
 
+    if startup_diagnostic_previous != "" and startup_diagnostic_previous != "DONE":
+        _startup_diag_halt(startup_diagnostic_previous)
+        return
+
     if not STARTUP_CONTROL_TEST:
-        # Extended toy collections are disabled for this build to keep the startup/catalog light.
         add_progressive_achievements()
         add_diverse_achievements()
         owned_claw_skins.resize(claw_skin_specs.size())
@@ -719,11 +804,9 @@ func _ready() -> void:
         call_deferred("setup_android_notifications")
         call_deferred("register_player_remote")
         call_deferred("sync_remote_config")
-    # Инициализация игры запускается единым последовательным потоком.
-    # SFX создаются после первого полноценного игрового кадра в
-    # activate_extra_features_after_startup(), чтобы не конкурировать с
-    # созданием мира и 3D-игрушек во время запуска Android.
     call_deferred("initialize_game_async")
+    if not STARTUP_CONTROL_TEST:
+        call_deferred("build_upgrade_sound_system")
 
 func _is_android_runtime_available() -> bool:
     return OS.has_feature("android") and not Engine.is_editor_hint() and Engine.has_singleton("AndroidRuntime")
@@ -1916,12 +1999,6 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                             finish_xp = int(data.get("xp_gain", 0))
                         last_prize_xp = finish_xp
                         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, 0)
-                        if bool(data.get("duplicate", false)):
-                            sale_name = last_prize_name
-                            sale_rarity = last_prize_rarity
-                            sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
-                            sale_available = true
-                            show_sale_offer()
                     elif not bool(data.get("success", false)):
                         current_result = "НЕ УДЕРЖАЛА 😅 • РЕЗУЛЬТАТ ПОДТВЕРЖДЁН СЕРВЕРОМ"
                 "action:promo_redeem":
@@ -2586,7 +2663,7 @@ func create_loading_screen() -> void:
     loading_screen.add_child(footer)
 
     var version := Label.new()
-    version.text = "MOBILE EDITION  •  v1.18.4"
+    version.text = "MOBILE EDITION  •  v1.14.2"
     version.position = Vector2(70, 1795)
     version.size = Vector2(940, 38)
     version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -2624,19 +2701,23 @@ func initialize_game_async() -> void:
     # обязательно отдаём кадр движку, чтобы загрузочный экран оставался живым.
     await get_tree().process_frame
 
+    _startup_write_phase("LOAD_PROFILE")
     await set_loading_status("ЗАГРУЖАЕМ ПРОФИЛЬ И РЕФЕРАЛЬНЫЕ ДАННЫЕ...")
     ensure_referral_code()
     process_incoming_referral()
     await set_loading_progress(5.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
+    _startup_write_phase("BUILD_WORLD")
     await set_loading_status("СОЗДАЁМ ИГРОВОЙ МИР И ПРИМЕНЯЕМ КАЧЕСТВО...")
     build_world()
     apply_quality_settings()
     await set_loading_progress(15.0, "МИР СОЗДАН")
+    _startup_write_phase("BUILD_MACHINE")
     await set_loading_status("СОЗДАЁМ АВТОМАТ И АКТИВИРУЕМ СОБЫТИЕ...")
     build_machine()
     if not STARTUP_CONTROL_TEST:
         activate_calendar_event()
     await set_loading_progress(30.0, "АВТОМАТ СОЗДАН")
+    _startup_write_phase("BUILD_CLAW")
     await set_loading_status("СОЗДАЁМ РЕЛЬСЫ, КЛЕШНЮ И ПРИЦЕЛ...")
     build_overhead_rails()
     await get_tree().process_frame
@@ -2645,6 +2726,7 @@ func initialize_game_async() -> void:
     build_aim_marker()
     await get_tree().process_frame
     await set_loading_progress(43.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
+    _startup_write_phase("BUILD_PRIZES")
     await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКИ...")
     await build_prizes_async()
     await get_tree().process_frame
@@ -2652,24 +2734,29 @@ func initialize_game_async() -> void:
 
     # В проекте GPUParticles3D сейчас намеренно отключены. Поэтому не делаем
     # фиктивный тяжёлый этап: здесь только фиксируем реальное состояние эффектов.
+    _startup_write_phase("VISUAL_EFFECTS")
     await set_loading_status("ПРОВЕРЯЕМ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И ОСВЕЩЕНИЕ...")
     sparkle_particles = null
     await get_tree().process_frame
     await set_loading_progress(72.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
     await get_tree().process_frame
 
+    _startup_write_phase("BUILD_UI")
     await build_ui()
 
+    _startup_write_phase("BUILD_AUDIO")
     await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
     if not STARTUP_CONTROL_TEST:
         build_audio()
     await get_tree().process_frame
     await set_loading_progress(97.0, "ЗВУК ПОДГОТОВЛЕН")
+    _startup_write_phase("SHOP_VISUALS")
     await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
     if not STARTUP_CONTROL_TEST:
         apply_shop_visuals()
     await get_tree().process_frame
     await set_loading_progress(98.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
+    _startup_write_phase("DAILY_EVENTS")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     if DAILY_ONLY_TEST:
         await set_loading_status("ПРОВЕРЯЕМ ЕЖЕДНЕВНУЮ СЕРИЮ...")
@@ -2693,6 +2780,7 @@ func initialize_game_async() -> void:
 
     # До этой точки НИ ОДНО пользовательское меню и сам игровой экран не
     # должны быть видимы. Всё подготавливаем скрытым под загрузчиком.
+    _startup_write_phase("FINAL_UI")
     await set_loading_status("ФИНАЛЬНАЯ ПРОВЕРКА И ПОДГОТОВКА ИГРОВОГО ЭКРАНА...")
     close_all_panels()
     if menu_layer and is_instance_valid(menu_layer):
@@ -2713,6 +2801,7 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
+    _startup_write_phase("DONE")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.visible = false
@@ -3804,8 +3893,7 @@ func get_toy_variant_color(base: Color, variant: int) -> Color:
             return base
 
 func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> void:
-    # UPDATED 3D TOYS are OFF in v1.18.6. Keep only the lightweight legacy
-    # prize shape required by the existing 3D gameplay scene.
+    # Legacy lightweight toy visual. The detailed 3D plush rework is disabled.
     var mat := make_mat(color, 0.35, 0.55)
     var body := make_sphere(root, 0.72, Vector3(0, 0.72, 0), mat, "ToyBody")
     body.scale = Vector3(1.0, 1.0, 0.92)
@@ -3815,7 +3903,6 @@ func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> 
     elif rarity == "ЭПИЧЕСКАЯ":
         var badge := make_sphere(root, 0.075, Vector3(0, 1.28, 0.60), make_mat(Color("#8A6E8D"), 0.25, 0.3), "ToyBadge")
         badge.scale = Vector3(1.0, 0.55, 0.35)
-
 
 func build_particles() -> void:
     # Неоновые частицы отключены: стиль автомата — дерево, металл и стекло.
@@ -6345,12 +6432,6 @@ func build_collection_panel() -> PanelContainer:
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
-        if done:
-            var reward := Label.new()
-            reward.text = "НАГРАДА: 💰 +100 ₽   •   🔑 +1   •   ⚙ +10 запчастей"
-            reward.add_theme_font_size_override("font_size", 17)
-            reward.modulate = GOLD
-            card.add_child(reward)
         var names := Label.new()
         var parts: Array[String] = []
         for toy in toys:
@@ -7983,14 +8064,6 @@ func _process(delta: float) -> void:
             current_result = "ГОТОВ К ИГРЕ"
             save_game()
             update_ui()
-    if collection_reward_pending_timer > 0.0:
-        collection_reward_pending_timer -= delta
-        if collection_reward_pending_timer <= 0.0 and collection_reward_pending_name != "":
-            show_collection_complete_popup(collection_reward_pending_name, collection_reward_pending_rubles, collection_reward_pending_keys, collection_reward_pending_parts)
-            collection_reward_pending_name = ""
-            collection_reward_pending_rubles = 0
-            collection_reward_pending_keys = 0
-            collection_reward_pending_parts = 0
     if popup_timer > 0.0:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
@@ -8428,36 +8501,6 @@ func resolve_grab() -> bool:
     update_ui()
     return true
 
-func check_collection_completion() -> void:
-    if last_prize_collection == "" or completed_collections.has(last_prize_collection):
-        return
-    var needed := 0
-    var got := 0
-    for toy in toys:
-        if String(toy.get("collection", "")) != last_prize_collection:
-            continue
-        needed += 1
-        if collection.has(String(toy.get("name", ""))):
-            got += 1
-    if needed <= 0 or got < needed:
-        return
-    # One-time reward for completing a collection.
-    var reward_rubles := 100
-    var reward_keys := 1
-    var reward_parts := 10
-    completed_collections[last_prize_collection] = true
-    coins += reward_rubles
-    chest_keys += reward_keys
-    total_keys_earned += reward_keys
-    workshop_parts += reward_parts
-    collection_reward_pending_name = last_prize_collection
-    collection_reward_pending_rubles = reward_rubles
-    collection_reward_pending_keys = reward_keys
-    collection_reward_pending_parts = reward_parts
-    # The normal new-toy/duplicate popup gets priority first; the collection
-    # reward popup appears immediately after it closes.
-    collection_reward_pending_timer = 4.1
-
 func finalize_delivered_prize() -> void:
     if _server_ready():
         if player_token == "":
@@ -8521,7 +8564,6 @@ func finalize_delivered_prize() -> void:
                 best_result_xp = last_prize_xp
                 best_result = "%s • +%d XP" % [last_prize_name, last_prize_xp]
         current_result = "🎉 ДОСТАЛ: %s • %s" % [last_prize_name, last_prize_rarity]
-        check_collection_completion()
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
         play_upgrade_sound("win")
@@ -8531,13 +8573,9 @@ func finalize_delivered_prize() -> void:
     update_missions()
     if kind == "toy":
         last_reward_rubles = maxi(0, coins - coins_before_prize)
-        var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
-        if previous_count > 0:
-            # Дубликат остаётся открытым до выбора игрока.
-            show_sale_offer()
-        else:
-            # Новая игрушка показывает полную информацию и закрывается сама.
-            show_new_toy_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_reward_rubles, last_prize_xp, rating_gain)
+        # Legacy behavior: no duplicate choice window and no new-toy popup.
+        # The ordinary result window remains the only result presentation.
+        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, 0)
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8806,18 +8844,6 @@ func show_new_toy_popup(toy_name: String, cname: String, rarity: String, rubles:
     if popup_rating_label:
         popup_rating_label.text = "🏆 РЕЙТИНГ: +%d" % maxi(0, rating_gain)
     popup_achievement_label.text = "Новая игрушка добавлена в коллекцию."
-    popup_timer = 4.0
-    result_popup.visible = true
-
-func show_collection_complete_popup(cname: String, rubles: int, keys: int, parts: int) -> void:
-    if not result_popup: return
-    if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
-    popup_name_label.text = cname
-    popup_info_label.text = "ВСЕ ИГРУШКИ СОБРАНЫ"
-    popup_xp_label.text = "💰 +%d ₽   •   🔑 +%d ключ   •   ⚙ +%d запчастей" % [rubles, keys, parts]
-    if popup_rating_label:
-        popup_rating_label.text = "НАГРАДА ЗА ПОЛНУЮ КОЛЛЕКЦИЮ"
-    popup_achievement_label.text = "Награда уже зачислена. Коллекция отмечена как полностью собранная."
     popup_timer = 4.0
     result_popup.visible = true
 
