@@ -7729,6 +7729,17 @@ func build_help_panel() -> PanelContainer:
     )
     social_row.add_child(vk)
 
+    var reviews := Button.new()
+    reviews.text = "⭐  ОЦЕНКА И ОТЗЫВЫ"
+    reviews.custom_minimum_size = Vector2(300, 62)
+    style_button(reviews, Color("#8A6B45"))
+    reviews.add_theme_font_size_override("font_size", 18)
+    reviews.pressed.connect(func():
+        current_result = "ОЦЕНКА И ОТЗЫВЫ: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
+        update_ui()
+    )
+    social_row.add_child(reviews)
+
     var max_btn := Button.new()
     max_btn.text = "◆  MAX"
     max_btn.custom_minimum_size = Vector2(300, 62)
