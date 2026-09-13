@@ -3320,7 +3320,7 @@ func build_prizes() -> void:
             var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor)
             body.rotation = rot
             prize_bodies.append(body)
-            prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
     if prize_bodies.is_empty():
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
@@ -3381,7 +3381,7 @@ func build_prizes_async() -> void:
             var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor)
             body.rotation = rot
             prize_bodies.append(body)
-            prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
         var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
         await set_loading_progress(saved_progress, "ИГРУШКА %d ИЗ %d ВОССТАНОВЛЕНА" % [loaded_count, valid_saved_count])
 
@@ -3419,7 +3419,7 @@ func spawn_one_random_prize(n: int) -> void:
     var body := make_physics_toy(source_index, toys[source_index], Vector3(x, y, z), variant_color, size_factor)
     body.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-PI, PI), rng.randf_range(-0.25, 0.25))
     prize_bodies.append(body)
-    prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+    prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
 func get_thematic_toy_indices() -> Array[int]:
     var result: Array[int] = []
@@ -3539,7 +3539,7 @@ func spawn_random_prizes(count: int, animate_refill: bool = false) -> void:
                 body.set_meta("refill_active", true)
                 body.set_meta("refill_delay", float(n) * 0.10)
             prize_bodies.append(body)
-            prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
 func make_coin_capsule(pos: Vector3) -> RigidBody3D:
     var body := RigidBody3D.new()
@@ -3630,10 +3630,6 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
     var toy_weight: float = float(data.get("weight", 38.0))
     body.mass = clampf(toy_weight / 55.0, 0.20, 1.15)
     body.set_meta("toy_weight", toy_weight)
-    body.set_meta("toy_name", String(data.get("name", "Игрушка")))
-    body.set_meta("toy_collection", String(data.get("collection", "")))
-    body.set_meta("toy_rarity", String(data.get("rarity", "ОБЫЧНАЯ")))
-    body.set_meta("toy_source_index", index)
     body.set_meta("slippery", randf() < (0.10 if String(data.get("rarity", "")) == "ОБЫЧНАЯ" else 0.18))
     body.scale = Vector3(TOY_SCALE * size_factor, TOY_SCALE * size_factor, TOY_SCALE * size_factor)
     body.linear_damp = 2.4
@@ -4220,38 +4216,8 @@ func build_ui() -> void:
     setup_android_ui_navigation()
     await get_tree().process_frame
     await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
-    await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
-    setup_android_scrolls()
     await get_tree().process_frame
-    await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
-
-func setup_android_scrolls() -> void:
-    # Единая настройка прокрутки для всех длинных окон под Android.
-    # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
-    # остаётся достаточно широкой для точного захвата.
-    var stack: Array[Node] = [self]
-    while not stack.is_empty():
-        var current: Node = stack.pop_back()
-        if current is ScrollContainer:
-            configure_android_scroll(current)
-        for child in current.get_children():
-            stack.append(child)
-
-func configure_android_scroll(scroll: ScrollContainer) -> void:
-    if scroll.has_meta("android_scroll_configured"):
-        return
-    scroll.set_meta("android_scroll_configured", true)
-    scroll.follow_focus = true
-    scroll.scroll_deadzone = 1
-    scroll.add_theme_constant_override("scroll_bar_width", 20)
-    scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
-    if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-        scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    else:
-        # Горизонтальные категории листаются влево/вправо отдельно.
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+    await set_loading_progress(96.0, "НАСТРОЙКА ЗАВЕРШЕНА")
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -8350,11 +8316,6 @@ func is_claw_over_prize_hole() -> bool:
 
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
-    if is_claw_over_prize_hole():
-        current_result = "⚠ НАД ОТВЕРСТИЕМ — ЗАХВАТ НЕДОСТУПЕН"
-        play_upgrade_sound("error")
-        update_ui()
-        return
     play_upgrade_sound("grab")
     register_game_activity()
     if _server_ready():
@@ -8567,23 +8528,11 @@ func finalize_delivered_prize() -> void:
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
         play_upgrade_sound("win")
-    if kind == "toy" and previous_count > 0 and not sale_available:
-        # Только дубль уже имеющейся игрушки можно продать.
-        sale_name = last_prize_name
-        sale_rarity = last_prize_rarity
-        sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
-        sale_available = true
-        show_sale_offer()
     complete_daily_mission_if_ready()
     complete_weekly_mission_if_ready()
     check_achievements()
     update_missions()
-    if kind == "toy":
-        last_reward_rubles = maxi(0, coins - coins_before_prize)
-        var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
-        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
-        if previous_count > 0 and sale_available:
-            show_sale_offer()
+    # Окно результата игрушки отключено: награда начисляется без popup.
     pending_prize_data.clear()
     save_game()
     update_ui()
