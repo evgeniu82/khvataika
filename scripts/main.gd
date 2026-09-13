@@ -4640,7 +4640,9 @@ func build_extra_hud() -> void:
     var mtimer := Label.new()
     mtimer.name = "MissionDetailTimer"
     mtimer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    mtimer.add_theme_font_size_override("font_size", 11)
+    mtimer.add_theme_font_size_override("font_size", 13)
+    mtimer.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    mtimer.custom_minimum_size = Vector2(0, 18)
     mtimer.modulate = Color("#D6A14A")
     mtimer.visible = false
     mv.add_child(mtimer)
@@ -4742,13 +4744,17 @@ func update_mission_timers_light() -> void:
 
     if daily_login_panel and is_instance_valid(daily_login_panel) and daily_login_panel.visible:
         var hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
+        var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
+        if daily_timer:
+            daily_timer.visible = false
+            if not daily_claim_available and daily_series_claimed_at > 0:
+                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ: %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.visible = true
         if hint:
             if daily_claim_available:
-                hint.text = "Нажми на день, который доступен сейчас"
-            elif daily_series_claimed_at > 0:
-                hint.text = "⏳ НОВАЯ СЕРИЯ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_day())
+                hint.text = "Нажми на доступный день"
             else:
-                hint.text = "Нажми на день, который доступен сейчас"
+                hint.text = "День уже получен — жди новый"
 
 func toggle_daily_mission() -> void:
     toggle_mission_detail(true)
@@ -4823,6 +4829,7 @@ func build_daily_login_panel() -> void:
     # и раскрывается влево от кнопки.
     daily_login_panel.position = Vector2(310, 285)
     daily_login_panel.size = Vector2(300, 165)
+    daily_login_panel.custom_minimum_size = Vector2(300, 165)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     daily_login_panel.z_index = 30
@@ -4853,6 +4860,16 @@ func build_daily_login_panel() -> void:
     daily_days_container.add_theme_constant_override("h_separation", 4)
     daily_days_container.add_theme_constant_override("v_separation", 4)
     v.add_child(daily_days_container)
+
+    var daily_timer := Label.new()
+    daily_timer.name = "DailyLoginTimer"
+    daily_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    daily_timer.add_theme_font_size_override("font_size", 13)
+    daily_timer.modulate = Color("#D6A14A")
+    daily_timer.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    daily_timer.custom_minimum_size = Vector2(0, 18)
+    daily_timer.visible = false
+    v.add_child(daily_timer)
 
     daily_day_buttons.clear()
     for day in range(1, 8):
@@ -4890,8 +4907,14 @@ func update_daily_login_ui() -> void:
         if detail:
             detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
         var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
-        if daily_hint and not daily_claim_available and daily_series_claimed_at > 0:
-            daily_hint.text = "⏳ НОВАЯ СЕРИЯ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_day())
+        var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
+        if daily_timer:
+            daily_timer.visible = false
+            if not daily_claim_available and daily_series_claimed_at > 0:
+                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ: %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.visible = true
+        if daily_hint:
+            daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен — жди новый"
 
         for i in range(daily_day_buttons.size()):
             var day := i + 1
@@ -8561,8 +8584,18 @@ func move_z(amount: float) -> void:
     register_game_activity()
     claw_move_target.z = clampf(claw_move_target.z + amount * joystick_sensitivity * claw_move_multiplier(), CLAW_MIN.z, CLAW_MAX.z)
 
+func _claw_over_prize_hole() -> bool:
+    # Отверстие выдачи — безопасная зона: здесь кнопка ЗАХВАТ не запускает
+    # опускание клешни, потому что под ней нет игрушки для захвата.
+    # Небольшой запас по краям учитывает размер самой клешни.
+    return absf(claw_pos.x - PRIZE_HOLE.x) <= 0.68 and absf(claw_pos.z - PRIZE_HOLE.z) <= 0.55
+
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
+    if _claw_over_prize_hole():
+        current_result = "КЛЕШНЬ НАД ОТВЕРСТИЕМ • ВЫБЕРИТЕ ИГРУШКУ"
+        update_ui()
+        return
     play_upgrade_sound("grab")
     register_game_activity()
     if _server_ready():
