@@ -1,0 +1,336 @@
+573:func get_collection_names() -> Array[String]:
+586:func add_extended_collections() -> void:
+640:func add_progressive_achievements() -> void:
+664:func add_diverse_achievements() -> void:
+719:func _achievement_exists(id: String) -> bool:
+725:func _ready() -> void:
+769:func _is_android_runtime_available() -> bool:
+772:func _get_background_notification_receiver() -> Variant:
+785:func _ensure_android_notification_channel() -> bool:
+803:func _android_notification_permission_granted() -> bool:
+810:func _request_android_notification_permission() -> bool:
+822:func _on_notification_permission_result(permission: String, granted: bool) -> void:
+837:func _send_pending_test_notification() -> void:
+859:func test_game_notification() -> void:
+874:func setup_android_notifications() -> void:
+888:func notify_phone(title: String, message: String, force: bool = false) -> void:
+972:func _next_daily_notification_timestamp(hour: int, minute: int) -> int:
+982:func _schedule_background_notification(id: int, timestamp_ms: int, title: String, message: String, daily: bool) -> void:
+999:func schedule_background_notifications() -> void:
+1020:func cancel_background_notifications() -> void:
+1035:func notify_daily_bonus_if_available() -> void:
+1042:func update_return_bonus_state() -> void:
+1057:func claim_return_bonus() -> void:
+1080:func start_workshop_job() -> void:
+1105:func process_workshop_job() -> void:
+1134:func season_pass_reward(level: int) -> Dictionary:
+1144:func grant_season_pass_reward(level: int) -> String:
+1171:func add_season_pass_xp(amount: int) -> void:
+1185:func server_reward_amount(value: int) -> int:
+1188:func ensure_player_id() -> void:
+1197:func _normalized_server_url() -> String:
+1200:func _server_ready() -> bool:
+1203:func get_server_game_state() -> Dictionary:
+1241:func _bool_array_from_variant(value: Variant, fallback: Array[bool]) -> Array[bool]:
+1249:func _int_array_from_variant(value: Variant, fallback: Array[int]) -> Array[int]:
+1257:func apply_server_game_state(data: Dictionary) -> void:
+1473:func show_server_blocked(reason: String = "") -> void:
+1499:func _remote_headers() -> PackedStringArray:
+1505:func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
+1531:func _flush_queued_server_action() -> void:
+1541:func _ensure_connection_http() -> void:
+1550:func _check_server_connection() -> void:
+1562:func _on_connection_http_completed(result: int, response_code: int, _headers: PackedStringArray, _body: PackedByteArray) -> void:
+1573:func update_connection_status_ui() -> void:
+1586:func register_device_remote() -> void:
+1597:func poll_server_notifications() -> void:
+1607:func register_player_remote() -> void:
+1622:func sync_remote_config() -> void:
+1636:func sync_player_to_server() -> void:
+1655:func get_player_online_score() -> int:
+1658:func request_global_rating() -> void:
+1676:func apply_referral_remote(code: String) -> void:
+1692:func redeem_promo_code_remote(code: String) -> void:
+1708:func _apply_remote_catalog(catalog: Dictionary) -> void:
+1764:func _apply_remote_config(config: Dictionary) -> void:
+1823:func _on_remote_http_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+2065:func redeem_promo_code(code: String) -> void:
+2093:func get_local_leaderboard() -> Array[Dictionary]:
+2103:func refresh_live_systems_panel() -> void:
+2125:func _format_countdown(seconds: int) -> String:
+2131:func build_info_menu_panel(panel_name: String, panel_size: Vector2) -> PanelContainer:
+2141:func add_panel_title(parent: VBoxContainer, title_text: String) -> void:
+2150:func build_season_pass_panel() -> PanelContainer:
+2260:func refresh_season_pass_panel() -> void:
+2304:func build_promo_panel() -> PanelContainer:
+2316:func refresh_promo_panel() -> void:
+2321:func build_news_panel() -> PanelContainer:
+2332:func refresh_news_panel(panel: PanelContainer = null) -> void:
+2354:func build_rating_panel() -> PanelContainer:
+2364:func refresh_rating_panel() -> void:
+2378:func build_return_bonus_panel() -> PanelContainer:
+2387:func refresh_return_bonus_panel() -> void:
+2399:func build_live_systems_panel() -> PanelContainer:
+2438:func create_loading_screen() -> void:
+2643:func set_loading_status(text: String) -> void:
+2652:func set_loading_progress(value: float, text: String) -> void:
+2667:func initialize_game_async() -> void:
+2779:func activate_extra_features_after_startup() -> void:
+2802:func _notification(what: int) -> void:
+2812:func make_fur_mat(color: Color) -> ShaderMaterial:
+2853:func make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emission_strength: float = 0.0) -> StandardMaterial3D:
+2864:func make_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, node_name: String = "Box") -> MeshInstance3D:
+2875:func make_static_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, node_name: String = "StaticBox") -> StaticBody3D:
+2894:func make_collision_box(parent: Node3D, size: Vector3, pos: Vector3, node_name: String = "CollisionBox") -> StaticBody3D:
+2906:func make_sphere(parent: Node3D, radius: float, pos: Vector3, material: Material, node_name: String = "Sphere") -> MeshInstance3D:
+2920:func make_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, material: Material, node_name: String = "Cylinder") -> MeshInstance3D:
+2934:func make_tube(parent: Node3D, a: Vector3, b: Vector3, radius: float, material: Material, node_name: String = "Tube") -> MeshInstance3D:
+2940:func build_world() -> void:
+3003:func build_machine() -> void:
+3164:func build_overhead_rails() -> void:
+3183:func build_claw() -> void:
+3222:func build_aim_marker() -> void:
+3235:func build_prizes() -> void:
+3274:func build_prizes_async() -> void:
+3346:func spawn_one_random_prize(n: int) -> void:
+3368:func get_thematic_toy_indices() -> Array[int]:
+3394:func event_allows_toy(index: int, rng: RandomNumberGenerator) -> bool:
+3402:func event_rarity_weight_bonus(rarity: String) -> float:
+3408:func spawn_random_prizes(count: int, animate_refill: bool = false) -> void:
+3488:func make_coin_capsule(pos: Vector3) -> RigidBody3D:
+3524:func advance_batch() -> void:
+3532:func batch_allowed(source_index: int) -> bool:
+3542:func refill_prizes_if_needed() -> void:
+3551:func safe_prize_position(pos: Vector3) -> Vector3:
+3563:func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: Color = Color(-1, -1, -1, -1), size_factor: float = 1.0) -> RigidBody3D:
+3599:func plush_piece(root: Node3D, pos: Vector3, scale: Vector3, mat: Material, name: String) -> MeshInstance3D:
+3604:func plush_face(root: Node3D, face_y: float, face_z: float, white: Material, dark: Material, pink: Material) -> void:
+3611:func add_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3623:func add_fox(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3633:func add_bunny(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3640:func add_panda(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3647:func add_cat(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3654:func add_dog(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3660:func add_koala(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3666:func add_frog(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3675:func add_turtle(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3683:func add_monkey(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3690:func add_tiger(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3697:func add_shark(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3705:func add_penguin(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3712:func add_whale(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3720:func add_dragon(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, legendary: bool=false) -> void:
+3731:func add_unicorn(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, king: bool=false) -> void:
+3740:func add_fairy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3746:func add_griffin(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3752:func add_robot(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, master: bool=false) -> void:
+3765:func add_space_cat(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3771:func add_duck(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3780:func add_cyber_cat(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3787:func add_mecha_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3796:func add_space_shark(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3802:func add_star_panda(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3808:func add_fairy_plush(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3815:func add_griffin_plush(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
+3822:func get_toy_variant_color(base: Color, variant: int) -> Color:
+3833:func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> void:
+3885:func build_particles() -> void:
+3889:func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 2) -> StyleBoxFlat:
+3901:func style_button(b: Button, accent: Color = Color("#A8754A"), large: bool = false) -> void:
+3914:func style_panel(p: PanelContainer, bg: Color = Color("#1D1612"), border: Color = Color("#76583F"), radius: int = 26, border_width: int = 3) -> void:
+3917:func decorate_main_menu_button(b: Button) -> void:
+3934:func add_neon_header(parent: Control, title_text: String, subtitle_text: String = "") -> void:
+3951:func build_ui() -> void:
+4166:func setup_android_scrolls() -> void:
+4178:func configure_android_scroll(scroll: ScrollContainer) -> void:
+4194:func setup_android_ui_navigation() -> void:
+4202:func make_android_back_button() -> Button:
+4214:func _visible_navigation_context() -> String:
+4266:func _navigation_panel_for_context(context: String) -> Control:
+4291:func update_android_navigation() -> void:
+4300:func _dismiss_gameplay_side_panels_on_tap() -> void:
+4308:func _on_android_back_pressed() -> void:
+4334:func _unhandled_input(event: InputEvent) -> void:
+4354:func get_menu_notice_text() -> String:
+4364:func build_extra_hud() -> void:
+4473:func animate_panel_in(panel: Control, from_scale: float = 0.94) -> void:
+4485:func animate_panel_out(panel: Control) -> void:
+4494:func close_side_panels(except_name: String = "") -> void:
+4510:func toggle_daily_mission() -> void:
+4513:func toggle_weekly_mission() -> void:
+4516:func toggle_mission_detail(is_daily: bool) -> void:
+4536:func _calendar_day_number(date_str: String) -> int:
+4556:func setup_login_streak() -> void:
+4570:func build_daily_login_panel() -> void:
+4629:func update_daily_login_ui() -> void:
+4664:func toggle_daily_login() -> void:
+4685:func claim_login_reward() -> void:
+4691:func claim_login_reward_for_day(day: int) -> void:
+4742:func setup_events() -> void:
+4748:func get_today_event() -> Dictionary:
+4757:func get_event_profile(event: Dictionary) -> Dictionary:
+4784:func activate_calendar_event() -> void:
+4807:func apply_event_theme() -> void:
+4822:func build_event_decorations() -> void:
+4848:func start_random_event() -> void:
+4852:func get_weekly_event() -> Dictionary:
+4863:func update_weekly_event() -> void:
+4873:func build_event_panel() -> void:
+4898:func update_event_panel() -> void:
+4907:func toggle_event_panel() -> void:
+4918:func build_audio() -> void:
+4929:func _play_next_music_track() -> void:
+4939:func select_music_track(index: int) -> void:
+4949:func apply_sfx_volume_settings() -> void:
+4956:func apply_music_settings() -> void:
+4966:func make_sfx_player(path: String) -> AudioStreamPlayer:
+4973:func make_menu_circle_button(icon_text: String, tooltip_text: String, pos: Vector2, accent: Color) -> Button:
+4990:func make_menu_button(text_value: String, pos: Vector2, size_value: Vector2, accent: Color = CYAN, large: bool = false) -> Button:
+5000:func build_hud() -> void:
+5162:func make_control_button(text_value: String, pos: Vector2) -> Button:
+5171:func build_result_popup() -> void:
+5210:func build_shop_panel() -> PanelContainer:
+5291:func show_shop_feedback(message: String, seconds: float = 2.4) -> void:
+5298:func refresh_shop() -> void:
+5314:func shop_section(title: String, desc: String) -> void:
+5327:func shop_item_button(title: String, desc: String, state: String, accent: Color, action: Callable) -> void:
+5338:func shop_upgrade_preview(i: int, level: int) -> String:
+5346:func build_shop_upgrades() -> void:
+5358:func build_shop_claws() -> void:
+5367:func build_shop_claw_skins() -> void:
+5376:func build_shop_toy_skins() -> void:
+5385:func build_shop_machine_skins() -> void:
+5394:func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
+5431:func buy_claw_skin(index: int) -> void:
+5433:func buy_toy_skin(index: int) -> void:
+5436:func buy_machine_skin(index: int) -> void:
+5439:func apply_shop_visuals() -> void:
+5477:func build_vip_panel() -> PanelContainer:
+5489:func refresh_vip_panel() -> void:
+5503:func buy_vip(index: int) -> void:
+5521:func get_current_season() -> Dictionary:
+5527:func get_current_season_icon() -> String:
+5536:func get_current_season_short_name() -> String:
+5545:func build_seasons_panel() -> PanelContainer:
+5651:func refresh_seasons_panel() -> void:
+5742:func chest_rarity_for_win(rarity: String) -> String:
+5751:func award_chest_for_win(rarity: String) -> void:
+5759:func open_chest(kind: String, skip_confirmation: bool = false) -> void:
+5846:func chest_guaranteed_reward(kind: String) -> Dictionary:
+5855:func chest_bonus_chance(kind: String) -> float:
+5859:func chest_bonus_reward(kind: String) -> Dictionary:
+5868:func chest_exclusive_chance(kind: String) -> float:
+5872:func grant_chest_exclusive(kind: String) -> String:
+5883:func build_chests_panel() -> PanelContainer:
+5954:func refresh_chests_panel() -> void:
+5977:func workshop_upgrade(stat: String) -> void:
+5999:func workshop_blueprint_bonus(stat: String) -> float:
+6003:func workshop_module_cost(stat: String, level: int) -> int:
+6009:func total_workshop_levels() -> int:
+6012:func workshop_blueprint_cost(tier: String) -> int:
+6015:func workshop_buy_blueprint(stat: String, tier: String) -> void:
+6034:func workshop_calibrate() -> void:
+6053:func workshop_toggle_overclock() -> void:
+6074:func refresh_workshop_panel() -> void:
+6189:func workshop_module_effect_text(stat: String, level: int) -> String:
+6193:func workshop_buy_next_blueprint(stat: String) -> void:
+6200:func build_workshop_panel() -> PanelContainer:
+6261:func build_collection_panel() -> PanelContainer:
+6322:func build_achievements_panel() -> PanelContainer:
+6397:func refresh_achievements_panel() -> void:
+6439:func _on_achievement_category_pressed(category: String) -> void:
+6443:func achievement_matches_category(spec: Dictionary, category: String) -> bool:
+6476:func make_data_row(parent: VBoxContainer, title_text: String, value_text: String) -> void:
+6494:func build_profile_panel() -> PanelContainer:
+6801:func select_profile_avatar(index: int) -> void:
+6807:func save_profile_changes() -> void:
+6829:func copy_profile_value(value: String, title: String, button: Button = null) -> void:
+6847:func refresh_profile_panel() -> void:
+6956:func get_player_title() -> String:
+6964:func build_stats_panel() -> PanelContainer:
+6996:func refresh_stats_panel() -> void:
+7053:func count_owned_claws() -> int:
+7059:func total_upgrade_levels() -> int:
+7065:func ensure_referral_code() -> void:
+7073:func get_referral_link() -> String:
+7076:func process_incoming_referral() -> void:
+7104:func build_referral_panel() -> PanelContainer:
+7210:func refresh_referral_panel() -> void:
+7219:func claim_referral_code(code: String) -> void:
+7241:func build_settings_panel() -> PanelContainer:
+7331:func make_labeled_control(title_text: String, control: Control) -> VBoxContainer:
+7336:func apply_grab_button_scale() -> void:
+7341:func reset_settings_defaults() -> void:
+7374:func confirm_reset_settings() -> void:
+7385:func confirm_reset_progress() -> void:
+7396:func quality_name() -> String:
+7400:func update_quality_info() -> void:
+7407:func apply_quality_settings() -> void:
+7448:func set_gameplay_3d_visible(show_game: bool) -> void:
+7454:func set_main_menu_controls(show_controls: bool) -> void:
+7459:func get_capture_preview() -> float:
+7494:func apply_language() -> void:
+7529:func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
+7535:func build_help_panel() -> PanelContainer:
+7565:func start_game() -> void:
+7587:func update_hud_profile_button() -> void:
+7594:func show_main_menu() -> void:
+7605:func open_panel(which: String) -> void:
+7667:func close_gameplay_overlay() -> void:
+7678:func close_all_panels() -> void:
+7705:func update_ui() -> void:
+7727:func _process(delta: float) -> void:
+7887:func animate_camera(delta: float) -> void:
+7894:func animate_machine_lights() -> void:
+7900:func process_claw(delta: float) -> void:
+8082:func follow_grabbed_toy() -> void:
+8092:func update_cable() -> void:
+8101:func animate_grip(amount: float) -> void:
+8107:func shop_upgrade_level(index: int) -> int:
+8112:func claw_move_multiplier() -> float:
+8115:func claw_lower_speed() -> float:
+8118:func claw_raise_speed() -> float:
+8121:func claw_travel_speed() -> float:
+8124:func claw_grip_close_time() -> float:
+8127:func claw_release_time() -> float:
+8130:func move_x(amount: float) -> void:
+8135:func move_z(amount: float) -> void:
+8140:func drop_claw() -> void:
+8180:func resolve_grab() -> bool:
+8288:func finalize_delivered_prize() -> void:
+8368:func find_top_layer_drop_y() -> float:
+8388:func choose_top_layer_prize() -> int:
+8409:func remove_delivered_prize() -> void:
+8418:func choose_toy() -> int:
+8458:func xp_for_rarity(rarity: String) -> int:
+8466:func xp_needed_for_level(level: int) -> int:
+8470:func award_toy_xp(rarity: String) -> int:
+8498:func check_collection_completion(collection_name: String) -> void:
+8515:func achievement_value(spec: Dictionary) -> int:
+8566:func check_achievements() -> void:
+8577:func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0) -> void:
+8593:func rarity_reward(rarity: String) -> int:
+8601:func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ") -> void:
+8614:func buy_claw(index: int, skip_confirmation: bool = false) -> void:
+8648:func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
+8692:func show_sale_offer() -> void:
+8724:func sell_duplicate() -> void:
+8741:func keep_duplicate() -> void:
+8749:func reset_progress() -> void:
+8846:func serialize_prizes() -> Array:
+8864:func setup_daily_systems() -> void:
+8881:func register_game_activity() -> void:
+8889:func update_missions() -> void:
+8904:func show_waiting_screen() -> void:
+8927:func complete_daily_mission_if_ready() -> void:
+8939:func complete_weekly_mission_if_ready() -> void:
+8951:func claim_daily_bonus() -> void:
+8973:func rarity_color(rarity: String) -> Color:
+8983:func build_upgrade_sound_system() -> void:
+9012:func play_upgrade_sound(kind: String) -> void:
+9025:func play_ui_sound(kind: String) -> void:
+9032:func get_profile_summary() -> String:
+9037:func get_daily_weekly_summary() -> String:
+9040:func refresh_upgrade_dashboard() -> void:
+9045:func save_game() -> void:
+9173:func load_save() -> void:

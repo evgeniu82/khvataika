@@ -1,4 +1,4 @@
-# ХВАТАЙКА 1.13.6 — SERVER CHAIN QA / FIX
+# ХВАТАЙКА 1.14.1 — SERVER CHAIN QA / FIX
 
 Дата проверки: 2026-09-11
 

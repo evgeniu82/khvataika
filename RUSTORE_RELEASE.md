@@ -2,7 +2,7 @@
 
 ## Готово в проекте
 - Название: **Хватайка**
-- Версия: **1.13.6**
+- Версия: **1.14.1**
 - Version code: **13**
 - Package ID: **com.clawneon.khvataika**
 - Android preset: **Android RuStore AAB**
