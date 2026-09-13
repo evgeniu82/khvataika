@@ -198,8 +198,13 @@ var season_pass_level: int = 1
 const SEASON_PASS_MAX_LEVEL: int = 30
 var promo_codes_used: Dictionary = {}
 var promo_status: String = ""
-var news_items: Array[Dictionary] = []
-var news_unread: int = 0
+var news_items: Array[Dictionary] = [
+    {"date":"08.09.2026", "title":"🆕 ХВАТАЙКА v1.8.4", "text":"Добавлен раздел «Новости»: здесь будут появляться обновления, события, новые игрушки и важные объявления."},
+    {"date":"08.09.2026", "title":"🎟 НОВЫЕ ПРОМОКОДЫ", "text":"Следи за новостями — именно здесь будут публиковаться новые промокоды и условия их получения."},
+    {"date":"08.09.2026", "title":"🎁 БОНУС ЗА ВОЗВРАЩЕНИЕ", "text":"Бонус теперь появляется отдельным кружком на игровом экране только тогда, когда он доступен."},
+    {"date":"08.09.2026", "title":"🔔 УВЕДОМЛЕНИЯ", "text":"Система уведомлений продолжает напоминать о наградах, серии, событиях, мастерской и сундуках."}
+]
+var news_unread: int = 4
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
@@ -1833,10 +1838,15 @@ func _apply_remote_config(config: Dictionary) -> void:
         for raw_holiday in server_holidays:
             if raw_holiday is Dictionary: holiday_list.append(raw_holiday)
         if not holiday_list.is_empty(): holiday_calendar = holiday_list
-    # Офлайн-версия пока держит раздел «Новости» пустым.
-    remote_news_items.clear()
-    news_items.clear()
-    news_unread = 0
+    var remote_news: Variant = config.get("news", [])
+    if remote_news is Array:
+        remote_news_items.clear()
+        for item in remote_news:
+            if item is Dictionary:
+                remote_news_items.append(item)
+        if not remote_news_items.is_empty():
+            news_items = remote_news_items.duplicate(true)
+            news_unread = maxi(0, int(config.get("unread_news", remote_news_items.size())))
     var event: Variant = config.get("active_event", {})
     if event is Dictionary and not event.is_empty():
         active_event_id = String(event.get("id", active_event_id))
@@ -2366,20 +2376,26 @@ func build_news_panel() -> PanelContainer:
     return p
 
 func refresh_news_panel(panel: PanelContainer = null) -> void:
-    var target := panel if panel != null else news_panel
+    var target:=panel if panel != null else news_panel
     if target == null: return
-    var list := target.get_node_or_null("ScrollContainer/NewsContent/NewsList") as VBoxContainer
+    var list:=target.get_node_or_null("ScrollContainer/NewsContent/NewsList") as VBoxContainer
     if list == null: return
     for child in list.get_children(): child.queue_free()
-    # Раздел пока намеренно пуст: серверные/старые новости сюда не подмешиваются.
-    var empty := Label.new()
-    empty.text = "НОВОСТЕЙ ПОКА НЕТ"
-    empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    empty.add_theme_font_size_override("font_size", 22)
-    empty.modulate = Color("#BCA996")
-    list.add_child(empty)
-    news_unread = 0
+    for item in news_items:
+        var card:=PanelContainer.new()
+        card.custom_minimum_size=Vector2(0,145)
+        style_panel(card,Color("#241B16"),Color("#76583F"),18,2)
+        var cv:=VBoxContainer.new(); cv.add_theme_constant_override("separation",5); card.add_child(cv)
+        var title:=Label.new(); title.text="%s  •  %s" % [String(item.get("date","")),String(item.get("title",""))]; title.add_theme_font_size_override("font_size",21); title.modulate=Color("#E1C29A"); cv.add_child(title)
+        var body:=Label.new(); body.text=String(item.get("text","")); body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; body.add_theme_font_size_override("font_size",17); body.modulate=Color("#D8C3AA"); cv.add_child(body)
+        var read_button:=Button.new(); read_button.text="ПРОЧИТАНО"; read_button.custom_minimum_size=Vector2(0,48); style_button(read_button,Color("#76583F")); var news_id:=String(item.get("id","")); read_button.pressed.connect(func():
+            if _server_ready() and player_token != "":
+                _server_action("news_read", {"news_id":news_id})
+            news_unread = maxi(0, news_unread - 1)
+            read_button.disabled = true
+        ); cv.add_child(read_button)
+        list.add_child(card)
+    # Индикатор снимается только после серверного подтверждения прочтения.
 
 func build_rating_panel() -> PanelContainer:
     var p:=build_info_menu_panel("RatingPanel",Vector2(970,900))
@@ -4348,10 +4364,13 @@ func update_android_navigation() -> void:
         hud_back_button.visible = false
     _last_nav_context = _visible_navigation_context()
 
-func _dismiss_gameplay_side_panels_on_tap(event_position: Vector2 = Vector2(-1, -1)) -> void:
-    # Отключено по запросу пользователя. Окна от круглых кнопок
-    # больше не закрываются обычным нажатием по экрану.
-    return
+func _dismiss_gameplay_side_panels_on_tap() -> void:
+    # Любое свободное касание игрового поля закрывает открытое боковое окно.
+    # Нажатие на другой круг закрывает предыдущее через close_side_panels().
+    var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
+    var has_side_panel: bool = (mission_panel != null and mission_panel.visible) or (daily_login_panel != null and daily_login_panel.visible) or (event_panel != null and event_panel.visible)
+    if has_side_panel:
+        close_side_panels()
 
 func _on_android_back_pressed() -> void:
     var context := _visible_navigation_context()
@@ -4383,12 +4402,13 @@ func _unhandled_input(event: InputEvent) -> void:
     if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
         get_viewport().set_input_as_handled()
         return
-    # Автозакрытие боковых окон касанием отключено.
+    # Свободное касание/клик по игровому полю закрывает открытое боковое окно.
+    # Кнопки интерфейса обрабатываются раньше и сюда не попадают.
     if event is InputEventScreenTouch and event.pressed:
-        _dismiss_gameplay_side_panels_on_tap(event.position)
+        _dismiss_gameplay_side_panels_on_tap()
         return
     if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-        _dismiss_gameplay_side_panels_on_tap(event.position)
+        _dismiss_gameplay_side_panels_on_tap()
         return
 
     # Android system Back закрывает окно сначала, а не игру.
@@ -5420,7 +5440,7 @@ func build_shop_claw_skins() -> void:
         var equipped := selected_claw_skin == i
         var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(claw_skin_specs[i]["price"]))
         var accent: Color = claw_skin_specs[i]["color"]
-        shop_item_button("СКИН №%02d  🦾 %s" % [i + 1, String(claw_skin_specs[i]["name"])], "№%02d • Цвет клешни и металлических элементов" % [i + 1], state, accent, func(idx: int = i): buy_claw_skin(idx); refresh_shop())
+        shop_item_button("%02d  🦾 %s" % [i + 1, String(claw_skin_specs[i]["name"])], "Цвет клешни и металлических элементов", state, accent, func(idx: int = i): buy_claw_skin(idx); refresh_shop())
 
 func build_shop_toy_skins() -> void:
     shop_section("🧸  СКИНЫ ИГРУШЕК", "Оформление всей партии призов. Скин применяется к игрушкам в автомате без изменения их характеристик.")
@@ -5429,7 +5449,7 @@ func build_shop_toy_skins() -> void:
         var equipped := selected_toy_skin == i
         var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(toy_skin_specs[i]["price"]))
         var accent: Color = toy_skin_specs[i]["tint"]
-        shop_item_button("СКИН №%02d  🧸 %s" % [i + 1, String(toy_skin_specs[i]["name"])], "№%02d • Стиль плюша и расцветка коллекции" % [i + 1], state, accent, func(idx: int = i): buy_toy_skin(idx); refresh_shop())
+        shop_item_button("%02d  🧸 %s" % [i + 1, String(toy_skin_specs[i]["name"])], "Стиль плюша и расцветка коллекции", state, accent, func(idx: int = i): buy_toy_skin(idx); refresh_shop())
 
 func build_shop_machine_skins() -> void:
     shop_section("🏪  СКИНЫ АППАРАТА", "Полное оформление корпуса и подсветки. Игровая механика и физика остаются прежними.")
@@ -5438,7 +5458,7 @@ func build_shop_machine_skins() -> void:
         var equipped := selected_machine_skin == i
         var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(machine_skin_specs[i]["price"]))
         var accent: Color = machine_skin_specs[i]["light"]
-        shop_item_button("СКИН №%02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], "№%02d • Корпус + фирменная подсветка" % [i + 1], state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
+        shop_item_button("%02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], "Корпус + фирменная подсветка", state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
 
 func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
     if index < 0 or index >= specs.size(): return selected
