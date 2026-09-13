@@ -4747,7 +4747,7 @@ func update_mission_timers_light() -> void:
         var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
         if daily_timer:
             daily_timer.visible = false
-            if not daily_claim_available and daily_series_claimed_at > 0:
+            if not daily_claim_available:
                 daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
                 daily_timer.visible = true
         if hint:
@@ -4826,9 +4826,9 @@ func setup_login_streak() -> void:
 func build_daily_login_panel() -> void:
     daily_login_panel = PanelContainer.new()
     daily_login_panel.name = "DailyLoginPanel"
-    # Большая карточка привязана к правому кругу. Полностью помещается в экран
-    # и раскрывается влево от кнопки.
-    daily_login_panel.position = Vector2(310, 285)
+    # Карточка открывается непосредственно рядом с кнопкой ежедневной серии,
+    # как остальные правые информационные окна. Размер по высоте не меняем.
+    daily_login_panel.position = Vector2(630, 335)
     daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.custom_minimum_size = Vector2(300, 165)
     daily_login_panel.visible = false
@@ -4911,7 +4911,7 @@ func update_daily_login_ui() -> void:
         var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
         if daily_timer:
             daily_timer.visible = false
-            if not daily_claim_available and daily_series_claimed_at > 0:
+            if not daily_claim_available:
                 daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
                 daily_timer.visible = true
         if daily_hint:
@@ -4952,10 +4952,10 @@ func toggle_daily_login() -> void:
     daily_login_panel.visible = true
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
-    # Окно появляется у правого круга и уезжает строго влево.
-    # Правая граница финального окна остаётся немного левее круга.
-    var final_pos := Vector2(310, 285)
-    daily_login_panel.position = Vector2(620, 285)
+    # Окно появляется непосредственно рядом с правым кругом и уезжает влево.
+    # Высота и размер окна остаются прежними.
+    var final_pos := Vector2(630, 335)
+    daily_login_panel.position = Vector2(940, 335)
     daily_login_panel.modulate.a = 0.0
     var tween := create_tween()
     tween.set_parallel(true)
