@@ -5494,32 +5494,41 @@ func build_shop_claws() -> void:
         var bonus_text := "Базовый шанс захвата: +%d%%" % int(float(claw_specs[i]["bonus"]) * 100.0)
         shop_item_button("%02d  🦾 %s" % [i + 1, String(claw_specs[i]["name"])], bonus_text, state, claw_specs[i]["color"], func(idx: int = i): buy_claw(idx); refresh_shop())
 
+func skin_level_text(index: int, is_starter: bool = false) -> String:
+    var level := index + 1
+    if is_starter:
+        return "УРОВЕНЬ 1 • СТАРТОВЫЙ • БЕСПЛАТНО"
+    return "УРОВЕНЬ %d • ОТКРЫВАЕТСЯ ПОКУПКОЙ" % level
+
 func build_shop_claw_skins() -> void:
-    shop_section("🦾  СКИНЫ КЛЕШНИ", "Только внешний вид. Выберите стиль после покупки — клешня сразу изменит оформление.")
+    shop_section("🦾  СКИНЫ КЛЕШНИ", "Первый скин — стартовый и уже установлен с начала игры. Все следующие скины начинаются со 2-го уровня и имеют свой отдельный внешний стиль.")
     for i in range(claw_skin_specs.size()):
         var owned := owned_claw_skins[i]
         var equipped := selected_claw_skin == i
-        var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(claw_skin_specs[i]["price"]))
+        var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else ("%d ₽" % int(claw_skin_specs[i]["price"])))
         var accent: Color = claw_skin_specs[i]["color"]
-        shop_item_button("СКИН №%02d  🦾 %s" % [i + 1, String(claw_skin_specs[i]["name"])], "№%02d • Цвет клешни и металлических элементов" % [i + 1], state, accent, func(idx: int = i): buy_claw_skin(idx); refresh_shop())
+        var level_text := skin_level_text(i, i == 0)
+        shop_item_button("СКИН %02d  🦾 %s" % [i + 1, String(claw_skin_specs[i]["name"])], level_text + " • Цвет клешни и металлических элементов", state, accent, func(idx: int = i): buy_claw_skin(idx); refresh_shop())
 
 func build_shop_toy_skins() -> void:
-    shop_section("🧸  СКИНЫ ИГРУШЕК", "Оформление всей партии призов. Скин применяется к игрушкам в автомате без изменения их характеристик.")
+    shop_section("🧸  СКИНЫ ИГРУШЕК", "Первый скин — стартовый и уже установлен с начала игры. Все следующие скины начинаются со 2-го уровня и отличаются своей расцветкой.")
     for i in range(toy_skin_specs.size()):
         var owned := owned_toy_skins[i]
         var equipped := selected_toy_skin == i
-        var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(toy_skin_specs[i]["price"]))
+        var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else ("%d ₽" % int(toy_skin_specs[i]["price"])))
         var accent: Color = toy_skin_specs[i]["tint"]
-        shop_item_button("СКИН №%02d  🧸 %s" % [i + 1, String(toy_skin_specs[i]["name"])], "№%02d • Стиль плюша и расцветка коллекции" % [i + 1], state, accent, func(idx: int = i): buy_toy_skin(idx); refresh_shop())
+        var level_text := skin_level_text(i, i == 0)
+        shop_item_button("СКИН %02d  🧸 %s" % [i + 1, String(toy_skin_specs[i]["name"])], level_text + " • Стиль плюша и расцветка коллекции", state, accent, func(idx: int = i): buy_toy_skin(idx); refresh_shop())
 
 func build_shop_machine_skins() -> void:
-    shop_section("🏪  СКИНЫ АППАРАТА", "Полное оформление корпуса и подсветки. Игровая механика и физика остаются прежними.")
+    shop_section("🏪  СКИНЫ АППАРАТА", "Первый скин — стартовый и уже установлен с начала игры. Все следующие скины начинаются со 2-го уровня и имеют отдельный корпус и подсветку.")
     for i in range(machine_skin_specs.size()):
         var owned := owned_machine_skins[i]
         var equipped := selected_machine_skin == i
-        var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(machine_skin_specs[i]["price"]))
+        var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else ("%d ₽" % int(machine_skin_specs[i]["price"])))
         var accent: Color = machine_skin_specs[i]["light"]
-        shop_item_button("СКИН №%02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], "№%02d • Корпус + фирменная подсветка" % [i + 1], state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
+        var level_text := skin_level_text(i, i == 0)
+        shop_item_button("СКИН %02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], level_text + " • Корпус + фирменная подсветка", state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
 
 func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
     if index < 0 or index >= specs.size(): return selected
@@ -9541,9 +9550,14 @@ func load_save() -> void:
     if saved_machine_skins is Array and saved_machine_skins.size() == machine_skin_specs.size():
         owned_machine_skins = []
         for value in saved_machine_skins: owned_machine_skins.append(bool(value))
+    # Индекс 0 всегда означает стартовый скин. Индексы 1+ — магазинные скины
+    # (уровни 2+). Это сохраняет совместимость со старыми сохранениями и серверными ID.
     if not owned_claw_skins.is_empty(): owned_claw_skins[0] = true
     if not owned_toy_skins.is_empty(): owned_toy_skins[0] = true
     if not owned_machine_skins.is_empty(): owned_machine_skins[0] = true
+    selected_claw_skin = clampi(selected_claw_skin, 0, maxi(0, claw_skin_specs.size() - 1))
+    selected_toy_skin = clampi(selected_toy_skin, 0, maxi(0, toy_skin_specs.size() - 1))
+    selected_machine_skin = clampi(selected_machine_skin, 0, maxi(0, machine_skin_specs.size() - 1))
     selected_claw_skin = clampi(int(data.get("selected_claw_skin", 0)), 0, claw_skin_specs.size() - 1)
     selected_toy_skin = clampi(int(data.get("selected_toy_skin", 0)), 0, toy_skin_specs.size() - 1)
     selected_machine_skin = clampi(int(data.get("selected_machine_skin", 0)), 0, machine_skin_specs.size() - 1)
