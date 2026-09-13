@@ -4114,6 +4114,7 @@ func build_ui() -> void:
     gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
     gameplay_modal_blocker.visible = false
     gameplay_modal_blocker.z_index = 20
+    gameplay_modal_blocker.gui_input.connect(_on_gameplay_modal_blocker_gui_input)
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
     await get_tree().process_frame
@@ -4349,9 +4350,22 @@ func update_android_navigation() -> void:
     _last_nav_context = _visible_navigation_context()
 
 func _dismiss_gameplay_side_panels_on_tap(event_position: Vector2 = Vector2(-1, -1)) -> void:
-    # Отключено по запросу пользователя. Окна от круглых кнопок
-    # больше не закрываются обычным нажатием по экрану.
-    return
+    # Закрываем только окна, открытые круглыми кнопками игрового HUD.
+    # Нажатие внутри самого окна до этой функции не доходит: окно находится
+    # выше невидимого GameplayModalBlocker.
+    var has_side_panel := false
+    if hud_layer and is_instance_valid(hud_layer):
+        var mission := hud_layer.get_node_or_null("MissionDetailPanel") as Control
+        if mission and mission.visible:
+            has_side_panel = true
+    if daily_login_panel and is_instance_valid(daily_login_panel) and daily_login_panel.visible:
+        has_side_panel = true
+    if event_panel and is_instance_valid(event_panel) and event_panel.visible:
+        has_side_panel = true
+    if return_bonus_panel and is_instance_valid(return_bonus_panel) and return_bonus_panel.visible:
+        has_side_panel = true
+    if has_side_panel:
+        close_side_panels()
 
 func _on_android_back_pressed() -> void:
     var context := _visible_navigation_context()
@@ -4378,6 +4392,13 @@ func _on_android_back_pressed() -> void:
             if hud_layer.visible:
                 show_main_menu()
     update_android_navigation()
+
+func _on_gameplay_modal_blocker_gui_input(event: InputEvent) -> void:
+    # Касание/клик по свободному месту вокруг окна закрывает его.
+    # Само окно находится выше blocker и поэтому получает свои кнопки нормально.
+    if (event is InputEventScreenTouch and event.pressed) or (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
+        _dismiss_gameplay_side_panels_on_tap(event.position)
+        get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
     if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
@@ -7583,36 +7604,37 @@ func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
     control.text = ru_text if language == "ru" else en_text
 
 func build_help_panel() -> PanelContainer:
-    # Компактная помощь: всё содержимое рассчитано на один экран без прокрутки.
+    # Полноэкранная компактная помощь: без прокрутки, текст заполняет
+    # центральную часть, а соцсети и НАЗАД всегда находятся внизу.
     var p := PanelContainer.new()
-    p.position = Vector2(55, 115)
-    p.size = Vector2(970, 1120)
+    p.position = Vector2(25, 35)
+    p.size = Vector2(1030, 1850)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 24, 3)
     menu_layer.add_child(p)
 
     var root := VBoxContainer.new()
-    root.add_theme_constant_override("separation", 6)
+    root.add_theme_constant_override("separation", 7)
     p.add_child(root)
 
     var h := Label.new()
     h.text = "❓  ПОМОЩЬ"
     h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    h.add_theme_font_size_override("font_size", 31)
+    h.add_theme_font_size_override("font_size", 34)
     h.modulate = Color("#E1C29A")
     root.add_child(h)
 
     var intro := Label.new()
-    intro.text = "КРАТКАЯ СПРАВКА ПО ИГРЕ «ХВАТАЙКА»"
+    intro.text = "ПОЛНАЯ КРАТКАЯ СПРАВКА ПО ИГРЕ «ХВАТАЙКА»"
     intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    intro.add_theme_font_size_override("font_size", 14)
+    intro.add_theme_font_size_override("font_size", 15)
     intro.modulate = Color("#BCA996")
     root.add_child(intro)
 
     var body := Label.new()
-    body.text = "🎮 ИГРА — двигай клешню кнопками или джойстиком, наведи её над игрушкой и нажми «ЗАХВАТ». Успешно доставленный приз попадает в коллекцию и даёт награды.\n\n🎯 ЗАХВАТ — старайся попасть ближе к центру игрушки. Тяжёлые и неудобно лежащие призы захватывать сложнее.\n\n⭐ ПРОГРЕСС — опыт, уровни, задания, достижения, сундуки и сезонные награды развивают профиль. Прогресс сохраняется локально.\n\n🏆 РЕЙТИНГ — начисляется только за реально доставленные игрушки и новые уровни. За запуск игры или проигрыш рейтинг не увеличивается.\n\n🛒 МАГАЗИН — улучшения и скины. Скины меняют внешний вид и не меняют механику.\n\n🛠 МАСТЕРСКАЯ — модули, калибровка и другие возможности автомата.\n\n💡 СОВЕТ — не всегда самая большая игрушка лучший выбор: оцени положение приза и траекторию клешни."
+    body.text = "🎮 ИГРА — двигай клешню кнопками или джойстиком. Наведи её над выбранной игрушкой и нажми «ЗАХВАТ». После успешного подъёма приз отправляется в коллекцию.\n\n🎯 ЗАХВАТ — лучше цепляться ближе к центру игрушки. Сложнее захватываются тяжёлые, лежащие боком и зажатые между другими призами игрушки.\n\n🕹 УПРАВЛЕНИЕ — сначала оцени положение приза, затем аккуратно подведи клешню. Не спеши: точность обычно важнее скорости.\n\n🎁 ИГРУШКИ — собранные призы пополняют коллекцию. Повторные игрушки также учитываются в прогрессе и наградах игры.\n\n⭐ ПРОГРЕСС — выполняй задания, повышай уровень, получай опыт, открывай достижения, сундуки и сезонные награды. Прогресс сохраняется локально на устройстве.\n\n🏆 РЕЙТИНГ — рейтинг начисляется только за реально доставленные игрушки и новые уровни. За запуск игры, обычное движение клешни или проигрыш рейтинг не увеличивается.\n\n🛒 МАГАЗИН — здесь находятся доступные улучшения и визуальные скины. Скины меняют внешний вид и не должны менять механику захвата.\n\n🎨 СКИНЫ — купленный скин можно выбрать в соответствующей категории. Для клешни, игрушек и аппарата используются отдельные наборы внешнего вида.\n\n🛠 МАСТЕРСКАЯ — здесь находятся модули, калибровка и дополнительные возможности автомата. Следи за доступными улучшениями и выполняй задания мастерской.\n\n📅 МИССИИ — ежедневные и недельные задания дают дополнительные награды. Нажми на круглую кнопку миссии справа, чтобы посмотреть подробности. Нажатие по свободному месту вокруг открытого окна закрывает его.\n\n🎁 СУНДУКИ И НАГРАДЫ — открывай полученные сундуки и используй доступные ключи. Проверяй профиль, чтобы видеть накопленный прогресс.\n\n🌟 СЕЗОНЫ И СОБЫТИЯ — сезонные активности, пропуск и события могут давать дополнительные задания и награды.\n\n⚙ НАСТРОЙКИ — здесь можно изменить доступные параметры игры, музыку и звуки интерфейса.\n\n💡 СОВЕТ — самая большая игрушка не всегда лучший выбор. Оцени её положение, свободное пространство вокруг и траекторию клешни перед захватом.\n\n💾 СОХРАНЕНИЕ — эта версия работает локально: игровой прогресс, покупки и настройки сохраняются на устройстве."
     body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    body.add_theme_font_size_override("font_size", 15)
+    body.add_theme_font_size_override("font_size", 18)
     body.modulate = Color("#F0E1CE")
     body.size_flags_vertical = Control.SIZE_EXPAND_FILL
     root.add_child(body)
@@ -7620,27 +7642,27 @@ func build_help_panel() -> PanelContainer:
     var social_title := Label.new()
     social_title.text = "🌐  СОЦИАЛЬНЫЕ СЕТИ"
     social_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    social_title.add_theme_font_size_override("font_size", 18)
+    social_title.add_theme_font_size_override("font_size", 21)
     social_title.modulate = Color("#E1C29A")
     root.add_child(social_title)
 
     var social_hint := Label.new()
     social_hint.text = "Новости, обновления и события игры"
     social_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    social_hint.add_theme_font_size_override("font_size", 13)
+    social_hint.add_theme_font_size_override("font_size", 14)
     social_hint.modulate = Color("#BCA996")
     root.add_child(social_hint)
 
     var social_row := HBoxContainer.new()
     social_row.alignment = BoxContainer.ALIGNMENT_CENTER
-    social_row.add_theme_constant_override("separation", 10)
+    social_row.add_theme_constant_override("separation", 14)
     root.add_child(social_row)
 
     var vk := Button.new()
-    vk.text = "Ⓥ  VK  ВКонтакте"
-    vk.custom_minimum_size = Vector2(265, 54)
+    vk.text = "◉  VK  ВКонтакте"
+    vk.custom_minimum_size = Vector2(300, 62)
     style_button(vk, Color("#526F8E"))
-    vk.add_theme_font_size_override("font_size", 16)
+    vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
         current_result = "VK: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
         update_ui()
@@ -7649,9 +7671,9 @@ func build_help_panel() -> PanelContainer:
 
     var max_btn := Button.new()
     max_btn.text = "◆  MAX"
-    max_btn.custom_minimum_size = Vector2(265, 54)
+    max_btn.custom_minimum_size = Vector2(300, 62)
     style_button(max_btn, Color("#7A5D91"))
-    max_btn.add_theme_font_size_override("font_size", 16)
+    max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
         current_result = "MAX: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
         update_ui()
@@ -7660,9 +7682,9 @@ func build_help_panel() -> PanelContainer:
 
     var close := Button.new()
     close.text = "←  НАЗАД"
-    close.custom_minimum_size = Vector2(0, 64)
+    close.custom_minimum_size = Vector2(0, 70)
     style_button(close, Color("#9A7653"))
-    close.add_theme_font_size_override("font_size", 18)
+    close.add_theme_font_size_override("font_size", 20)
     close.pressed.connect(func(): show_main_menu())
     root.add_child(close)
     return p
