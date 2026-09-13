@@ -6,6 +6,11 @@ extends Node3D
 # physics-based plush prizes, animated cable/claw, smooth camera and menus.
 
 const SAVE_PATH: String = "user://claw_save.json"
+const SAVE_SCHEMA_VERSION: int = 3
+# 1.14.1 is intentionally a self-contained offline build. The online code remains
+# in the project for the later server phase, but it can never become authoritative
+# while this build is running.
+const OFFLINE_MODE: bool = true
 const PLAY_COST: int = 0
 const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
 const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
@@ -13,8 +18,8 @@ const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
 const CLAW_HOME := Vector3(PRIZE_HOLE.x, 8.20, PRIZE_HOLE.z)
 const CLAW_MIN := Vector3(-2.55, 2.70, -1.55)
 const CLAW_MAX := Vector3(2.55, 8.20, 1.55)
-const TOY_SCALE := 0.04968
-const TARGET_PRIZE_COUNT: int = 60
+const TOY_SCALE := 0.155
+const TARGET_PRIZE_COUNT: int = 30
 const MAX_PRIZE_CENTER_Y: float = 5.12
 const GRAB_SLIP_CHANCE: float = 0.22
 const CAPSULE_CHANCE: float = 0.055
@@ -44,12 +49,15 @@ var xp_to_next: int = 80
 const MAX_PLAYER_LEVEL: int = 1000
 const REFILL_THRESHOLD: int = 12
 const REFILL_AMOUNT: int = 15
-const INITIAL_PRIZE_COUNT: int = 60
+const INITIAL_PRIZE_COUNT: int = 30
 var total_games: int = 0
 var total_prizes_won: int = 0
+var rating_points: int = 0
 var rarity_wins: Dictionary = {}
 var unlocked_achievements: Dictionary = {}
 var pending_new_achievements: Array[String] = []
+var pending_achievement_rewards: Array[Dictionary] = []
+var pending_achievement_popup_text: String = ""
 var last_daily_bonus_date: String = ""
 var daily_bonus_amount: int = 25
 var best_result: String = "—"
@@ -121,6 +129,11 @@ var weekly_mission_progress: int = 0
 var weekly_mission_target: int = 12
 var weekly_mission_key: String = ""
 var weekly_mission_claimed: bool = false
+var daily_mission_name: String = "Поймай 3 игрушки"
+var weekly_mission_name: String = "Поймай 12 игрушек"
+var mission_timer_accum: float = 0.0
+var mission_popup_timer: float = 0.0
+var mission_popup_panel: PanelContainer
 var lucky_toy_index: int = 0
 var lucky_toy_date: String = ""
 var refill_animation_timer: float = 0.0
@@ -192,13 +205,8 @@ var season_pass_level: int = 1
 const SEASON_PASS_MAX_LEVEL: int = 30
 var promo_codes_used: Dictionary = {}
 var promo_status: String = ""
-var news_items: Array[Dictionary] = [
-    {"date":"08.09.2026", "title":"🆕 ХВАТАЙКА v1.8.4", "text":"Добавлен раздел «Новости»: здесь будут появляться обновления, события, новые игрушки и важные объявления."},
-    {"date":"08.09.2026", "title":"🎟 НОВЫЕ ПРОМОКОДЫ", "text":"Следи за новостями — именно здесь будут публиковаться новые промокоды и условия их получения."},
-    {"date":"08.09.2026", "title":"🎁 БОНУС ЗА ВОЗВРАЩЕНИЕ", "text":"Бонус теперь появляется отдельным кружком на игровом экране только тогда, когда он доступен."},
-    {"date":"08.09.2026", "title":"🔔 УВЕДОМЛЕНИЯ", "text":"Система уведомлений продолжает напоминать о наградах, серии, событиях, мастерской и сундуках."}
-]
-var news_unread: int = 4
+var news_items: Array[Dictionary] = []
+var news_unread: int = 0
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
@@ -216,6 +224,7 @@ var server_settings_dirty: bool = false
 var server_settings_sync_timer: float = 0.0
 var blocked_overlay: PanelContainer
 var news_menu_button: Button
+var main_menu_balance_label: Label
 var remote_config: Dictionary = {}
 var remote_news_items: Array[Dictionary] = []
 var remote_leaderboard: Array[Dictionary] = []
@@ -1197,7 +1206,10 @@ func _server_ready() -> bool:
 
 func get_server_game_state() -> Dictionary:
     return {
-        "coins": coins, "player_name": player_name, "player_avatar_index": player_avatar_index,
+        "save_schema": SAVE_SCHEMA_VERSION,
+            "offline_mode": OFFLINE_MODE,
+            "coins": coins,
+            "rating_points": rating_points, "player_name": player_name, "player_avatar_index": player_avatar_index,
         "bonus_keys": bonus_keys, "engineering_parts": engineering_parts, "chest_inventory": chest_inventory,
         "chest_keys": chest_keys, "chest_exclusive_toys": chest_exclusive_toys, "chest_exclusive_skins": chest_exclusive_skins,
         "chest_exclusive_reward_count": chest_exclusive_reward_count, "total_chests_opened": total_chests_opened,
@@ -1215,8 +1227,12 @@ func get_server_game_state() -> Dictionary:
         "best_result": best_result, "best_result_xp": best_result_xp, "current_win_streak": current_win_streak,
         "best_win_streak": best_win_streak, "total_xp_earned": total_xp_earned, "highest_reward_rubles": highest_reward_rubles,
         "perfect_grabs": perfect_grabs, "heavy_toy_wins": heavy_toy_wins, "lucky_toy_wins": lucky_toy_wins,
-        "daily_mission_progress": daily_mission_progress, "daily_mission_date": daily_mission_date,
+        "daily_mission_progress": daily_mission_progress,
+            "daily_mission_name": daily_mission_name,
+            "daily_mission_reward": daily_mission_reward, "daily_mission_date": daily_mission_date,
         "daily_mission_claimed": daily_mission_claimed, "weekly_mission_progress": weekly_mission_progress,
+            "weekly_mission_name": weekly_mission_name,
+            "weekly_mission_reward": weekly_mission_reward,
         "weekly_mission_key": weekly_mission_key, "weekly_mission_claimed": weekly_mission_claimed,
         "season_pass_xp": season_pass_xp, "season_pass_level": season_pass_level, "active_season_id": active_season_id,
         "owned_claws": owned_claws, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
@@ -1251,6 +1267,7 @@ func apply_server_game_state(data: Dictionary) -> void:
     if data.is_empty():
         return
     coins = maxi(0, int(data.get("coins", coins)))
+    rating_points = maxi(0, int(data.get("rating", rating_points)))
     player_name = String(data.get("player_name", player_name)).substr(0, 20)
     player_avatar_index = clampi(int(data.get("player_avatar_index", player_avatar_index)), 0, AVATAR_OPTIONS.size() - 1)
     bonus_keys = maxi(0, int(data.get("bonus_keys", bonus_keys)))
@@ -1310,9 +1327,11 @@ func apply_server_game_state(data: Dictionary) -> void:
     heavy_toy_wins = maxi(0, int(data.get("heavy_toy_wins", heavy_toy_wins)))
     lucky_toy_wins = maxi(0, int(data.get("lucky_toy_wins", lucky_toy_wins)))
     daily_mission_progress = maxi(0, int(data.get("daily_mission_progress", daily_mission_progress)))
+    daily_mission_name = String(data.get("daily_mission_name", daily_mission_name))
     daily_mission_date = String(data.get("daily_mission_date", daily_mission_date))
     daily_mission_claimed = bool(data.get("daily_mission_claimed", daily_mission_claimed))
     weekly_mission_progress = maxi(0, int(data.get("weekly_mission_progress", weekly_mission_progress)))
+    weekly_mission_name = String(data.get("weekly_mission_name", weekly_mission_name))
     weekly_mission_key = String(data.get("weekly_mission_key", weekly_mission_key))
     weekly_mission_claimed = bool(data.get("weekly_mission_claimed", weekly_mission_claimed))
     season_pass_xp = maxi(0, int(data.get("season_pass_xp", season_pass_xp)))
@@ -1646,7 +1665,7 @@ func sync_player_to_server() -> void:
         remote_sync_status = "ОШИБКА СИНХРОНИЗАЦИИ"
 
 func get_player_online_score() -> int:
-    return total_games * 12 + total_prizes_won * 35 + player_level * 180 + best_win_streak * 25
+    return rating_points
 
 func request_global_rating() -> void:
     if not _server_ready():
@@ -2084,7 +2103,7 @@ func redeem_promo_code(code: String) -> void:
     refresh_live_systems_panel()
 
 func get_local_leaderboard() -> Array[Dictionary]:
-    var score := total_games * 12 + total_prizes_won * 35 + player_level * 180 + best_win_streak * 25
+    var score := rating_points
     var rows: Array[Dictionary] = [
         {"name":"NEONFOX","score":score + 4200}, {"name":"CLAWMASTER","score":score + 3100},
         {"name":"TOYHUNTER","score":score + 2050}, {"name":player_name,"score":score},
@@ -2316,7 +2335,7 @@ func build_news_panel() -> PanelContainer:
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
     var v:=VBoxContainer.new(); v.name="NewsContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",12); scroll.add_child(v)
     add_panel_title(v,"📰  НОВОСТИ")
-    var intro:=Label.new(); intro.text="Здесь будут появляться новости игры, события, новые функции, игрушки и новые промокоды."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
+    var intro:=Label.new(); intro.text="Новостей пока нет. Здесь появятся обновления, события и объявления."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
     var list:=VBoxContainer.new(); list.name="NewsList"; list.add_theme_constant_override("separation",10); v.add_child(list)
     var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,74); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
     refresh_news_panel(p)
@@ -2361,7 +2380,7 @@ func refresh_rating_panel() -> void:
     var note:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/RatingNote") as Label
     var rows: Array = get_local_leaderboard() if not SERVER_AUTHORITATIVE else remote_leaderboard
     if note:
-        note.text = "🏠 ЛОКАЛЬНЫЙ РЕЙТИНГ • работает полностью без сервера" if not SERVER_AUTHORITATIVE else "🌐 ОБЩИЙ ОНЛАЙН-РЕЙТИНГ • данные игроков загружаются с сервера"
+        note.text = ("🏠 ВАШ РЕЙТИНГ: %d • начисляется только за выигранные игрушки и повышение уровня\nОчки за игрушку: обычная 1 • редкая 3 • эпическая 5 • легендарная 8" % rating_points) if not SERVER_AUTHORITATIVE else "🌐 ОБЩИЙ ОНЛАЙН-РЕЙТИНГ • данные игроков загружаются с сервера"
     for c in list.get_children():c.queue_free()
     if rows.is_empty():
         var empty := Label.new(); empty.text="Рейтинг пока пуст."; empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; empty.add_theme_font_size_override("font_size",19); list.add_child(empty); return
@@ -2625,7 +2644,7 @@ func create_loading_screen() -> void:
     loading_screen.add_child(footer)
 
     var version := Label.new()
-    version.text = "MOBILE EDITION  •  v1.13.6"
+    version.text = "MOBILE EDITION  •  v1.14.1"
     version.position = Vector2(70, 1795)
     version.size = Vector2(940, 38)
     version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -3225,6 +3244,17 @@ func build_aim_marker() -> void:
     aim_marker.position = Vector3(claw_pos.x, 3.08, claw_pos.z)
     add_child(aim_marker)
 
+func settle_prizes_after_spawn() -> void:
+    # Игрушки остаются обычными RigidBody3D: физика сама раздвигает их и укладывает на пол.
+    # Здесь только стартуем их чуть выше опоры и даём короткий импульс вниз, чтобы не было зависания.
+    for i in range(prize_bodies.size()):
+        var body := prize_bodies[i]
+        if not body or not is_instance_valid(body): continue
+        if bool(body.get_meta("refill_active",false)): continue
+        body.freeze = false
+        body.sleeping = false
+        body.linear_velocity.y = minf(body.linear_velocity.y, -0.15)
+
 func build_prizes() -> void:
     for body in prize_bodies:
         if body and is_instance_valid(body):
@@ -3234,9 +3264,11 @@ func build_prizes() -> void:
 
     if saved_prizes.is_empty():
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
+        settle_prizes_after_spawn()
         return
 
-    for saved in saved_prizes:
+    for saved_index in range(mini(saved_prizes.size(), TARGET_PRIZE_COUNT)):
+        var saved = saved_prizes[saved_index]
         if not (saved is Dictionary):
             continue
         var source_index: int = clampi(int(saved.get("source_index", 0)), 0, toys.size() - 1)
@@ -3263,6 +3295,7 @@ func build_prizes() -> void:
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         spawn_random_prizes(TARGET_PRIZE_COUNT - prize_bodies.size())
+    settle_prizes_after_spawn()
 
 func build_prizes_async() -> void:
     # Реальная последовательная загрузка игрушек. Каждая игрушка создаётся
@@ -3276,7 +3309,7 @@ func build_prizes_async() -> void:
 
     var total_to_build := INITIAL_PRIZE_COUNT
     if not saved_prizes.is_empty():
-        total_to_build = saved_prizes.size()
+        total_to_build = mini(saved_prizes.size(), TARGET_PRIZE_COUNT)
     total_to_build = maxi(total_to_build, 1)
 
     if saved_prizes.is_empty():
@@ -3288,14 +3321,16 @@ func build_prizes_async() -> void:
         return
 
     var valid_saved_count := 0
-    for saved in saved_prizes:
+    for i in range(mini(saved_prizes.size(), total_to_build)):
+        var saved = saved_prizes[i]
         if saved is Dictionary:
             valid_saved_count += 1
     if valid_saved_count <= 0:
         valid_saved_count = INITIAL_PRIZE_COUNT
 
     var loaded_count := 0
-    for saved in saved_prizes:
+    for saved_index in range(mini(saved_prizes.size(), total_to_build)):
+        var saved = saved_prizes[saved_index]
         if not (saved is Dictionary):
             continue
         loaded_count += 1
@@ -3335,6 +3370,7 @@ func build_prizes_async() -> void:
             spawn_one_random_prize(i)
             var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
             await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])
+    settle_prizes_after_spawn()
 
 func spawn_one_random_prize(n: int) -> void:
     var rng := RandomNumberGenerator.new()
@@ -3535,7 +3571,9 @@ func batch_allowed(source_index: int) -> bool:
 func refill_prizes_if_needed() -> void:
     if prize_bodies.size() <= REFILL_THRESHOLD:
         var amount: int = REFILL_AMOUNT if prize_bodies.size() > 0 else INITIAL_PRIZE_COUNT
-        spawn_random_prizes(amount, true)
+        amount = mini(amount, maxi(0, TARGET_PRIZE_COUNT - prize_bodies.size()))
+        if amount > 0:
+            spawn_random_prizes(amount, true)
         current_result = "🎁 ПОПОЛНЕНИЕ • НОВАЯ ПАРТИЯ ЗАГРУЖАЕТСЯ"
         refill_animation_timer = 3.8
         update_ui()
@@ -3546,11 +3584,11 @@ func safe_prize_position(pos: Vector3) -> Vector3:
     # Никогда не восстанавливаем сохранённую игрушку за физическими стенками.
     result.x = clampf(result.x, -2.95, 2.95)
     result.z = clampf(result.z, -1.66, 1.66)
-    result.y = clampf(result.y, 3.22, MAX_PRIZE_CENTER_Y)
+    result.y = clampf(result.y, 2.96, MAX_PRIZE_CENTER_Y)
     if absf(result.x - PRIZE_HOLE.x) < 0.82 and absf(result.z - PRIZE_HOLE.z) < 0.52 and result.y < 4.0:
         result.x = randf_range(-2.5, 1.15)
         result.z = randf_range(-1.45, 1.0)
-        result.y = clampf(result.y, 3.22, MAX_PRIZE_CENTER_Y)
+        result.y = clampf(result.y, 2.96, MAX_PRIZE_CENTER_Y)
     return result
 
 func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: Color = Color(-1, -1, -1, -1), size_factor: float = 1.0) -> RigidBody3D:
@@ -3579,9 +3617,9 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
 
     var shape := CollisionShape3D.new()
     var sphere_shape := SphereShape3D.new()
-    sphere_shape.radius = 0.27
+    sphere_shape.radius = 0.32
     shape.shape = sphere_shape
-    shape.position = Vector3(0, 0.55, 0)
+    shape.position = Vector3(0, 0.34, 0)
     body.add_child(shape)
 
     var render_color: Color = data["color"] if visual_color.a < 0.0 else visual_color
@@ -3823,6 +3861,34 @@ func get_toy_variant_color(base: Color, variant: int) -> Color:
         _:
             return base
 
+func add_generic_collection_toy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int) -> void:
+    # Полноценная 3D-заглушка для всех дополнительных коллекционных игрушек.
+    plush_piece(root,Vector3(0,0.58,0),Vector3(1.18,1.02,0.92),mat,"GenericBody")
+    plush_piece(root,Vector3(0,1.28,0),Vector3(0.82,0.78,0.76),mat,"GenericHead")
+    plush_piece(root,Vector3(-0.50,1.55,0),Vector3(0.30,0.34,0.30),mat,"GenericEarL")
+    plush_piece(root,Vector3(0.50,1.55,0),Vector3(0.30,0.34,0.30),mat,"GenericEarR")
+    plush_piece(root,Vector3(-0.62,0.55,0.08),Vector3(0.36,0.58,0.34),mat,"GenericArmL")
+    plush_piece(root,Vector3(0.62,0.55,0.08),Vector3(0.36,0.58,0.34),mat,"GenericArmR")
+    plush_face(root,1.38,0.67,white,dark,pink)
+    match variant % 8:
+        0: make_box(root,Vector3(0.68,0.16,0.20),Vector3(0,1.86,0),make_mat(Color("#B88645"),0.45,0.22),"Cap")
+        1: make_box(root,Vector3(0.20,0.80,0.16),Vector3(0,1.98,0),mat,"LongEar")
+        2: make_box(root,Vector3(0.72,0.55,0.08),Vector3(0,1.18,-0.08),mat,"Wing")
+        3: make_cylinder(root,0.12,0.55,Vector3(0,1.92,0),make_mat(Color("#C69B55"),0.6,0.2),"Horn")
+        4: make_box(root,Vector3(0.76,0.18,0.20),Vector3(0,0.72,0.50),make_mat(Color("#71879B"),0.7,0.2),"Chest")
+        5: make_box(root,Vector3(0.18,0.62,0.16),Vector3(-0.48,1.10,-0.12),mat,"FinL"); make_box(root,Vector3(0.18,0.62,0.16),Vector3(0.48,1.10,-0.12),mat,"FinR")
+        6: make_box(root,Vector3(0.55,0.20,0.10),Vector3(0,0.82,0.62),white,"Belly")
+        _: make_sphere(root,0.14,Vector3(0,1.92,0),make_mat(Color("#D9B85A"),0.65,0.18),"Badge")
+
+func add_unique_toy_identity(root: Node3D, index: int, mat: Material, dark: Material) -> void:
+    var accents := [Color("#D5B45A"),Color("#6BE7FF"),Color("#FF6FCF"),Color("#45F0A0"),Color("#F39C32"),Color("#9C78D8"),Color("#E36A43"),Color("#7BC6A8")]
+    var a := accents[abs(index) % accents.size()]
+    var badge := make_mat(a,0.45,0.24)
+    make_sphere(root,0.075,Vector3(0,0.82,0.64),badge,"IdentityBadge")
+    if index % 3 == 0:
+        make_box(root,Vector3(0.10,0.42,0.06),Vector3(-0.34,1.38,0.70),dark,"MarkL")
+        make_box(root,Vector3(0.10,0.42,0.06),Vector3(0.34,1.38,0.70),dark,"MarkR")
+
 func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> void:
     # Все призы сделаны как единая линейка мягких коллекционных игрушек:
     # крупные мягкие формы, вышитое лицо, характерные детали каждой коллекции.
@@ -3864,6 +3930,9 @@ func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> 
         29: add_cyber_cat(root,body_mat,dark,white,pink)
         30: add_mecha_bear(root,body_mat,dark,white,pink)
         31: add_robot(root,body_mat,dark,white,pink,true)
+        _: add_generic_collection_toy(root,body_mat,dark,white,pink,index)
+
+    add_unique_toy_identity(root,index,body_mat,dark)
 
     # Мягкая тканевая "сигнатура" коллекции: маленькая нашивка на груди.
     if rarity == "ЛЕГЕНДАРНАЯ":
@@ -3986,6 +4055,18 @@ func build_ui() -> void:
     top_panel.add_child(subtitle)
     main_menu_controls.append(subtitle)
 
+    var main_balance := Label.new()
+    main_menu_balance_label = main_balance
+    main_balance.name = "MainMenuBalance"
+    main_balance.position = Vector2(24, 137)
+    main_balance.size = Vector2(922, 27)
+    main_balance.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    main_balance.add_theme_font_size_override("font_size", 18)
+    main_balance.modulate = Color("#DDB47A")
+    main_balance.text = "💰 БАЛАНС: %d ₽" % coins
+    top_panel.add_child(main_balance)
+    main_menu_controls.append(main_balance)
+
     var play := make_menu_button("▶  ИГРАТЬ", Vector2(75, 265), Vector2(930, 92), Color("#A8754A"), true)
     play.pressed.connect(start_game)
     start_button = play
@@ -4053,7 +4134,7 @@ func build_ui() -> void:
     gameplay_modal_blocker = Control.new()
     gameplay_modal_blocker.name = "GameplayModalBlocker"
     gameplay_modal_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
+    gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_IGNORE
     gameplay_modal_blocker.visible = false
     gameplay_modal_blocker.z_index = 20
     hud_layer.add_child(gameplay_modal_blocker)
@@ -4173,7 +4254,9 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
         return
     scroll.set_meta("android_scroll_configured", true)
     scroll.follow_focus = true
-    scroll.scroll_deadzone = 1
+    scroll.scroll_deadzone = 2
+    scroll.scroll_vertical_custom_step = 72
+    scroll.scroll_horizontal_custom_step = 72
     scroll.add_theme_constant_override("scroll_bar_width", 20)
     scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
     if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
@@ -4480,25 +4563,26 @@ func animate_panel_out(panel: Control) -> void:
     var tween := create_tween()
     tween.set_parallel(true)
     tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-    tween.tween_property(panel, "scale", Vector2(0.96, 0.96), 0.10)
-    tween.tween_property(panel, "modulate:a", 0.0, 0.08)
+    tween.tween_property(panel, "scale", Vector2(0.96, 0.96), 0.12)
+    tween.tween_property(panel, "modulate:a", 0.0, 0.10)
+    tween.finished.connect(func():
+        if is_instance_valid(panel):
+            panel.visible = false
+            panel.scale = Vector2.ONE
+            panel.modulate.a = 1.0
+    )
 
 
 func close_side_panels(except_name: String = "") -> void:
     var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
     if mission_panel and except_name != "MissionDetailPanel" and mission_panel.visible:
         animate_panel_out(mission_panel)
-        mission_panel.visible = false
     if daily_login_panel and except_name != "DailyLoginPanel" and daily_login_panel.visible:
-        daily_login_panel.visible = false
-        daily_login_panel.scale = Vector2.ONE
-        daily_login_panel.modulate.a = 1.0
+        animate_panel_out(daily_login_panel)
     if event_panel and except_name != "EventPanel" and event_panel.visible:
         animate_panel_out(event_panel)
-        event_panel.visible = false
     if return_bonus_panel and except_name != "ReturnBonusPanel" and return_bonus_panel.visible:
         animate_panel_out(return_bonus_panel)
-        return_bonus_panel.visible = false
     update_android_navigation()
 func toggle_daily_mission() -> void:
     toggle_mission_detail(true)
@@ -4519,7 +4603,7 @@ func toggle_mission_detail(is_daily: bool) -> void:
     var detail := panel.get_node("MissionDetailVBox/MissionDetailText") as Label
     if is_daily:
         title.text = "🎯 МИССИЯ ДНЯ"
-        detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +50 ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target]
+        detail.text = "%s\nПрогресс: %d / %d\nНаграда: +%d ₽" % [daily_mission_name,daily_mission_progress,daily_mission_target,daily_mission_reward]
     else:
         title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
         detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
@@ -4566,7 +4650,7 @@ func build_daily_login_panel() -> void:
     # Большая карточка привязана к правому кругу. Полностью помещается в экран
     # и раскрывается влево от кнопки.
     daily_login_panel.position = Vector2(310, 285)
-    daily_login_panel.size = Vector2(300, 165)
+    daily_login_panel.size = Vector2(300, 150)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     hud_layer.add_child(daily_login_panel)
@@ -4580,18 +4664,18 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 12)
+    title.add_theme_font_size_override("font_size", 20)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    detail.add_theme_font_size_override("font_size", 9)
+    detail.add_theme_font_size_override("font_size", 12)
     v.add_child(detail)
 
     daily_days_container = GridContainer.new()
     daily_days_container.name = "DailyDaysGrid"
-    daily_days_container.columns = 3
+    daily_days_container.columns = 4
     daily_days_container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
     daily_days_container.add_theme_constant_override("h_separation", 4)
     daily_days_container.add_theme_constant_override("v_separation", 4)
@@ -4601,8 +4685,8 @@ func build_daily_login_panel() -> void:
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(92, 32)
-        day_button.add_theme_font_size_override("font_size", 9)
+        day_button.custom_minimum_size = Vector2(68, 28)
+        day_button.add_theme_font_size_override("font_size", 8)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
         day_button.set_meta("day_index", day)
@@ -4658,7 +4742,7 @@ func toggle_daily_login() -> void:
     if not daily_login_panel:
         return
     if daily_login_panel.visible:
-        daily_login_panel.visible = false
+        animate_panel_out(daily_login_panel)
         return
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
@@ -4901,7 +4985,7 @@ func toggle_event_panel() -> void:
     if not event_panel:
         return
     if event_panel.visible:
-        event_panel.visible = false
+        animate_panel_out(event_panel)
         return
     close_side_panels("EventPanel")
     event_panel.visible = true
@@ -4978,6 +5062,7 @@ func make_menu_circle_button(icon_text: String, tooltip_text: String, pos: Vecto
     b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), accent.lightened(0.18), 39, 4))
     b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color.WHITE, 39, 4))
     b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), accent, 39, 3))
+    b.pressed.connect(func(): play_ui_sound("button"))
     return b
 
 func make_menu_button(text_value: String, pos: Vector2, size_value: Vector2, accent: Color = CYAN, large: bool = false) -> Button:
@@ -5038,7 +5123,7 @@ func build_hud() -> void:
     var rubles_title := Label.new()
     rubles_title.text = "БАЛАНС"
     rubles_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    rubles_title.add_theme_font_size_override("font_size", 12)
+    rubles_title.add_theme_font_size_override("font_size", 20)
     rubles_title.modulate = Color("#C9B39A")
     rubles_box.add_child(rubles_title)
 
@@ -5060,7 +5145,7 @@ func build_hud() -> void:
     var level_title := Label.new()
     level_title.text = "УРОВЕНЬ"
     level_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    level_title.add_theme_font_size_override("font_size", 12)
+    level_title.add_theme_font_size_override("font_size", 20)
     level_title.modulate = Color("#C9B39A")
     level_box.add_child(level_title)
 
@@ -5111,11 +5196,21 @@ func build_hud() -> void:
     hud_layer.add_child(menu)
 
     # Виртуальный джойстик: только 4 понятных направления.
-    var pad := make_control_button("✦", Vector2(52, 1570))
+    var pad := Panel.new()
+    pad.name = "JoystickVisualPad"
+    pad.position = Vector2(52, 1570)
     pad.size = Vector2(250, 250)
-    pad.add_theme_font_size_override("font_size", 34)
-    pad.tooltip_text = "Управление клешнью"
+    pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    pad.add_theme_stylebox_override("panel", make_style(Color(0.12,0.09,0.07,0.42), Color("#76583F"), 125, 2))
     hud_layer.add_child(pad)
+    var pad_center := Label.new()
+    pad_center.text = "✦"
+    pad_center.position = Vector2(90, 78)
+    pad_center.size = Vector2(70, 70)
+    pad_center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    pad_center.add_theme_font_size_override("font_size", 30)
+    pad_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    pad.add_child(pad_center)
 
     var dirs: Array = [
         ["↑", Vector2(141, 1582), 0.0, -0.58],
@@ -5164,7 +5259,7 @@ func make_control_button(text_value: String, pos: Vector2) -> Button:
 func build_result_popup() -> void:
     result_popup = PanelContainer.new()
     result_popup.position = Vector2(90, 520)
-    result_popup.size = Vector2(900, 430)
+    result_popup.size = Vector2(900, 470)
     result_popup.visible = false
     style_panel(result_popup, Color("#A3754D"))
     hud_layer.add_child(result_popup)
@@ -5190,7 +5285,7 @@ func build_result_popup() -> void:
     v.add_child(popup_info_label)
     popup_xp_label = Label.new()
     popup_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    popup_xp_label.add_theme_font_size_override("font_size", 32)
+    popup_xp_label.add_theme_font_size_override("font_size", 30)
     popup_xp_label.modulate = Color("#E1C29A")
     v.add_child(popup_xp_label)
     popup_achievement_label = Label.new()
@@ -5221,7 +5316,7 @@ func build_shop_panel() -> PanelContainer:
     root.add_child(title)
 
     var subtitle := Label.new()
-    subtitle.text = "КЛЕШНЯ • МОДУЛИ • СКИНЫ • АППАРАТ"
+    subtitle.text = "УЛУЧШЕНИЯ • СКИНЫ КЛЕШНИ • СКИНЫ ИГРУШЕК • СКИНЫ АППАРАТА"
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     subtitle.add_theme_font_size_override("font_size", 16)
     subtitle.modulate = Color("#D7C9E8")
@@ -5231,13 +5326,13 @@ func build_shop_panel() -> PanelContainer:
     vip_button.custom_minimum_size = Vector2(0, 68)
     style_button(vip_button, Color("#C69A35"))
     vip_button.add_theme_font_size_override("font_size", 20)
-    vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); update_android_navigation())
+    vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); center_menu_panel(vip_panel); animate_panel_in(vip_panel); update_android_navigation())
     root.add_child(vip_button)
 
     var tabs := HBoxContainer.new()
     tabs.add_theme_constant_override("separation", 7)
     root.add_child(tabs)
-    var tab_specs := [["⚙  УЛУЧШЕНИЯ", "upgrades"], ["🦾  КЛЕШНИ", "claws"], ["🎨  СКИНЫ КЛЕШНИ", "claw_skins"], ["🧸  СКИНЫ ИГРУШЕК", "toy_skins"], ["🏪  СКИНЫ АППАРАТА", "machine_skins"]]
+    var tab_specs := [["⚙  УЛУЧШЕНИЯ", "upgrades"], ["🎨  СКИНЫ КЛЕШНИ", "claw_skins"], ["🧸  СКИНЫ ИГРУШЕК", "toy_skins"], ["🏪  СКИНЫ АППАРАТА", "machine_skins"]]
     for spec in tab_specs:
         var b := Button.new()
         b.text = String(spec[0])
@@ -5434,7 +5529,7 @@ func apply_shop_visuals() -> void:
     if claw and selected_claw_skin < claw_skin_specs.size():
         var c: Color = claw_skin_specs[selected_claw_skin]["color"]
         for node in claw.get_children():
-            if node is MeshInstance3D and node.name != "MotorHousing":
+            if node is MeshInstance3D:
                 var mat := node.material_override as StandardMaterial3D
                 if mat: mat.albedo_color = c
             elif node is Node3D:
@@ -5442,31 +5537,41 @@ func apply_shop_visuals() -> void:
                     if part is MeshInstance3D:
                         var pm := part.material_override as StandardMaterial3D
                         if pm: pm.albedo_color = c
-    if selected_machine_skin < machine_skin_specs.size():
+    if current_machine and selected_machine_skin < machine_skin_specs.size():
         var ms: Dictionary = machine_skin_specs[selected_machine_skin]
-        if current_machine == null:
-            return
         for node in current_machine.get_children():
             if node is MeshInstance3D:
                 var node_name := String(node.name)
-                # Перекрашиваем реальные элементы корпуса, а стекло/отверстие
-                # оставляем прозрачными и нейтральными.
                 if not node_name.contains("Glass") and not node_name.contains("Hole") and not node_name.contains("Light"):
                     var mm := node.material_override as StandardMaterial3D
                     if mm: mm.albedo_color = ms["frame"]
         for light in machine_lights:
             if light: light.light_color = ms["light"]
-    # Скин игрушек должен менять внешний вид уже созданных призов сразу после выбора.
+    # Скин игрушек меняет только основной плюш, сохраняя лицо, редкость и индивидуальность.
     if selected_toy_skin < toy_skin_specs.size():
         var tint: Color = toy_skin_specs[selected_toy_skin]["tint"]
-        for body in prize_bodies:
-            if body and is_instance_valid(body):
-                var meshes := body.find_children("", "MeshInstance3D", true, false)
-                for mesh_node in meshes:
-                    var toy_mesh := mesh_node as MeshInstance3D
-                    if toy_mesh:
-                        var toy_mat := toy_mesh.material_override as StandardMaterial3D
-                        if toy_mat: toy_mat.albedo_color = tint
+        var strength := 0.0 if selected_toy_skin == 0 else 0.34
+        for i in range(prize_bodies.size()):
+            var body := prize_bodies[i]
+            if not body or not is_instance_valid(body): continue
+            var source_index := int(prize_data[i].get("index",-1)) if i < prize_data.size() else -1
+            var base := toys[source_index]["color"] if source_index >= 0 and source_index < toys.size() else Color.WHITE
+            var blended := base.lerp(tint,strength)
+            var meshes := body.find_children("", "MeshInstance3D", true, false)
+            for mesh_node in meshes:
+                var toy_mesh := mesh_node as MeshInstance3D
+                if not toy_mesh: continue
+                var n := String(toy_mesh.name)
+                if n.contains("Eye") or n.contains("Nose") or n.contains("Muzzle") or n.contains("Badge") or n.contains("Mark"):
+                    continue
+                var sm := toy_mesh.material_override as ShaderMaterial
+                if sm and sm.shader:
+                    sm.set_shader_parameter("base_color", blended)
+                else:
+                    var std := toy_mesh.material_override as StandardMaterial3D
+                    if std: std.albedo_color = blended
+
+
 func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
@@ -5476,7 +5581,7 @@ func build_vip_panel() -> PanelContainer:
     var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
     var wallet := Label.new(); wallet.name = "VIPWallet"; wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; wallet.add_theme_font_size_override("font_size", 22); wallet.modulate = GOLD; v.add_child(wallet)
     var list := VBoxContainer.new(); list.name = "VIPList"; list.add_theme_constant_override("separation", 9); v.add_child(list)
-    var close := Button.new(); close.text = "←  В МАГАЗИН"; close.custom_minimum_size = Vector2(0, 80); style_button(close, CYAN); close.pressed.connect(func(): vip_panel.visible = false; shop_panel.visible = true; refresh_shop(); update_android_navigation()); v.add_child(close)
+    var close := Button.new(); close.text = "←  В МАГАЗИН"; close.custom_minimum_size = Vector2(0, 80); style_button(close, CYAN); close.pressed.connect(func(): animate_panel_out(vip_panel); shop_panel.visible = true; refresh_shop(); center_menu_panel(shop_panel); animate_panel_in(shop_panel); update_android_navigation()); v.add_child(close)
     refresh_vip_panel(); return p
 
 func refresh_vip_panel() -> void:
@@ -6251,6 +6356,29 @@ func build_workshop_panel() -> PanelContainer:
     v.add_child(close)
     return p
 
+func refresh_collection_panel() -> void:
+    if collection_panel and collection_panel.visible:
+        # Коллекция строится из одного каталога игрушек: имя, редкость и коллекция всегда совпадают.
+        var scroll := collection_panel.get_node_or_null("ScrollContainer") as ScrollContainer
+        if scroll:
+            var v := scroll.get_child(0) as VBoxContainer
+            if v:
+                for child in v.get_children():
+                    child.queue_free()
+                var h := Label.new(); h.text = "КОЛЛЕКЦИИ"; h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; h.add_theme_font_size_override("font_size",40); v.add_child(h)
+                for cname in get_collection_names():
+                    var needed := 0; var got := 0
+                    for toy in toys:
+                        if String(toy.get("collection","")) == cname:
+                            needed += 1
+                            if int(toy_inventory_counts.get(String(toy.get("name","")),0)) > 0: got += 1
+                    var title := Label.new(); title.text = ("🏆 " if completed_collections.has(cname) else "▣ ") + cname + " • %d/%d" % [got,needed]; title.add_theme_font_size_override("font_size",24); v.add_child(title)
+                    for toy in toys:
+                        if String(toy.get("collection","")) != cname: continue
+                        var nm := String(toy.get("name","")); var count := int(toy_inventory_counts.get(nm,0))
+                        var row := Label.new(); row.text = ("✓ " if count > 0 else "○ ") + nm + " • " + String(toy.get("rarity","")) + (" ×%d" % count if count > 1 else ""); row.add_theme_font_size_override("font_size",18); row.modulate = Color("#F0E7DC") if count > 0 else Color("#9B8D80"); v.add_child(row)
+                var close := Button.new(); close.text="НАЗАД К АВТОМАТУ"; close.custom_minimum_size=Vector2(0,82); style_button(close); close.pressed.connect(show_main_menu); v.add_child(close)
+
 func build_collection_panel() -> PanelContainer:
     var p := PanelContainer.new()
     p.position = Vector2(35, 150)
@@ -6422,7 +6550,8 @@ func refresh_achievements_panel() -> void:
         var unlocked := unlocked_achievements.has(String(spec["id"]))
         var target := int(spec.get("value", 1))
         var progress_value := mini(achievement_value(spec), target)
-        label.text = ("✓  " if unlocked else "○  ") + String(spec["name"]) + "\n     " + String(spec["desc"]) + "\n     Прогресс: %d / %d" % [progress_value, target]
+        var reward_preview := achievement_reward(spec)
+        label.text = ("✓  " if unlocked else "○  ") + String(spec["name"]) + "\n     " + String(spec["desc"]) + "\n     Прогресс: %d / %d   •   Приз: %s" % [progress_value, target, String(reward_preview.get("text","Награда"))]
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         label.add_theme_font_size_override("font_size", 18)
         label.modulate = Color("#E8D2B5") if unlocked else Color("#A58D76")
@@ -6724,7 +6853,7 @@ func build_profile_panel() -> PanelContainer:
 
     var avatar_title := Label.new()
     avatar_title.text = "ВЫБЕРИТЕ АВАТАРКУ"
-    avatar_title.add_theme_font_size_override("font_size", 12)
+    avatar_title.add_theme_font_size_override("font_size", 20)
     avatar_title.modulate = Color("#D8C3AA")
     edit.add_child(avatar_title)
 
@@ -6903,6 +7032,7 @@ func refresh_profile_panel() -> void:
 
     var stats: Array = [
         ["Баланс", "%d ₽" % coins],
+        ["Рейтинг", str(rating_points)],
         ["Всего игр", str(total_games)],
         ["Игрушек выиграно", str(total_prizes_won)],
         ["Процент побед", "%.1f%%" % win_rate],
@@ -7310,7 +7440,7 @@ func build_settings_panel() -> PanelContainer:
 
     var sep5 := Label.new(); sep5.text="ЯЗЫК"; sep5.add_theme_font_size_override("font_size",22); sep5.modulate=GOLD; v.add_child(sep5)
     language_option=OptionButton.new(); language_option.add_item("Русский"); language_option.add_item("English"); language_option.selected=0 if language=="ru" else 1; language_option.custom_minimum_size=Vector2(0,54)
-    language_option.item_selected.connect(func(idx:int): language="ru" if idx==0 else "en"; apply_language(); save_game()); v.add_child(language_option)
+    language_option.item_selected.connect(func(idx:int): play_ui_sound("select"); language="ru" if idx==0 else "en"; apply_language(); save_game()); v.add_child(language_option)
 
     var info := Label.new(); info.name="SettingsInfo"; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
     info.text = "НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ\nГрафика: %s • Лимит: %d FPS • Управление: %.2fx" % [quality_name(), fps_limit, joystick_sensitivity]
@@ -7399,44 +7529,37 @@ func update_quality_info() -> void:
 
 func apply_quality_settings() -> void:
     quality_level = clampi(quality_level, 0, 4)
-    if not is_inside_tree():
-        return
-
-    # MSAA — главный переключатель качества сглаживания на мобильном рендерере.
+    if not is_inside_tree(): return
     var viewport := get_viewport()
     if viewport:
-        match quality_level:
-            0:
-                viewport.msaa_3d = Viewport.MSAA_DISABLED
-            1:
-                viewport.msaa_3d = Viewport.MSAA_DISABLED
-            2:
-                viewport.msaa_3d = Viewport.MSAA_2X
-            3, 4:
-                viewport.msaa_3d = Viewport.MSAA_4X
-
-    # Упрощаем дорогие отражения на низких пресетах, но ничего не удаляем из игры.
+        viewport.msaa_3d = Viewport.MSAA_DISABLED if quality_level <= 1 else (Viewport.MSAA_2X if quality_level == 2 else Viewport.MSAA_4X)
     if reflection_probe and is_instance_valid(reflection_probe):
-        reflection_probe.visible = quality_level >= 2
-        reflection_probe.intensity = 0.65 if quality_level <= 1 else (0.95 if quality_level == 2 else (1.15 if quality_level == 3 else 1.25))
-
-    # Свет остаётся на всех уровнях; на низких пресетах уменьшается его стоимость.
-    var energy_mult: float = [0.62, 0.76, 0.88, 1.0, 1.08][quality_level]
-    for light in scene_lights:
+        reflection_probe.visible = quality_level >= 3
+        reflection_probe.intensity = 0.75 if quality_level == 3 else 0.9
+    var energy_mult := [0.72,0.82,0.90,0.96,1.0][quality_level]
+    for i in range(scene_lights.size()):
+        var light := scene_lights[i]
         if light and is_instance_valid(light):
-            light.shadow_enabled = quality_level >= 3
-            if light.has_meta("quality_base_energy"):
-                light.light_energy = float(light.get_meta("quality_base_energy")) * energy_mult
-            else:
+            if not light.has_meta("quality_base_energy"):
                 light.set_meta("quality_base_energy", light.light_energy)
-                light.light_energy *= energy_mult
-
-    # На низком качестве уменьшаем только визуальную детализацию материалов/сглаживание;
-    # количество игрушек, модели, механика и содержимое игры сохраняются.
+            light.light_energy = float(light.get_meta("quality_base_energy")) * energy_mult
+            # Только главный свет получает тени. Это резко дешевле на мобильных GPU.
+            light.shadow_enabled = (i == 0 and quality_level >= 3)
     if world_environment and is_instance_valid(world_environment) and world_environment.environment:
         var env := world_environment.environment
-        env.glow_enabled = quality_level >= 3
-        env.ambient_light_energy = [0.82, 0.74, 0.68, 0.65, 0.62][quality_level]
+        env.glow_enabled = false
+        env.ambient_light_energy = [0.74,0.72,0.70,0.68,0.66][quality_level]
+    # Ультра добавляет детализацию игрушек/материалов, но не включает тяжёлое освещение.
+    var fuzz_values := [0.010,0.020,0.030,0.042,0.055]
+    for body in prize_bodies:
+        if body and is_instance_valid(body):
+            body.set_meta("visual_quality", quality_level)
+            var meshes := body.find_children("", "MeshInstance3D", true, false)
+            for mesh_node in meshes:
+                var sm := mesh_node.material_override as ShaderMaterial
+                if sm and sm.shader:
+                    sm.set_shader_parameter("fuzz", fuzz_values[quality_level])
+
 
 func set_gameplay_3d_visible(show_game: bool) -> void:
     # Меню работает как отдельный экран: автомат не остаётся под окнами меню.
@@ -7484,40 +7607,49 @@ func get_capture_preview() -> float:
         chance += lucky_bonus
     return clampf(chance, 0.08, 0.90)
 
+func translate_runtime_text(text_value: String) -> String:
+    var t := text_value
+    var pairs := {
+        "БАЛАНС":"BALANCE","УРОВЕНЬ":"LEVEL","Прогресс":"Progress","Награда":"Reward","Обновится через":"Resets in",
+        "Серия":"Streak","дней":"days","День":"Day","из":"of","Поймай":"Catch","игрушки":"toys","игрушек":"toys",
+        "МИССИЯ ДНЯ":"DAILY MISSION","НЕДЕЛЬНОЕ ЗАДАНИЕ":"WEEKLY MISSION","ЕЖЕДНЕВНАЯ СЕРИЯ":"DAILY STREAK",
+        "ПРИЗ ПОЛУЧЕН":"PRIZE RECEIVED","ПРИЗ ПОЛУЧЕН!":"PRIZE RECEIVED!","ПОЛУЧЕНО":"CLAIMED","ЗАБРАТЬ":"CLAIM",
+        "НЕДОСТАТОЧНО РУБЛЕЙ":"NOT ENOUGH RUBLES","ПОЛУЧЕН":"RECEIVED","ВЫПОЛНЕНО":"COMPLETED",
+        "ОБЫЧНАЯ":"COMMON","НЕОБЫЧНАЯ":"UNCOMMON","РЕДКАЯ":"RARE","ЭПИЧЕСКАЯ":"EPIC","ЛЕГЕНДАРНАЯ":"LEGENDARY","МИФИЧЕСКАЯ":"MYTHIC",
+        "КЛЮЧИ":"KEYS","ДЕТАЛИ":"PARTS","ИГР":"GAMES","ПРИЗОВ":"PRIZES","КОЛЛЕКЦИИ":"COLLECTIONS",
+        "Новостей пока нет. Здесь появятся обновления, события и объявления.":"No news yet. Updates, events and announcements will appear here."
+    }
+    if language == "en":
+        for key in pairs.keys(): t=t.replace(String(key),String(pairs[key]))
+    return t
+
 func apply_language() -> void:
     if language_option:
         language_option.selected = 0 if language == "ru" else 1
     var dict := {
-        "▶  ИГРАТЬ":"▶  PLAY", "🛒  МАГАЗИН":"🛒  SHOP", "★  КОЛЛЕКЦИЯ":"★  COLLECTION",
-        "🏆  ДОСТИЖЕНИЯ":"🏆  ACHIEVEMENTS", "⚙  НАСТРОЙКИ":"⚙  SETTINGS", "❓  ПОМОЩЬ":"❓  HELP",
-        "МЕНЮ":"MENU", "👤\nПРОФИЛЬ":"👤\nPROFILE", "БАЛАНС":"BALANCE", "УРОВЕНЬ":"LEVEL",
-        "ЗВУК ДВИЖЕНИЯ КЛЕШНИ":"CLAW MOVEMENT SOUND", "Фоновая музыка":"Background music",
-        "Звук движения клешни":"Claw movement sound", "ГРОМКОСТЬ ЗВУКА":"SOUND VOLUME",
-        "Вибрация при нажатии «ЗАХВАТ»":"Vibration on GRAB", "Автоматические подсказки":"Automatic tips",
-        "СБРОСИТЬ ПРОГРЕСС":"RESET PROGRESS", "←  НАЗАД":"←  BACK", "←  НАЗАД К МЕНЮ":"←  BACK TO MENU",
-        "НАЗАД К АВТОМАТУ":"BACK TO MACHINE", "ЕЖЕДНЕВНАЯ СЕРИЯ":"DAILY STREAK",
-        "ЗАБРАТЬ ПРИЗ":"CLAIM REWARD", "ПРИЗ УЖЕ ПОЛУЧЕН":"REWARD CLAIMED",
-        "ПОМОЩЬ":"HELP", "КАК ИГРАТЬ?":"HOW TO PLAY?", "КОЛЛЕКЦИИ":"COLLECTIONS",
-        "МАГАЗИН":"SHOP", "НАСТРОЙКИ":"SETTINGS", "ПРОФИЛЬ ИГРОКА":"PLAYER PROFILE",
-        "👥  РЕФЕРАЛЬНАЯ СИСТЕМА":"👥  REFERRAL SYSTEM", "👥 РЕФЕРАЛЬНАЯ СИСТЕМА":"👥 REFERRAL SYSTEM",
-        "ТВОЙ РЕФЕРАЛЬНЫЙ КОД":"YOUR REFERRAL CODE", "📋 СКОПИРОВАТЬ ССЫЛКУ":"📋 COPY INVITE LINK",
-        "ЕСТЬ КОД ДРУГА?":"HAVE A FRIEND CODE?", "🎁 ПОЛУЧИТЬ ПОДАРОК":"🎁 CLAIM GIFT"
+        "ХВАТАЙКА":"KHVATAYKA","СИМУЛЯТОР АРКАДНОЙ ХВАТАЙКИ":"ARCADE CLAW SIMULATOR",
+        "▶  ИГРАТЬ":"▶  PLAY","🛒  МАГАЗИН":"🛒  SHOP","★  КОЛЛЕКЦИЯ":"★  COLLECTION","🏆  ДОСТИЖЕНИЯ":"🏆  ACHIEVEMENTS","⚙  НАСТРОЙКИ":"⚙  SETTINGS","❓  ПОМОЩЬ":"❓  HELP","МЕНЮ":"MENU","БАЛАНС":"BALANCE","УРОВЕНЬ":"LEVEL",
+        "👤\nПРОФИЛЬ":"👤\nPROFILE","НАЗАД К АВТОМАТУ":"BACK TO MACHINE","←  НАЗАД":"←  BACK","←  НАЗАД К МЕНЮ":"←  BACK TO MENU",
+        "РЕЙТИНГ":"RATING","НОВОСТИ":"NEWS","ПРОМОКОДЫ":"PROMO CODES","РЕФЕРАЛЬНАЯ СИСТЕМА":"REFERRAL SYSTEM","ЕЖЕДНЕВНАЯ СЕРИЯ":"DAILY STREAK","МИССИЯ ДНЯ":"DAILY MISSION","НЕДЕЛЬНОЕ ЗАДАНИЕ":"WEEKLY MISSION","СЕЗОННЫЙ\nПРОПУСК":"SEASON\nPASS",
+        "СКИНЫ КЛЕШНИ":"CLAW SKINS","СКИНЫ ИГРУШЕК":"TOY SKINS","СКИНЫ АППАРАТА":"MACHINE SKINS","УЛУЧШЕНИЯ":"UPGRADES",
+        "ПРИЗ ПОЛУЧЕН!":"PRIZE RECEIVED!","ДОСТИЖЕНИЯ":"ACHIEVEMENTS","КОЛЛЕКЦИИ":"COLLECTIONS","НАСТРОЙКИ СОХРАНЯЮТСЯ АВТОМАТИЧЕСКИ":"SETTINGS ARE SAVED AUTOMATICALLY",
+        "Звуки игры и интерфейса":"Game and interface sounds","Громкость эффектов":"Effects volume","Громкость музыки":"Music volume","Фоновая мелодия":"Background music","Качество":"Quality","Ограничение кадров":"FPS limit","Язык":"Language",
+        "Русский":"Russian","English":"English","Вибрация при захвате":"Vibration on grab","Автоматические подсказки":"Automatic tips","Подтверждать покупки":"Confirm purchases","Уведомления игры":"Game notifications"
     }
-    for node in get_tree().get_nodes_in_group("localized_text"):
-        if node is Label or node is Button or node is CheckButton:
-            var ru_text := String(node.get_meta("ru_text", node.text))
-            var en_text := String(node.get_meta("en_text", dict.get(ru_text, ru_text)))
-            node.text = ru_text if language == "ru" else en_text
-    # Для уже созданных элементов меню используем точное соответствие текста.
     var stack: Array[Node] = [self]
     while not stack.is_empty():
         var current: Node = stack.pop_back()
         if current is Label or current is Button or current is CheckButton:
-            var key := String(current.get_meta("ru_key", current.text))
-            if not current.has_meta("ru_key") and dict.has(key):
-                current.set_meta("ru_key", key)
-            if dict.has(key): current.text = key if language == "ru" else String(dict[key])
+            var control := current as Control
+            var text_value := String(current.text)
+            if not control.has_meta("ru_text"):
+                control.set_meta("ru_text", text_value)
+            var ru_text := String(control.get_meta("ru_text",text_value))
+            var en_text := String(dict.get(ru_text,ru_text))
+            control.text = ru_text if language == "ru" else translate_runtime_text(en_text)
         for child in current.get_children(): stack.append(child)
+    if settings_panel: update_quality_info()
+
 
 func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
     control.add_to_group("localized_text")
@@ -7527,14 +7659,21 @@ func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
 
 func build_help_panel() -> PanelContainer:
     var p := PanelContainer.new()
-    p.position = Vector2(80, 300)
-    p.size = Vector2(920, 900)
+    p.name = "HelpPanel"
+    p.position = Vector2(35, 150)
+    p.size = Vector2(1010, 1570)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
+    var scroll := ScrollContainer.new()
+    scroll.name = "HelpScroll"
+    scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    scroll.offset_left = 18; scroll.offset_top = 18; scroll.offset_right = -18; scroll.offset_bottom = -18
+    p.add_child(scroll)
     var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 16)
-    p.add_child(v)
+    v.custom_minimum_size = Vector2(940, 0)
+    v.add_theme_constant_override("separation", 14)
+    scroll.add_child(v)
     var h := Label.new()
     h.text = "❓ ПОМОЩЬ"
     h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -7542,7 +7681,7 @@ func build_help_panel() -> PanelContainer:
     h.modulate = Color("#E1C29A")
     v.add_child(h)
     var text := Label.new()
-    text.text = "КАК ИГРАТЬ?\n\n1. Перемещай клешню стрелками или джойстиком.\n2. Наведи прицел на подходящую игрушку.\n3. Следи за индикатором шанса захвата.\n4. Нажми «ЗАХВАТ» и дождись результата.\n5. Тяжёлые и скользкие игрушки сложнее удержать.\n6. Выполняй ежедневные и недельные задания.\n7. Ищи счастливую игрушку дня — она даёт x3.\n8. Следи за профилем, коллекцией и прогрессом.\n\nПодсказка: не всегда выгодно брать самую большую игрушку!"
+    text.text = "КАК ИГРАТЬ?\n\n1. Перемещай клешню стрелками или четырьмя кнопками джойстика.\n2. Наведи клешню на верхнюю игрушку.\n3. Чем точнее позиция и сильнее клешня, тем выше шанс захвата.\n4. Нажми «ЗАХВАТ» и дождись доставки приза.\n5. Редкие игрушки дают больше рублей и рейтинга.\n6. Дубли можно оставить в коллекции или продать.\n7. Следи за миссиями, ежедневной серией и таймерами.\n8. Все покупки и баланс используют один общий кошелёк.\n\nПОДСКАЗКА: не обязательно брать самую тяжёлую игрушку — точность тоже важна."
     text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     text.add_theme_font_size_override("font_size", 21)
     text.modulate = Color("#F0E1CE")
@@ -7551,7 +7690,7 @@ func build_help_panel() -> PanelContainer:
     close.text = "←  НАЗАД"
     close.custom_minimum_size = Vector2(0, 90)
     style_button(close, Color("#9A7653"))
-    close.pressed.connect(func(): show_main_menu())
+    close.pressed.connect(show_main_menu)
     v.add_child(close)
     return p
 
@@ -7594,13 +7733,23 @@ func show_main_menu() -> void:
     set_gameplay_3d_visible(false)
     set_main_menu_controls(true)
     menu_layer.visible = true
+    menu_layer.modulate.a = 0.0
+    var tween := create_tween()
+    tween.tween_property(menu_layer,"modulate:a",1.0,0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+    update_ui()
+
+func center_menu_panel(panel: Control) -> void:
+    if not panel or not is_instance_valid(panel): return
+    var safe_w := 1080.0
+    var safe_h := 1920.0
+    var x := maxf(12.0,(safe_w - panel.size.x) * 0.5)
+    var y := maxf(125.0,(safe_h - panel.size.y) * 0.5)
+    panel.position = Vector2(x,y)
 
 func open_panel(which: String) -> void:
     if not game_initialized:
         return
-    # Окна на экране аппарата работают как переключатель: открыть одно —
-    # автоматически закрыть все остальные. При этом сам аппарат остаётся видимым.
-    if which == "profile" or which == "seasons" or which == "chests" or which == "workshop" or which == "season_pass" or which == "return_bonus":
+    if which in ["profile","seasons","chests","workshop","season_pass","return_bonus"]:
         close_all_panels()
         menu_layer.visible = false
         set_main_menu_controls(false)
@@ -7608,53 +7757,44 @@ func open_panel(which: String) -> void:
         set_gameplay_3d_visible(true)
         if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
             gameplay_modal_blocker.visible = true
-        if which == "profile":
-            profile_panel.visible = true
-            refresh_profile_panel()
-        elif which == "seasons":
-            seasons_panel.visible = true
-            refresh_seasons_panel()
-        elif which == "chests":
-            chests_panel.visible = true
-            refresh_chests_panel()
-        elif which == "workshop":
-            workshop_panel.visible = true
-            refresh_workshop_panel()
-        elif which == "season_pass":
-            season_pass_panel.visible = true
-            refresh_season_pass_panel()
-        else:
-            return_bonus_panel.visible = true
-            refresh_return_bonus_panel()
+        match which:
+            "profile": profile_panel.visible = true; refresh_profile_panel(); animate_panel_in(profile_panel)
+            "seasons": seasons_panel.visible = true; refresh_seasons_panel(); animate_panel_in(seasons_panel)
+            "chests": chests_panel.visible = true; refresh_chests_panel(); animate_panel_in(chests_panel)
+            "workshop": workshop_panel.visible = true; refresh_workshop_panel(); animate_panel_in(workshop_panel)
+            "season_pass": season_pass_panel.visible = true; refresh_season_pass_panel(); animate_panel_in(season_pass_panel)
+            "return_bonus": return_bonus_panel.visible = true; refresh_return_bonus_panel(); animate_panel_in(return_bonus_panel)
+        update_android_navigation()
         return
-
-    # Обычные пункты меню открываются отдельным экраном, как и раньше.
     close_all_panels()
     set_gameplay_3d_visible(false)
     hud_layer.visible = false
     set_main_menu_controls(false)
     menu_layer.visible = true
-    if which == "shop": shop_panel.visible = true
-    elif which == "collection": collection_panel.visible = true
-    elif which == "settings": settings_panel.visible = true
-    elif which == "achievements":
-        achievements_panel.visible = true
-        refresh_achievements_panel()
-    elif which == "help":
-        help_panel.visible = true
-    elif which == "referral":
-        referral_panel.visible = true
-        refresh_referral_panel()
-    elif which == "promo":
-        promo_panel.visible = true
-        refresh_promo_panel()
-    elif which == "news":
-        news_panel.visible = true
-        refresh_news_panel()
-    elif which == "rating":
-        rating_panel.visible = true
-        refresh_rating_panel()
-        request_global_rating()
+    var panel: Control = null
+    match which:
+        "shop":
+            panel = shop_panel; shop_panel.visible = true; refresh_shop()
+        "collection":
+            panel = collection_panel; collection_panel.visible = true; refresh_collection_panel()
+        "settings":
+            panel = settings_panel; settings_panel.visible = true; update_quality_info()
+        "achievements":
+            panel = achievements_panel; achievements_panel.visible = true; refresh_achievements_panel()
+        "help":
+            panel = help_panel; help_panel.visible = true
+        "referral":
+            panel = referral_panel; referral_panel.visible = true; refresh_referral_panel()
+        "promo":
+            panel = promo_panel; promo_panel.visible = true; refresh_promo_panel()
+        "news":
+            panel = news_panel; news_panel.visible = true; refresh_news_panel()
+        "rating":
+            panel = rating_panel; rating_panel.visible = true; refresh_rating_panel(); request_global_rating()
+        _:
+            return
+    center_menu_panel(panel)
+    animate_panel_in(panel)
     update_android_navigation()
 
 func close_gameplay_overlay() -> void:
@@ -7698,6 +7838,8 @@ func close_all_panels() -> void:
 func update_ui() -> void:
     if coins_label:
         coins_label.text = "%d ₽" % coins
+    if main_menu_balance_label and is_instance_valid(main_menu_balance_label):
+        main_menu_balance_label.text = "💰 БАЛАНС: %d ₽" % coins
     if status_label:
         status_label.text = current_result
     if level_label:
@@ -7715,7 +7857,7 @@ func update_ui() -> void:
         machine_status_label.text = "🧸  ПРИЗЫ: %d\n🍀  ИГРУШКА ДНЯ: %s ×3\n🔥  СЕРИЯ ПОБЕД: %d\n📦  ПАРТИЯ: %s%s" % [prize_bodies.size(), lucky_name, current_win_streak, batch_type, active_note]
     update_missions()
     if news_menu_button and is_instance_valid(news_menu_button):
-        news_menu_button.text = "📰  НОВОСТИ  !" if news_unread > 0 else "📰  НОВОСТИ"
+        news_menu_button.text = "📰  НОВОСТИ"
 
 func _process(delta: float) -> void:
     time_alive += delta
@@ -7730,6 +7872,16 @@ func _process(delta: float) -> void:
     if connection_check_timer <= 0.0:
         connection_check_timer = 20.0
         _check_server_connection()
+    mission_timer_accum += delta
+    if mission_timer_accum >= 0.5:
+        mission_timer_accum = 0.0
+        setup_daily_systems()
+        update_mission_timer_ui()
+        apply_language()
+    if mission_popup_timer > 0.0:
+        mission_popup_timer -= delta
+        if mission_popup_timer <= 0.0 and mission_popup_panel and is_instance_valid(mission_popup_panel):
+            animate_panel_out(mission_popup_panel)
     if shop_feedback_timer > 0.0:
         shop_feedback_timer -= delta
         if shop_feedback_timer <= 0.0 and shop_feedback_label and is_instance_valid(shop_feedback_label):
@@ -7856,7 +8008,7 @@ func _process(delta: float) -> void:
     if popup_timer > 0.0:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
-            result_popup.visible = false
+            animate_panel_out(result_popup)
     if drop_state == 0 and hud_layer.visible:
         # Движение не прыгает между точками: кнопка задаёт цель, а каретка
         # плавно догоняет её с инерцией. Клавиатура также работает плавно.
@@ -7885,10 +8037,16 @@ func animate_camera(delta: float) -> void:
     camera.look_at(target_look, Vector3.UP)
 
 func animate_machine_lights() -> void:
+    var mult := [0.72,0.82,0.90,0.96,1.0][clampi(quality_level,0,4)]
     for i in range(machine_lights.size()):
         var light := machine_lights[i]
-        var base := 0.55 if i >= 3 else 2.0
-        light.light_energy = base + sin(time_alive * 1.2 + float(i)) * (0.08 if i >= 3 else 0.25)
+        if not light or not is_instance_valid(light): continue
+        if not light.has_meta("anim_base_energy"):
+            light.set_meta("anim_base_energy", light.light_energy)
+        var base := float(light.get_meta("anim_base_energy"))
+        var pulse := 0.035 if i >= 3 else 0.08
+        light.light_energy = base * mult + sin(time_alive * 1.2 + float(i)) * pulse * mult
+
 
 func process_claw(delta: float) -> void:
     if not claw: return
@@ -8326,6 +8484,7 @@ func finalize_delivered_prize() -> void:
         daily_mission_progress = mini(daily_mission_target, daily_mission_progress + 1)
         weekly_mission_progress = mini(weekly_mission_target, weekly_mission_progress + 1)
         rarity_wins[last_prize_rarity] = int(rarity_wins.get(last_prize_rarity, 0)) + 1
+        rating_points += rating_for_rarity(last_prize_rarity)
         total_xp_earned += last_prize_xp
         # Праздничный множитель действует на обычную награду тоже.
         coins += maxi(0, int(round(float(rarity_reward(last_prize_rarity)) * maxf(0.0, active_event_reward_mult - 1.0))))
@@ -8354,6 +8513,7 @@ func finalize_delivered_prize() -> void:
     complete_weekly_mission_if_ready()
     check_achievements()
     update_missions()
+    show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles)
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8480,10 +8640,11 @@ func award_toy_xp(rarity: String) -> int:
         player_xp -= xp_to_next
         player_level += 1
         xp_to_next = xp_needed_for_level(player_level)
+        rating_points += 2
         var level_reward: int = 15 + player_level * 2
         coins += level_reward
         current_result = "⬆ НОВЫЙ УРОВЕНЬ %d • +%d ₽" % [player_level, level_reward]
-        play_upgrade_sound("level")
+        play_ui_sound("reward")
     if player_level >= MAX_PLAYER_LEVEL:
         player_xp = xp_to_next
     return gained
@@ -8563,32 +8724,100 @@ func check_achievements() -> void:
             continue
         if achievement_value(spec) >= int(spec["value"]):
             unlocked_achievements[id] = true
+            var reward := grant_achievement_reward(spec)
             pending_new_achievements.append(String(spec["name"]))
+            pending_achievement_rewards.append({"name":String(spec["name"]),"reward":String(reward.get("text","Награда"))})
     if not pending_new_achievements.is_empty():
+        var chunks: Array[String] = []
+        for item in pending_achievement_rewards:
+            chunks.append("🏆 %s — %s" % [String(item.get("name","Достижение")),String(item.get("reward","Награда"))])
+        pending_achievement_popup_text = "\n".join(chunks)
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % pending_new_achievements[0]
+        if pending_prize_data.is_empty():
+            show_achievement_popup()
+
+func show_achievement_popup() -> void:
+    if pending_achievement_popup_text == "" or not result_popup:
+        return
+    var first := pending_achievement_rewards[0] if not pending_achievement_rewards.is_empty() else {}
+    popup_name_label.text = "🏆 ДОСТИЖЕНИЕ ПОЛУЧЕНО!"
+    popup_info_label.text = String(first.get("name","Новое достижение"))
+    popup_xp_label.text = String(first.get("reward","Награда получена"))
+    popup_achievement_label.text = pending_achievement_popup_text
+    popup_timer = 3.0
+    result_popup.visible = true
+    animate_panel_in(result_popup,0.94)
+    play_ui_sound("reward")
+    pending_new_achievements.clear()
+    pending_achievement_rewards.clear()
+    pending_achievement_popup_text = ""
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0) -> void:
     if not result_popup: return
     popup_name_label.text = toy_name
     popup_info_label.text = "%s  •  %s" % [cname, rarity]
+    var rating_gain := rating_for_rarity(rarity) if cname != "МОНЕТНЫЙ БОНУС" else 0
     if reward_rubles > 0:
-        popup_xp_label.text = "+%d ₽" % reward_rubles
+        popup_xp_label.text = "+%d ₽   •   +%d рейтинга   •   +%d XP" % [reward_rubles, rating_gain, xp]
     else:
-        popup_xp_label.text = "+%d XP" % xp
-    if pending_new_achievements.is_empty():
+        popup_xp_label.text = "+%d рейтинга   •   +%d XP" % [rating_gain, xp]
+    if pending_achievement_popup_text != "":
+        popup_achievement_label.text = pending_achievement_popup_text
+    elif not pending_new_achievements.is_empty():
+        popup_achievement_label.text = "🏆 ДОСТИЖДЕНИЕ: " + " • ".join(pending_new_achievements)
+    else:
         popup_achievement_label.text = ""
-    else:
-        popup_achievement_label.text = "🏆 ДОСТИЖЕНИЕ: " + " • ".join(pending_new_achievements)
     popup_timer = 3.0
     result_popup.visible = true
     pending_new_achievements.clear()
+    pending_achievement_rewards.clear()
+    pending_achievement_popup_text = ""
+
+func rating_for_rarity(rarity: String) -> int:
+    match rarity:
+        "ОБЫЧНАЯ": return 1
+        "НЕОБЫЧНАЯ": return 2
+        "РЕДКАЯ": return 3
+        "ЭПИЧЕСКАЯ": return 5
+        "ЛЕГЕНДАРНАЯ": return 8
+        "МИФИЧЕСКАЯ": return 12
+    return 1
+
+func achievement_reward(spec: Dictionary) -> Dictionary:
+    var target := int(spec.get("value",1))
+    var kind := String(spec.get("kind",""))
+    var tier := 0
+    if target >= 1000 or kind in ["xp","games"]: tier = 4
+    elif target >= 100 or kind in ["level","collections"]: tier = 3
+    elif target >= 25 or kind in ["rarity","best_streak","chests_opened"]: tier = 2
+    elif target >= 5: tier = 1
+    var rewards := [
+        {"type":"coins","amount":25,"text":"💰 +25 ₽"},
+        {"type":"parts","amount":20,"text":"⚙ +20 деталей"},
+        {"type":"keys","amount":1,"text":"🔑 +1 ключ"},
+        {"type":"coins","amount":150,"text":"💰 +150 ₽"},
+        {"type":"parts","amount":100,"text":"⚙ +100 деталей"}
+    ]
+    if kind in ["claw_skins","toy_skins","machine_skins"] and target >= 3:
+        return {"type":"coins","amount":120,"text":"💰 +120 ₽"}
+    return rewards[clampi(tier,0,rewards.size()-1)]
+
+func grant_achievement_reward(spec: Dictionary) -> Dictionary:
+    var reward := achievement_reward(spec)
+    match String(reward.get("type","coins")):
+        "coins", "rubles": coins += int(reward.get("amount",0))
+        "parts": workshop_parts += int(reward.get("amount",0)); engineering_parts += int(reward.get("amount",0))
+        "keys": bonus_keys += int(reward.get("amount",0)); chest_keys += int(reward.get("amount",0))
+    return reward
 
 func rarity_reward(rarity: String) -> int:
     match rarity:
-        "ОБЫЧНАЯ": return 8
-        "РЕДКАЯ": return 20
-        "ЭПИЧЕСКАЯ": return 50
-        "ЛЕГЕНДАРНАЯ": return 150
+        "ОБЫЧНАЯ": return 10
+        "НЕОБЫЧНАЯ": return 20
+        "РЕДКАЯ": return 40
+        "ЭПИЧЕСКАЯ": return 80
+        "ЛЕГЕНДАРНАЯ": return 160
+        "МИФИЧЕСКАЯ": return 300
     return 5
 
 func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ") -> void:
@@ -8688,6 +8917,7 @@ func show_sale_offer() -> void:
     popup_achievement_label.text = "Игрушка уже есть в коллекции. Можно оставить дубль или продать его."
     popup_timer = 0.0
     result_popup.visible = true
+    animate_panel_in(result_popup,0.94)
     if not sale_panel:
         sale_panel = PanelContainer.new()
         sale_panel.position = Vector2(90, 900)
@@ -8713,6 +8943,7 @@ func show_sale_offer() -> void:
         keep.pressed.connect(keep_duplicate)
         h.add_child(keep)
     sale_panel.visible = true
+    animate_panel_in(sale_panel,0.96)
 
 func sell_duplicate() -> void:
     if not sale_available: return
@@ -8741,6 +8972,7 @@ func keep_duplicate() -> void:
 
 func reset_progress() -> void:
     coins = 120
+    rating_points = 0
     selected_claw = 0
     owned_claws = [true, false, false, false, false, false, false, false, false, false]
     collection.clear()
@@ -8776,9 +9008,13 @@ func reset_progress() -> void:
     vibration_on = true
     auto_tips_on = true
     daily_mission_progress = 0
+    daily_mission_name = "Поймай 3 игрушки"
+    daily_mission_reward = 50
     daily_mission_date = Time.get_date_string_from_system()
     daily_mission_claimed = false
     weekly_mission_progress = 0
+    weekly_mission_name = "Поймай 12 игрушек"
+    weekly_mission_reward = 180
     weekly_mission_key = ""
     weekly_mission_claimed = false
     lucky_toy_date = ""
@@ -8855,21 +9091,82 @@ func serialize_prizes() -> Array:
     return result
 
 func setup_daily_systems() -> void:
+    var changed := false
     var today := Time.get_date_string_from_system()
     if daily_mission_date != today:
         daily_mission_date = today
         daily_mission_progress = 0
         daily_mission_claimed = false
-    var day_number := int(floor(Time.get_unix_time_from_system() / 86400.0))
-    var week_key := str(int(floor(float(day_number) / 7.0)))
+        var variants := [["Поймай 3 игрушки",3,50],["Поймай 5 игрушек",5,80],["Поймай 7 игрушек",7,100],["Поймай 4 игрушки",4,70]]
+        var pick := abs(today.hash()) % variants.size()
+        daily_mission_name = String(variants[pick][0])
+        daily_mission_target = int(variants[pick][1])
+        daily_mission_reward = int(variants[pick][2])
+        changed = true
+    var dt := Time.get_datetime_dict_from_system()
+    var weekday := int(dt.get("weekday",0))
+    var day_number := _calendar_day_number(today)
+    var monday_number := day_number - ((weekday + 6) % 7)
+    var week_key := str(monday_number)
     if weekly_mission_key != week_key:
         weekly_mission_key = week_key
         weekly_mission_progress = 0
         weekly_mission_claimed = false
-    if lucky_toy_date != today:
-        lucky_toy_date = today
-        lucky_toy_index = abs(today.hash()) % toys.size()
-    save_game()
+        var weekly_variants := [["Поймай 12 игрушек",12,180],["Поймай 20 игрушек",20,300],["Поймай 25 игрушек",25,400]]
+        var wpick := abs(week_key.hash()) % weekly_variants.size()
+        weekly_mission_name = String(weekly_variants[wpick][0])
+        weekly_mission_target = int(weekly_variants[wpick][1])
+        weekly_mission_reward = int(weekly_variants[wpick][2])
+        changed = true
+    if changed:
+        save_game()
+
+func next_daily_reset_unix() -> int:
+    var dt := Time.get_datetime_dict_from_system()
+    var elapsed := int(dt.hour) * 3600 + int(dt.minute) * 60 + int(dt.second)
+    return int(Time.get_unix_time_from_system()) + maxi(1, 86400 - elapsed)
+
+func next_weekly_reset_unix() -> int:
+    var dt := Time.get_datetime_dict_from_system()
+    var weekday := int(dt.get("weekday",0))
+    var days_to_monday := (8 - weekday) % 7
+    if days_to_monday == 0:
+        days_to_monday = 7
+    var elapsed := int(dt.hour) * 3600 + int(dt.minute) * 60 + int(dt.second)
+    return int(Time.get_unix_time_from_system()) + days_to_monday * 86400 + maxi(1, 86400 - elapsed)
+
+func update_mission_timer_ui() -> void:
+    var panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer if hud_layer else null
+    if not panel or not panel.visible: return
+    var detail := panel.get_node_or_null("MissionDetailVBox/MissionDetailText") as Label
+    if not detail: return
+    var now := int(Time.get_unix_time_from_system())
+    var daily_left := maxi(0, next_daily_reset_unix() - now)
+    var weekly_left := maxi(0, next_weekly_reset_unix() - now)
+    var is_daily := String(panel.get_meta("mission_type","daily")) == "daily"
+    if is_daily:
+        detail.text = "%s\nПрогресс: %d / %d\nНаграда: +%d ₽\n⏱ Обновится через: %s" % [daily_mission_name,daily_mission_progress,daily_mission_target,daily_mission_reward,_format_countdown(daily_left)]
+    else:
+        detail.text = "%s\nПрогресс: %d / %d\nНаграда: +%d ₽\n⏱ Обновится через: %s" % [weekly_mission_name,weekly_mission_progress,weekly_mission_target,weekly_mission_reward,_format_countdown(weekly_left)]
+
+func show_mission_completed_popup(is_daily: bool, reward: int) -> void:
+    if not hud_layer: return
+    if not mission_popup_panel:
+        mission_popup_panel = PanelContainer.new()
+        mission_popup_panel.name = "MissionCompletedPopup"
+        mission_popup_panel.position = Vector2(515, 390)
+        mission_popup_panel.size = Vector2(420, 120)
+        style_panel(mission_popup_panel, Color("#6E4B33"), Color("#C09A70"), 20, 3)
+        mission_popup_panel.z_index = 60
+        hud_layer.add_child(mission_popup_panel)
+        var l := Label.new(); l.name="MissionCompletedText"; l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER; l.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; l.add_theme_font_size_override("font_size",18); mission_popup_panel.add_child(l)
+    var label := mission_popup_panel.get_node("MissionCompletedText") as Label
+    label.text = ("🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА" if is_daily else "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНО") + "\n🎁 Награда: +%d ₽" % reward
+    mission_popup_timer = 2.6
+    mission_popup_panel.visible = true
+    animate_panel_in(mission_popup_panel,0.92)
+    play_ui_sound("reward")
+
 
 func register_game_activity() -> void:
     last_game_activity = time_alive
@@ -8889,10 +9186,11 @@ func update_missions() -> void:
         var detail := panel.get_node("MissionDetailVBox/MissionDetailText") as Label
         if is_daily:
             title.text = "🎯 МИССИЯ ДНЯ"
-            detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +50 ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target]
+            detail.text = "%s\nПрогресс: %d / %d\nНаграда: +%d ₽" % [daily_mission_name, daily_mission_progress, daily_mission_target, daily_mission_reward]
         else:
             title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
-            detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
+            detail.text = "%s\nПрогресс: %d / %d\nНаграда: +%d ₽" % [weekly_mission_name, weekly_mission_progress, weekly_mission_target, weekly_mission_reward]
+        update_mission_timer_ui()
 
 func show_waiting_screen() -> void:
     if not auto_tips_on:
@@ -8922,24 +9220,28 @@ func complete_daily_mission_if_ready() -> void:
         if _server_action("claim_daily_mission"):
             return
     if daily_mission_progress >= daily_mission_target and not daily_mission_claimed:
-        coins += server_reward_amount(daily_mission_reward)
+        coins += daily_mission_reward
         daily_mission_progress = daily_mission_target
         daily_mission_claimed = true
         total_daily_claims += 1
-        current_result = "🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(daily_mission_reward)
-        notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +50 ₽ уже получена!")
+        var exact_reward := daily_mission_reward
+        current_result = "🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА • +%d ₽" % exact_reward
+        show_mission_completed_popup(true, exact_reward)
+        notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +%d ₽ уже получена!" % exact_reward)
 
 func complete_weekly_mission_if_ready() -> void:
     if _server_ready() and player_token != "" and weekly_mission_progress >= weekly_mission_target and not weekly_mission_claimed:
         if _server_action("claim_weekly_mission"):
             return
     if weekly_mission_progress >= weekly_mission_target and not weekly_mission_claimed:
-        coins += server_reward_amount(weekly_mission_reward)
+        coins += weekly_mission_reward
         weekly_mission_progress = weekly_mission_target
         weekly_mission_claimed = true
         total_weekly_claims += 1
-        current_result = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(weekly_mission_reward)
-        notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
+        var exact_reward := weekly_mission_reward
+        current_result = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНО • +%d ₽" % exact_reward
+        show_mission_completed_popup(false, exact_reward)
+        notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +%d ₽ уже получена!" % exact_reward)
 
 func claim_daily_bonus() -> void:
     if SERVER_AUTHORITATIVE:
@@ -9025,10 +9327,10 @@ func play_ui_sound(kind: String) -> void:
 func get_profile_summary() -> String:
     var collections_done := completed_collections.size()
     var unique := collection.size()
-    return "Игрок: %s\nУровень %d  •  XP %d/%d\nИгр: %d  •  Игрушек: %d  •  Уникальных: %d\nЛучшая серия: %d  •  Идеальных захватов: %d\nКоллекции: %d/%d\nКлючи: %d  •  Детали: %d" % [player_name, player_level, player_xp, xp_to_next, total_games, total_prizes_won, unique, best_win_streak, perfect_grabs, collections_done, get_collection_names().size(), chest_keys, workshop_parts]
+    return "Игрок: %s\nУровень %d  •  XP %d/%d  •  Рейтинг %d\nИгр: %d  •  Игрушек: %d  •  Уникальных: %d\nЛучшая серия: %d  •  Идеальных захватов: %d\nКоллекции: %d/%d\nКлючи: %d  •  Детали: %d" % [player_name, player_level, player_xp, xp_to_next, rating_points, total_games, total_prizes_won, unique, best_win_streak, perfect_grabs, collections_done, get_collection_names().size(), chest_keys, workshop_parts]
 
 func get_daily_weekly_summary() -> String:
-    return "ЕЖЕДНЕВНОЕ: %d/%d   •   Награда %d ₽\nЕЖЕНЕДЕЛЬНОЕ: %d/%d   •   Награда %d ₽" % [daily_mission_progress,daily_mission_target,int(round(float(daily_mission_reward) * online_reward_multiplier)),weekly_mission_progress,weekly_mission_target,int(round(float(weekly_mission_reward) * online_reward_multiplier))]
+    return "%s: %d/%d • %d ₽\n%s: %d/%d • %d ₽" % [daily_mission_name,daily_mission_progress,daily_mission_target,daily_mission_reward,weekly_mission_name,weekly_mission_progress,weekly_mission_target,weekly_mission_reward]
 
 func refresh_upgrade_dashboard() -> void:
     update_ui()
@@ -9042,6 +9344,7 @@ func save_game() -> void:
     if f:
         f.store_string(JSON.stringify({
             "coins": coins,
+            "rating_points": rating_points,
             "player_name": player_name,
             "player_avatar_index": player_avatar_index,
             "music": music_on,
@@ -9151,9 +9454,13 @@ func save_game() -> void:
             "heavy_toy_wins": heavy_toy_wins,
             "lucky_toy_wins": lucky_toy_wins,
             "daily_mission_progress": daily_mission_progress,
+            "daily_mission_name": daily_mission_name,
+            "daily_mission_reward": daily_mission_reward,
             "daily_mission_date": daily_mission_date,
             "daily_mission_claimed": daily_mission_claimed,
             "weekly_mission_progress": weekly_mission_progress,
+            "weekly_mission_name": weekly_mission_name,
+            "weekly_mission_reward": weekly_mission_reward,
             "weekly_mission_key": weekly_mission_key,
             "weekly_mission_claimed": weekly_mission_claimed,
             "lucky_toy_index": lucky_toy_index,
@@ -9180,6 +9487,7 @@ func load_save() -> void:
     bonus_keys = int(data.get("bonus_keys", 0))
     engineering_parts = int(data.get("engineering_parts", 0))
     coins = maxi(0, int(data.get("coins", 120)))
+    rating_points = maxi(0, int(data.get("rating_points", 0)))
     selected_claw = clampi(int(data.get("claw", 0)), 0, claw_specs.size() - 1)
     music_on = bool(data.get("music", true))
     sfx_on = bool(data.get("sfx", true))
@@ -9214,10 +9522,10 @@ func load_save() -> void:
     season_pass_level = clampi(int(data.get("season_pass_level", 1)), 1, SEASON_PASS_MAX_LEVEL)
     var saved_codes: Variant = data.get("promo_codes_used", {})
     if saved_codes is Dictionary: promo_codes_used = saved_codes
-    server_url = String(data.get("server_url", DEFAULT_SERVER_URL)).strip_edges().trim_suffix("/")
-    # Migrate old cloud endpoint to the new Selectel server.
-    if server_url == "" or server_url == "https://khvataika-server.onrender.com":
-        server_url = DEFAULT_SERVER_URL
+    # Offline build: never restore a previous online endpoint from an old save.
+    # This prevents an old 1.12/1.13 save from silently changing the local mode.
+    server_url = ""
+    player_token = ""
     player_id = String(data.get("player_id", ""))
     quality_level = clampi(int(data.get("quality_level", 2)), 0, 4)
     var saved_upgrades: Variant = data.get("upgrades", upgrade_levels)
@@ -9250,6 +9558,7 @@ func load_save() -> void:
     selected_claw_skin = clampi(int(data.get("selected_claw_skin", 0)), 0, claw_skin_specs.size() - 1)
     selected_toy_skin = clampi(int(data.get("selected_toy_skin", 0)), 0, toy_skin_specs.size() - 1)
     selected_machine_skin = clampi(int(data.get("selected_machine_skin", 0)), 0, machine_skin_specs.size() - 1)
+    if shop_category == "claws": shop_category = "upgrades"
     var saved_vip: Variant = data.get("vip_owned", [])
     vip_owned.resize(vip_specs.size())
     for i in range(vip_owned.size()): vip_owned[i] = false
