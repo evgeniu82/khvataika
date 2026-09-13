@@ -4410,6 +4410,42 @@ func _on_gameplay_modal_blocker_gui_input(event: InputEvent) -> void:
         _dismiss_gameplay_side_panels_on_tap(event.position)
         get_viewport().set_input_as_handled()
 
+func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
+    # Ищем только в момент свайпа — ничего не перебираем во время запуска игры.
+    for child in node.get_children():
+        if child is Control and child.visible:
+            var control := child as Control
+            if control.get_global_rect().has_point(point):
+                var nested := _find_scroll_container_at(child, point)
+                if nested:
+                    return nested
+                if child is ScrollContainer:
+                    var scroll := child as ScrollContainer
+                    if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+                        return scroll
+        elif child.get_child_count() > 0:
+            var nested := _find_scroll_container_at(child, point)
+            if nested:
+                return nested
+    return null
+
+func _handle_free_screen_scroll(event: InputEventScreenDrag) -> bool:
+    var scroll := _find_scroll_container_at(self, event.position)
+    if scroll == null:
+        return false
+    var content_height := scroll.get_v_scroll_bar().max_value
+    if content_height <= 0.0:
+        return false
+    scroll.scroll_vertical = clampf(scroll.scroll_vertical - event.relative.y, 0.0, content_height)
+    return true
+
+func _input(event: InputEvent) -> void:
+    # Свободный свайп по любому видимому вертикальному окну.
+    # Обрабатывается только движение пальца, поэтому обычные кнопки не затрагиваются.
+    if event is InputEventScreenDrag:
+        if _handle_free_screen_scroll(event):
+            get_viewport().set_input_as_handled()
+
 func _unhandled_input(event: InputEvent) -> void:
     if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
         get_viewport().set_input_as_handled()
