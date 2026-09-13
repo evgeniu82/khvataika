@@ -7583,33 +7583,88 @@ func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
     control.text = ru_text if language == "ru" else en_text
 
 func build_help_panel() -> PanelContainer:
+    # Компактная помощь: всё содержимое рассчитано на один экран без прокрутки.
     var p := PanelContainer.new()
-    p.position = Vector2(80, 300)
-    p.size = Vector2(920, 900)
+    p.position = Vector2(55, 115)
+    p.size = Vector2(970, 1120)
     p.visible = false
-    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+    style_panel(p, Color("#241B16"), Color("#76583F"), 24, 3)
     menu_layer.add_child(p)
-    var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 16)
-    p.add_child(v)
+
+    var root := VBoxContainer.new()
+    root.add_theme_constant_override("separation", 6)
+    p.add_child(root)
+
     var h := Label.new()
-    h.text = "❓ ПОМОЩЬ"
+    h.text = "❓  ПОМОЩЬ"
     h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    h.add_theme_font_size_override("font_size", 36)
+    h.add_theme_font_size_override("font_size", 31)
     h.modulate = Color("#E1C29A")
-    v.add_child(h)
-    var text := Label.new()
-    text.text = "КАК ИГРАТЬ?\n\n1. Перемещай клешню стрелками или джойстиком.\n2. Наведи прицел на подходящую игрушку.\n3. Следи за индикатором шанса захвата.\n4. Нажми «ЗАХВАТ» и дождись результата.\n5. Тяжёлые и скользкие игрушки сложнее удержать.\n6. Выполняй ежедневные и недельные задания.\n7. Ищи счастливую игрушку дня — она даёт x3.\n8. Следи за профилем, коллекцией и прогрессом.\n\nПодсказка: не всегда выгодно брать самую большую игрушку!"
-    text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    text.add_theme_font_size_override("font_size", 21)
-    text.modulate = Color("#F0E1CE")
-    v.add_child(text)
+    root.add_child(h)
+
+    var intro := Label.new()
+    intro.text = "КРАТКАЯ СПРАВКА ПО ИГРЕ «ХВАТАЙКА»"
+    intro.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    intro.add_theme_font_size_override("font_size", 14)
+    intro.modulate = Color("#BCA996")
+    root.add_child(intro)
+
+    var body := Label.new()
+    body.text = "🎮 ИГРА — двигай клешню кнопками или джойстиком, наведи её над игрушкой и нажми «ЗАХВАТ». Успешно доставленный приз попадает в коллекцию и даёт награды.\n\n🎯 ЗАХВАТ — старайся попасть ближе к центру игрушки. Тяжёлые и неудобно лежащие призы захватывать сложнее.\n\n⭐ ПРОГРЕСС — опыт, уровни, задания, достижения, сундуки и сезонные награды развивают профиль. Прогресс сохраняется локально.\n\n🏆 РЕЙТИНГ — начисляется только за реально доставленные игрушки и новые уровни. За запуск игры или проигрыш рейтинг не увеличивается.\n\n🛒 МАГАЗИН — улучшения и скины. Скины меняют внешний вид и не меняют механику.\n\n🛠 МАСТЕРСКАЯ — модули, калибровка и другие возможности автомата.\n\n💡 СОВЕТ — не всегда самая большая игрушка лучший выбор: оцени положение приза и траекторию клешни."
+    body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    body.add_theme_font_size_override("font_size", 15)
+    body.modulate = Color("#F0E1CE")
+    body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    root.add_child(body)
+
+    var social_title := Label.new()
+    social_title.text = "🌐  СОЦИАЛЬНЫЕ СЕТИ"
+    social_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    social_title.add_theme_font_size_override("font_size", 18)
+    social_title.modulate = Color("#E1C29A")
+    root.add_child(social_title)
+
+    var social_hint := Label.new()
+    social_hint.text = "Новости, обновления и события игры"
+    social_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    social_hint.add_theme_font_size_override("font_size", 13)
+    social_hint.modulate = Color("#BCA996")
+    root.add_child(social_hint)
+
+    var social_row := HBoxContainer.new()
+    social_row.alignment = BoxContainer.ALIGNMENT_CENTER
+    social_row.add_theme_constant_override("separation", 10)
+    root.add_child(social_row)
+
+    var vk := Button.new()
+    vk.text = "Ⓥ  VK  ВКонтакте"
+    vk.custom_minimum_size = Vector2(265, 54)
+    style_button(vk, Color("#526F8E"))
+    vk.add_theme_font_size_override("font_size", 16)
+    vk.pressed.connect(func():
+        current_result = "VK: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
+        update_ui()
+    )
+    social_row.add_child(vk)
+
+    var max_btn := Button.new()
+    max_btn.text = "◆  MAX"
+    max_btn.custom_minimum_size = Vector2(265, 54)
+    style_button(max_btn, Color("#7A5D91"))
+    max_btn.add_theme_font_size_override("font_size", 16)
+    max_btn.pressed.connect(func():
+        current_result = "MAX: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
+        update_ui()
+    )
+    social_row.add_child(max_btn)
+
     var close := Button.new()
     close.text = "←  НАЗАД"
-    close.custom_minimum_size = Vector2(0, 90)
+    close.custom_minimum_size = Vector2(0, 64)
     style_button(close, Color("#9A7653"))
+    close.add_theme_font_size_override("font_size", 18)
     close.pressed.connect(func(): show_main_menu())
-    v.add_child(close)
+    root.add_child(close)
     return p
 
 func start_game() -> void:
