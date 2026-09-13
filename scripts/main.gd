@@ -4217,7 +4217,49 @@ func build_ui() -> void:
     await get_tree().process_frame
     await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
     await get_tree().process_frame
-    await set_loading_progress(96.0, "НАСТРОЙКА ЗАВЕРШЕНА")
+    await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
+    setup_android_scrolls()
+    await get_tree().process_frame
+    await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
+
+func setup_android_scrolls() -> void:
+    # Единая настройка прокрутки для всех длинных окон под Android.
+    # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
+    # остаётся достаточно широкой для точного захвата.
+    var stack: Array[Node] = [self]
+    while not stack.is_empty():
+        var current: Node = stack.pop_back()
+        if current is ScrollContainer:
+            configure_android_scroll(current)
+        for child in current.get_children():
+            stack.append(child)
+
+func configure_android_scroll(scroll: ScrollContainer) -> void:
+    if scroll.has_meta("android_scroll_configured"):
+        return
+    scroll.set_meta("android_scroll_configured", true)
+    scroll.follow_focus = true
+    scroll.scroll_deadzone = 1
+    scroll.add_theme_constant_override("scroll_bar_width", 20)
+    scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
+    if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+        scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    else:
+        # Горизонтальные категории листаются влево/вправо отдельно.
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+    # Свободная прокрутка пальцем: не нужно попадать в ползунок сбоку.
+    if not scroll.has_meta("free_touch_scroll_connected"):
+        scroll.set_meta("free_touch_scroll_connected", true)
+        scroll.gui_input.connect(func(event: InputEvent):
+            if event is InputEventScreenDrag:
+                if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+                    scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(event.relative.y)), 0, maxi(0, int(scroll.get_v_scroll_bar().max_value - scroll.get_v_scroll_bar().page)))
+                elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+                    scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(event.relative.x)), 0, maxi(0, int(scroll.get_h_scroll_bar().max_value - scroll.get_h_scroll_bar().page)))
+                get_viewport().set_input_as_handled()
+        )
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -8316,6 +8358,13 @@ func is_claw_over_prize_hole() -> bool:
 
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
+    # Если клешня уже непосредственно над отверстием, захват не запускаем.
+    # Это проверяется до звука, счётчика игры и серверного запроса.
+    if is_claw_over_prize_hole():
+        current_result = "НАД ОТВЕРСТИЕМ — ЗАХВАТ НЕВОЗМОЖЕН"
+        play_upgrade_sound("fail")
+        update_ui()
+        return
     play_upgrade_sound("grab")
     register_game_activity()
     if _server_ready():
