@@ -97,26 +97,7 @@ jobs:
           # installation failures on devices that require 16 KB pages.
           APP_GRADLE="$(find android/build -path '*/app/build.gradle' -type f -print -quit)"
           test -n "$APP_GRADLE"
-          python3 - "$APP_GRADLE" <<'PY2'
-from pathlib import Path
-import sys
-p = Path(sys.argv[1])
-s = p.read_text()
-if 'useLegacyPackaging true' not in s:
-    marker = 'android {'
-    pos = s.find(marker)
-    if pos < 0:
-        raise SystemExit('android block not found in app/build.gradle')
-    insert = '''android {
-    packagingOptions {
-        jniLibs {
-            useLegacyPackaging true
-        }
-    }'''
-    s = insert + s[pos + len(marker):]
-    p.write_text(s)
-print(f'Enabled legacy JNI packaging in {p}')
-PY2
+          python3 -c 'from pathlib import Path; import sys; p=Path(sys.argv[1]); s=p.read_text(); marker="android {"; pos=s.find(marker); assert pos>=0, "android block not found in app/build.gradle"; s=s if "useLegacyPackaging true" in s else s[:pos]+"android {\\n    packagingOptions {\\n        jniLibs {\\n            useLegacyPackaging true\\n        }\\n    }"+s[pos+len(marker):]; p.write_text(s)' "$APP_GRADLE"
           test -f "$APP_GRADLE"
           grep -q 'useLegacyPackaging true' "$APP_GRADLE"
 
