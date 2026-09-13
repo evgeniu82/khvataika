@@ -5421,7 +5421,7 @@ func build_shop_claw_skins() -> void:
         var equipped := selected_claw_skin == i
         var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(claw_skin_specs[i]["price"]))
         var accent: Color = claw_skin_specs[i]["color"]
-        shop_item_button("%02d  🦾 %s" % [i + 1, String(claw_skin_specs[i]["name"])], "Цвет клешни и металлических элементов", state, accent, func(idx: int = i): buy_claw_skin(idx); refresh_shop())
+        shop_item_button("СКИН №%02d  🦾 %s" % [i + 1, String(claw_skin_specs[i]["name"])], "№%02d • Цвет клешни и металлических элементов" % [i + 1], state, accent, func(idx: int = i): buy_claw_skin(idx); refresh_shop())
 
 func build_shop_toy_skins() -> void:
     shop_section("🧸  СКИНЫ ИГРУШЕК", "Оформление всей партии призов. Скин применяется к игрушкам в автомате без изменения их характеристик.")
@@ -5430,7 +5430,7 @@ func build_shop_toy_skins() -> void:
         var equipped := selected_toy_skin == i
         var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(toy_skin_specs[i]["price"]))
         var accent: Color = toy_skin_specs[i]["tint"]
-        shop_item_button("%02d  🧸 %s" % [i + 1, String(toy_skin_specs[i]["name"])], "Стиль плюша и расцветка коллекции", state, accent, func(idx: int = i): buy_toy_skin(idx); refresh_shop())
+        shop_item_button("СКИН №%02d  🧸 %s" % [i + 1, String(toy_skin_specs[i]["name"])], "№%02d • Стиль плюша и расцветка коллекции" % [i + 1], state, accent, func(idx: int = i): buy_toy_skin(idx); refresh_shop())
 
 func build_shop_machine_skins() -> void:
     shop_section("🏪  СКИНЫ АППАРАТА", "Полное оформление корпуса и подсветки. Игровая механика и физика остаются прежними.")
@@ -5439,7 +5439,7 @@ func build_shop_machine_skins() -> void:
         var equipped := selected_machine_skin == i
         var state := "✓ УСТАНОВЛЕНО" if equipped else ("✓ КУПЛЕНО • НАЖМИТЕ, ЧТОБЫ НАДЕТЬ" if owned else "%d ₽" % int(machine_skin_specs[i]["price"]))
         var accent: Color = machine_skin_specs[i]["light"]
-        shop_item_button("%02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], "Корпус + фирменная подсветка", state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
+        shop_item_button("СКИН №%02d  🏪 %s" % [i + 1, String(machine_skin_specs[i]["name"])], "№%02d • Корпус + фирменная подсветка" % [i + 1], state, accent, func(idx: int = i): buy_machine_skin(idx); refresh_shop())
 
 func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
     if index < 0 or index >= specs.size(): return selected
