@@ -4550,12 +4550,6 @@ func build_extra_hud() -> void:
     md.add_theme_font_size_override("font_size", 18)
     mv.add_child(md)
 
-    var mission_timer := Label.new()
-    mission_timer.name = "MissionDetailTimer"
-    mission_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    mission_timer.add_theme_font_size_override("font_size", 12)
-    mission_timer.modulate = Color("#E1C29A")
-    mv.add_child(mission_timer)
 
 func animate_panel_in(panel: Control, from_scale: float = 0.94) -> void:
     if not panel or not is_instance_valid(panel): return
@@ -4620,15 +4614,12 @@ func toggle_mission_detail(is_daily: bool) -> void:
     panel.set_meta("mission_type", "daily" if is_daily else "weekly")
     var title := panel.get_node("MissionDetailVBox/MissionDetailTitle") as Label
     var detail := panel.get_node("MissionDetailVBox/MissionDetailText") as Label
-    var timer_label := panel.get_node("MissionDetailVBox/MissionDetailTimer") as Label
     if is_daily:
         title.text = "🎯 МИССИЯ ДНЯ"
         detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +50 ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target]
-        timer_label.text = "⏱ Обновление через %s" % _format_hud_countdown(_seconds_until_next_midnight())
     else:
         title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
         detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
-        timer_label.text = "⏱ Обновление через %s" % _format_hud_countdown(_seconds_until_next_week_reset(), true)
     panel.visible = true
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
@@ -4698,13 +4689,6 @@ func build_daily_login_panel() -> void:
     detail.add_theme_font_size_override("font_size", 9)
     v.add_child(detail)
 
-    var daily_timer := Label.new()
-    daily_timer.name = "DailyLoginTimer"
-    daily_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    daily_timer.add_theme_font_size_override("font_size", 9)
-    daily_timer.modulate = Color("#E1C29A")
-    v.add_child(daily_timer)
-
     daily_days_container = GridContainer.new()
     daily_days_container.name = "DailyDaysGrid"
     daily_days_container.columns = 3
@@ -4737,16 +4721,9 @@ func build_daily_login_panel() -> void:
 
 func update_daily_login_ui() -> void:
     if not daily_claim_button: return
-    # Этот метод уже вызывается игровым циклом в стабильной версии 1.16.2,
-    # поэтому отдельный новый _process для таймеров не нужен.
     var mission_panel: PanelContainer = null
     if hud_layer:
         mission_panel = hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
-    if mission_panel and mission_panel.visible:
-        var mission_timer := mission_panel.get_node_or_null("MissionDetailVBox/MissionDetailTimer") as Label
-        if mission_timer:
-            var is_daily := String(mission_panel.get_meta("mission_type", "daily")) == "daily"
-            mission_timer.text = "⏱ Обновление через %s" % (_format_hud_countdown(_seconds_until_next_midnight()) if is_daily else _format_hud_countdown(_seconds_until_next_week_reset(), true))
     if daily_claim_available:
         daily_claim_button.modulate.a = 0.65 + 0.35 * (0.5 + 0.5 * sin(time_alive * 5.0))
     else:
@@ -4758,10 +4735,6 @@ func update_daily_login_ui() -> void:
         var reward := 20 + current_day * 5
         if detail:
             detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
-        var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
-        if daily_timer:
-            daily_timer.text = "⏱ Новый день через %s" % _format_hud_countdown(_seconds_until_next_midnight())
-
         for i in range(daily_day_buttons.size()):
             var day := i + 1
             var btn := daily_day_buttons[i]
@@ -9315,36 +9288,6 @@ func register_game_activity() -> void:
     waiting_idle_time = 0.0
     if waiting_overlay:
         waiting_overlay.visible = false
-
-func _seconds_until_next_midnight() -> int:
-    var now_unix := int(Time.get_unix_time_from_system())
-    var dt := Time.get_datetime_dict_from_system()
-    var midnight := Time.get_unix_time_from_datetime_dict({
-        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + 1,
-        "hour":0, "minute":0, "second":0
-    })
-    return maxi(0, int(midnight) - now_unix)
-
-func _seconds_until_next_week_reset() -> int:
-    var now_unix := int(Time.get_unix_time_from_system())
-    var dt := Time.get_datetime_dict_from_system()
-    var weekday := int(dt.get("weekday", 0))
-    var days_until_monday := 7 if weekday == 1 else ((8 - weekday) % 7)
-    var reset_unix := Time.get_unix_time_from_datetime_dict({
-        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + days_until_monday,
-        "hour":0, "minute":0, "second":0
-    })
-    return maxi(0, int(reset_unix) - now_unix)
-
-func _format_hud_countdown(seconds_left: int, weekly: bool = false) -> String:
-    var total := maxi(0, seconds_left)
-    var days := int(total / 86400)
-    var hours := int((total % 86400) / 3600)
-    var minutes := int((total % 3600) / 60)
-    var seconds := int(total % 60)
-    if weekly:
-        return "%dд %02d:%02d" % [days, hours, minutes]
-    return "%02d:%02d:%02d" % [hours, minutes, seconds]
 
 func update_missions() -> void:
     if not hud_layer or not is_instance_valid(hud_layer):
