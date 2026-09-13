@@ -4123,7 +4123,7 @@ func build_ui() -> void:
     gameplay_modal_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
     gameplay_modal_blocker.visible = false
-    gameplay_modal_blocker.z_index = 10
+    gameplay_modal_blocker.z_index = 20
     gameplay_modal_blocker.gui_input.connect(_on_gameplay_modal_blocker_gui_input)
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
@@ -4252,17 +4252,6 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
         # Горизонтальные категории листаются влево/вправо отдельно.
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     scroll.mouse_filter = Control.MOUSE_FILTER_STOP
-    # Свободная прокрутка пальцем: не нужно попадать в ползунок сбоку.
-    if not scroll.has_meta("free_touch_scroll_connected"):
-        scroll.set_meta("free_touch_scroll_connected", true)
-        scroll.gui_input.connect(func(event: InputEvent):
-            if event is InputEventScreenDrag:
-                if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-                    scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(event.relative.y)), 0, maxi(0, int(scroll.get_v_scroll_bar().max_value - scroll.get_v_scroll_bar().page)))
-                elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-                    scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(event.relative.x)), 0, maxi(0, int(scroll.get_h_scroll_bar().max_value - scroll.get_h_scroll_bar().page)))
-                get_viewport().set_input_as_handled()
-        )
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -4776,6 +4765,7 @@ func toggle_daily_login() -> void:
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
     daily_login_panel.visible = true
+    daily_login_panel.z_index = 20
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
     # Окно появляется у правого круга и уезжает строго влево.
@@ -5021,6 +5011,7 @@ func toggle_event_panel() -> void:
         return
     close_side_panels("EventPanel")
     event_panel.visible = true
+    event_panel.z_index = 20
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
     update_event_panel()
@@ -6443,11 +6434,6 @@ func build_collection_panel() -> PanelContainer:
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
-        var reward_line := Label.new()
-        reward_line.text = "🎁 " + collection_completion_reward_text(cname)
-        reward_line.add_theme_font_size_override("font_size", 17)
-        reward_line.modulate = Color("#D5B45A") if not done else Color("#F0D4A9")
-        card.add_child(reward_line)
         var names := Label.new()
         var parts: Array[String] = []
         for toy in toys:
@@ -8084,8 +8070,6 @@ func _process(delta: float) -> void:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
             result_popup.visible = false
-            if not pending_collection_completion.is_empty():
-                show_collection_completion_popup()
     if drop_state == 0 and hud_layer.visible:
         # Движение не прыгает между точками: кнопка задаёт цель, а каретка
         # плавно догоняет её с инерцией. Клавиатура также работает плавно.
@@ -8579,7 +8563,6 @@ func finalize_delivered_prize() -> void:
             if last_prize_xp > best_result_xp:
                 best_result_xp = last_prize_xp
                 best_result = "%s • +%d XP" % [last_prize_name, last_prize_xp]
-        check_collection_completion(last_prize_collection)
         current_result = "🎉 ДОСТАЛ: %s • %s" % [last_prize_name, last_prize_rarity]
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
@@ -8770,25 +8753,8 @@ func show_collection_completion_popup() -> void:
     pending_collection_completion.clear()
 
 func check_collection_completion(collection_name: String) -> void:
-    if completed_collections.has(collection_name):
-        return
-    var needed: int = 0
-    var got: int = 0
-    for toy in toys:
-        if String(toy["collection"]) == collection_name:
-            needed += 1
-            if collection.has(String(toy["name"])):
-                got += 1
-    if needed > 0 and got >= needed:
-        completed_collections[collection_name] = true
-        var reward := collection_completion_reward(collection_name)
-        coins += int(reward.get("rubles", 0))
-        workshop_parts += int(reward.get("parts", 0))
-        chest_keys += int(reward.get("keys", 0))
-        total_keys_earned += int(reward.get("keys", 0))
-        pending_collection_completion = {"name":collection_name, "reward_text":collection_completion_reward_text(collection_name)}
-        current_result = "🏆 КОЛЛЕКЦИЯ «%s» СОБРАНА" % collection_name
-        check_achievements()
+    # Функция отключена: награда за полную коллекцию больше не используется.
+    return
 
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
