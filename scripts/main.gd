@@ -491,6 +491,8 @@ var popup_xp_label: Label
 var popup_rating_label: Label
 var popup_title_label: Label
 var popup_timer: float = 0.0
+var active_touch_scroll: ScrollContainer = null
+var active_touch_id: int = -1
 var popup_achievement_label: Label
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
@@ -3649,6 +3651,10 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
 
     var render_color: Color = data["color"] if visual_color.a < 0.0 else visual_color
     make_toy_visual(body, index, String(data["rarity"]), render_color)
+    body.set_meta("toy_source_index", index)
+    body.set_meta("toy_name", String(data.get("name", "Игрушка")))
+    body.set_meta("toy_collection", String(data.get("collection", "")))
+    body.set_meta("toy_rarity", String(data.get("rarity", "ОБЫЧНАЯ")))
     body.rotation.y = randf_range(-0.5, 0.5)
     return body
 
@@ -3658,11 +3664,15 @@ func plush_piece(root: Node3D, pos: Vector3, scale: Vector3, mat: Material, name
     return n
 
 func plush_face(root: Node3D, face_y: float, face_z: float, white: Material, dark: Material, pink: Material) -> void:
-    make_sphere(root, 0.075, Vector3(-0.16, face_y, face_z), dark, "EyeL")
-    make_sphere(root, 0.075, Vector3(0.16, face_y, face_z), dark, "EyeR")
-    make_sphere(root, 0.030, Vector3(-0.135, face_y + 0.025, face_z + 0.055), white, "EyeSparkL")
-    make_sphere(root, 0.030, Vector3(0.185, face_y + 0.025, face_z + 0.055), white, "EyeSparkR")
-    make_sphere(root, 0.055, Vector3(0, face_y - 0.17, face_z + 0.045), pink, "Nose")
+    # Масштаб игрушек не увеличиваем. Исправляем только геометрию лица:
+    # глаза симметричны, нос строго между ними, рот находится под носом.
+    make_sphere(root, 0.075, Vector3(-0.16, face_y, face_z + 0.015), dark, "EyeL")
+    make_sphere(root, 0.075, Vector3(0.16, face_y, face_z + 0.015), dark, "EyeR")
+    make_sphere(root, 0.030, Vector3(-0.135, face_y + 0.025, face_z + 0.070), white, "EyeSparkL")
+    make_sphere(root, 0.030, Vector3(0.135, face_y + 0.025, face_z + 0.070), white, "EyeSparkR")
+    make_sphere(root, 0.055, Vector3(0, face_y - 0.17, face_z + 0.060), pink, "Nose")
+    var mouth := make_sphere(root, 0.060, Vector3(0, face_y - 0.285, face_z + 0.055), dark, "Mouth")
+    mouth.scale = Vector3(1.35, 0.45, 0.55)
 
 func add_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     plush_piece(root, Vector3(0,0.55,0), Vector3(1.12,1.02,0.88), mat, "RoundBody")
@@ -3735,6 +3745,8 @@ func add_turtle(root: Node3D, mat: Material, dark: Material, white: Material, pi
         plush_piece(root,pos,Vector3(0.36,0.22,0.30),mat,"Flipper")
     make_sphere(root,0.06,Vector3(-0.16,0.93,0.76),dark,"EyeL")
     make_sphere(root,0.06,Vector3(0.16,0.93,0.76),dark,"EyeR")
+    var turtle_mouth := make_sphere(root,0.055,Vector3(0,0.82,0.79),dark,"TurtleMouth")
+    turtle_mouth.scale=Vector3(1.45,0.42,0.45)
 
 func add_monkey(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     add_bear(root,mat,dark,white,pink)
@@ -4246,20 +4258,45 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
         scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     else:
-        # Горизонтальные категории листаются влево/вправо отдельно.
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     scroll.mouse_filter = Control.MOUSE_FILTER_STOP
-    # Свободная прокрутка пальцем: не нужно попадать в ползунок сбоку.
-    if not scroll.has_meta("free_touch_scroll_connected"):
-        scroll.set_meta("free_touch_scroll_connected", true)
-        scroll.gui_input.connect(func(event: InputEvent):
-            if event is InputEventScreenDrag:
-                if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-                    scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(event.relative.y)), 0, maxi(0, int(scroll.get_v_scroll_bar().max_value - scroll.get_v_scroll_bar().page)))
-                elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-                    scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(event.relative.x)), 0, maxi(0, int(scroll.get_h_scroll_bar().max_value - scroll.get_h_scroll_bar().page)))
-                get_viewport().set_input_as_handled()
-        )
+
+func _find_scroll_under_point(node: Node, point: Vector2) -> ScrollContainer:
+    var result: ScrollContainer = null
+    for child in node.get_children():
+        if not (child is CanvasItem) or not child.is_visible_in_tree():
+            continue
+        var found := _find_scroll_under_point(child, point)
+        if found:
+            result = found
+    if node is ScrollContainer and node.is_visible_in_tree():
+        var sc := node as ScrollContainer
+        if sc.get_global_rect().has_point(point):
+            result = sc
+    return result
+
+func _input(event: InputEvent) -> void:
+    if event is InputEventScreenTouch:
+        if event.pressed:
+            active_touch_id = event.index
+            active_touch_scroll = _find_scroll_under_point(self, event.position)
+        elif event.index == active_touch_id:
+            active_touch_id = -1
+            active_touch_scroll = null
+        return
+    if event is InputEventScreenDrag and event.index == active_touch_id and active_touch_scroll and is_instance_valid(active_touch_scroll) and active_touch_scroll.is_visible_in_tree():
+        var scroll := active_touch_scroll
+        var delta := event.relative
+        if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+            var bar := scroll.get_v_scroll_bar()
+            var max_scroll := maxi(0, int(bar.max_value - bar.page))
+            scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(delta.y)), 0, max_scroll)
+            get_viewport().set_input_as_handled()
+        elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+            var hbar := scroll.get_h_scroll_bar()
+            var max_scroll_h := maxi(0, int(hbar.max_value - hbar.page))
+            scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(delta.x)), 0, max_scroll_h)
+            get_viewport().set_input_as_handled()
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -8581,7 +8618,15 @@ func finalize_delivered_prize() -> void:
     complete_weekly_mission_if_ready()
     check_achievements()
     update_missions()
-    # Окно результата игрушки отключено: награда начисляется без popup.
+    if kind == "toy":
+        last_reward_rubles = maxi(0, coins - coins_before_prize)
+        var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
+        if previous_count > 0:
+            # Дубликат остаётся открытым до выбора игрока.
+            show_sale_offer()
+        else:
+            # Новая игрушка показывает полную информацию и закрывается сама.
+            show_new_toy_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_reward_rubles, last_prize_xp, rating_gain)
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8840,6 +8885,18 @@ func check_achievements() -> void:
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         if pending_prize_data.is_empty():
             show_achievement_popup()
+
+func show_new_toy_popup(toy_name: String, cname: String, rarity: String, rubles: int, xp: int, rating_gain: int) -> void:
+    if not result_popup: return
+    if popup_title_label: popup_title_label.text = "🆕 НОВАЯ ИГРУШКА!"
+    popup_name_label.text = toy_name
+    popup_info_label.text = "КОЛЛЕКЦИЯ: %s\nРЕДКОСТЬ: %s" % [cname, rarity]
+    popup_xp_label.text = "💰 РУБЛИ: +%d ₽   •   ✨ XP: +%d" % [rubles, xp]
+    if popup_rating_label:
+        popup_rating_label.text = "🏆 РЕЙТИНГ: +%d" % maxi(0, rating_gain)
+    popup_achievement_label.text = "Новая игрушка добавлена в коллекцию."
+    popup_timer = 4.0
+    result_popup.visible = true
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
