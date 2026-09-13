@@ -18,8 +18,8 @@ const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
 const CLAW_HOME := Vector3(PRIZE_HOLE.x, 8.20, PRIZE_HOLE.z)
 const CLAW_MIN := Vector3(-2.55, 2.70, -1.55)
 const CLAW_MAX := Vector3(2.55, 8.20, 1.55)
-const TOY_SCALE := 0.155
-const TARGET_PRIZE_COUNT: int = 30
+const TOY_SCALE := 0.04968
+const TARGET_PRIZE_COUNT: int = 60
 const MAX_PRIZE_CENTER_Y: float = 5.12
 const GRAB_SLIP_CHANCE: float = 0.22
 const CAPSULE_CHANCE: float = 0.055
@@ -49,7 +49,7 @@ var xp_to_next: int = 80
 const MAX_PLAYER_LEVEL: int = 1000
 const REFILL_THRESHOLD: int = 12
 const REFILL_AMOUNT: int = 15
-const INITIAL_PRIZE_COUNT: int = 30
+const INITIAL_PRIZE_COUNT: int = 60
 var total_games: int = 0
 var total_prizes_won: int = 0
 var rating_points: int = 0
@@ -205,8 +205,13 @@ var season_pass_level: int = 1
 const SEASON_PASS_MAX_LEVEL: int = 30
 var promo_codes_used: Dictionary = {}
 var promo_status: String = ""
-var news_items: Array[Dictionary] = []
-var news_unread: int = 0
+var news_items: Array[Dictionary] = [
+    {"date":"08.09.2026", "title":"🆕 ХВАТАЙКА v1.8.4", "text":"Добавлен раздел «Новости»: здесь будут появляться обновления, события, новые игрушки и важные объявления."},
+    {"date":"08.09.2026", "title":"🎟 НОВЫЕ ПРОМОКОДЫ", "text":"Следи за новостями — именно здесь будут публиковаться новые промокоды и условия их получения."},
+    {"date":"08.09.2026", "title":"🎁 БОНУС ЗА ВОЗВРАЩЕНИЕ", "text":"Бонус теперь появляется отдельным кружком на игровом экране только тогда, когда он доступен."},
+    {"date":"08.09.2026", "title":"🔔 УВЕДОМЛЕНИЯ", "text":"Система уведомлений продолжает напоминать о наградах, серии, событиях, мастерской и сундуках."}
+]
+var news_unread: int = 4
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
@@ -2335,7 +2340,7 @@ func build_news_panel() -> PanelContainer:
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
     var v:=VBoxContainer.new(); v.name="NewsContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",12); scroll.add_child(v)
     add_panel_title(v,"📰  НОВОСТИ")
-    var intro:=Label.new(); intro.text="Новостей пока нет. Здесь появятся обновления, события и объявления."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
+    var intro:=Label.new(); intro.text="Здесь будут появляться новости игры, события, новые функции, игрушки и новые промокоды."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
     var list:=VBoxContainer.new(); list.name="NewsList"; list.add_theme_constant_override("separation",10); v.add_child(list)
     var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,74); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
     refresh_news_panel(p)
@@ -3244,17 +3249,6 @@ func build_aim_marker() -> void:
     aim_marker.position = Vector3(claw_pos.x, 3.08, claw_pos.z)
     add_child(aim_marker)
 
-func settle_prizes_after_spawn() -> void:
-    # Игрушки остаются обычными RigidBody3D: физика сама раздвигает их и укладывает на пол.
-    # Здесь только стартуем их чуть выше опоры и даём короткий импульс вниз, чтобы не было зависания.
-    for i in range(prize_bodies.size()):
-        var body := prize_bodies[i]
-        if not body or not is_instance_valid(body): continue
-        if bool(body.get_meta("refill_active",false)): continue
-        body.freeze = false
-        body.sleeping = false
-        body.linear_velocity.y = minf(body.linear_velocity.y, -0.15)
-
 func build_prizes() -> void:
     for body in prize_bodies:
         if body and is_instance_valid(body):
@@ -3264,11 +3258,9 @@ func build_prizes() -> void:
 
     if saved_prizes.is_empty():
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
-        settle_prizes_after_spawn()
         return
 
-    for saved_index in range(mini(saved_prizes.size(), TARGET_PRIZE_COUNT)):
-        var saved = saved_prizes[saved_index]
+    for saved in saved_prizes:
         if not (saved is Dictionary):
             continue
         var source_index: int = clampi(int(saved.get("source_index", 0)), 0, toys.size() - 1)
@@ -3295,7 +3287,6 @@ func build_prizes() -> void:
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         spawn_random_prizes(TARGET_PRIZE_COUNT - prize_bodies.size())
-    settle_prizes_after_spawn()
 
 func build_prizes_async() -> void:
     # Реальная последовательная загрузка игрушек. Каждая игрушка создаётся
@@ -3309,7 +3300,7 @@ func build_prizes_async() -> void:
 
     var total_to_build := INITIAL_PRIZE_COUNT
     if not saved_prizes.is_empty():
-        total_to_build = mini(saved_prizes.size(), TARGET_PRIZE_COUNT)
+        total_to_build = saved_prizes.size()
     total_to_build = maxi(total_to_build, 1)
 
     if saved_prizes.is_empty():
@@ -3321,16 +3312,14 @@ func build_prizes_async() -> void:
         return
 
     var valid_saved_count := 0
-    for i in range(mini(saved_prizes.size(), total_to_build)):
-        var saved = saved_prizes[i]
+    for saved in saved_prizes:
         if saved is Dictionary:
             valid_saved_count += 1
     if valid_saved_count <= 0:
         valid_saved_count = INITIAL_PRIZE_COUNT
 
     var loaded_count := 0
-    for saved_index in range(mini(saved_prizes.size(), total_to_build)):
-        var saved = saved_prizes[saved_index]
+    for saved in saved_prizes:
         if not (saved is Dictionary):
             continue
         loaded_count += 1
@@ -3370,7 +3359,6 @@ func build_prizes_async() -> void:
             spawn_one_random_prize(i)
             var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
             await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])
-    settle_prizes_after_spawn()
 
 func spawn_one_random_prize(n: int) -> void:
     var rng := RandomNumberGenerator.new()
@@ -3571,9 +3559,7 @@ func batch_allowed(source_index: int) -> bool:
 func refill_prizes_if_needed() -> void:
     if prize_bodies.size() <= REFILL_THRESHOLD:
         var amount: int = REFILL_AMOUNT if prize_bodies.size() > 0 else INITIAL_PRIZE_COUNT
-        amount = mini(amount, maxi(0, TARGET_PRIZE_COUNT - prize_bodies.size()))
-        if amount > 0:
-            spawn_random_prizes(amount, true)
+        spawn_random_prizes(amount, true)
         current_result = "🎁 ПОПОЛНЕНИЕ • НОВАЯ ПАРТИЯ ЗАГРУЖАЕТСЯ"
         refill_animation_timer = 3.8
         update_ui()
@@ -3584,11 +3570,11 @@ func safe_prize_position(pos: Vector3) -> Vector3:
     # Никогда не восстанавливаем сохранённую игрушку за физическими стенками.
     result.x = clampf(result.x, -2.95, 2.95)
     result.z = clampf(result.z, -1.66, 1.66)
-    result.y = clampf(result.y, 2.96, MAX_PRIZE_CENTER_Y)
+    result.y = clampf(result.y, 3.22, MAX_PRIZE_CENTER_Y)
     if absf(result.x - PRIZE_HOLE.x) < 0.82 and absf(result.z - PRIZE_HOLE.z) < 0.52 and result.y < 4.0:
         result.x = randf_range(-2.5, 1.15)
         result.z = randf_range(-1.45, 1.0)
-        result.y = clampf(result.y, 2.96, MAX_PRIZE_CENTER_Y)
+        result.y = clampf(result.y, 3.22, MAX_PRIZE_CENTER_Y)
     return result
 
 func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: Color = Color(-1, -1, -1, -1), size_factor: float = 1.0) -> RigidBody3D:
@@ -3617,9 +3603,9 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
 
     var shape := CollisionShape3D.new()
     var sphere_shape := SphereShape3D.new()
-    sphere_shape.radius = 0.32
+    sphere_shape.radius = 0.27
     shape.shape = sphere_shape
-    shape.position = Vector3(0, 0.34, 0)
+    shape.position = Vector3(0, 0.55, 0)
     body.add_child(shape)
 
     var render_color: Color = data["color"] if visual_color.a < 0.0 else visual_color
@@ -4134,7 +4120,7 @@ func build_ui() -> void:
     gameplay_modal_blocker = Control.new()
     gameplay_modal_blocker.name = "GameplayModalBlocker"
     gameplay_modal_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
     gameplay_modal_blocker.visible = false
     gameplay_modal_blocker.z_index = 20
     hud_layer.add_child(gameplay_modal_blocker)
@@ -4254,9 +4240,7 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
         return
     scroll.set_meta("android_scroll_configured", true)
     scroll.follow_focus = true
-    scroll.scroll_deadzone = 2
-    scroll.scroll_vertical_custom_step = 72
-    scroll.scroll_horizontal_custom_step = 72
+    scroll.scroll_deadzone = 1
     scroll.add_theme_constant_override("scroll_bar_width", 20)
     scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
     if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
@@ -4563,26 +4547,25 @@ func animate_panel_out(panel: Control) -> void:
     var tween := create_tween()
     tween.set_parallel(true)
     tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-    tween.tween_property(panel, "scale", Vector2(0.96, 0.96), 0.12)
-    tween.tween_property(panel, "modulate:a", 0.0, 0.10)
-    tween.finished.connect(func():
-        if is_instance_valid(panel):
-            panel.visible = false
-            panel.scale = Vector2.ONE
-            panel.modulate.a = 1.0
-    )
+    tween.tween_property(panel, "scale", Vector2(0.96, 0.96), 0.10)
+    tween.tween_property(panel, "modulate:a", 0.0, 0.08)
 
 
 func close_side_panels(except_name: String = "") -> void:
     var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
     if mission_panel and except_name != "MissionDetailPanel" and mission_panel.visible:
         animate_panel_out(mission_panel)
+        mission_panel.visible = false
     if daily_login_panel and except_name != "DailyLoginPanel" and daily_login_panel.visible:
-        animate_panel_out(daily_login_panel)
+        daily_login_panel.visible = false
+        daily_login_panel.scale = Vector2.ONE
+        daily_login_panel.modulate.a = 1.0
     if event_panel and except_name != "EventPanel" and event_panel.visible:
         animate_panel_out(event_panel)
+        event_panel.visible = false
     if return_bonus_panel and except_name != "ReturnBonusPanel" and return_bonus_panel.visible:
         animate_panel_out(return_bonus_panel)
+        return_bonus_panel.visible = false
     update_android_navigation()
 func toggle_daily_mission() -> void:
     toggle_mission_detail(true)
@@ -4650,7 +4633,7 @@ func build_daily_login_panel() -> void:
     # Большая карточка привязана к правому кругу. Полностью помещается в экран
     # и раскрывается влево от кнопки.
     daily_login_panel.position = Vector2(310, 285)
-    daily_login_panel.size = Vector2(300, 150)
+    daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     hud_layer.add_child(daily_login_panel)
@@ -4664,18 +4647,18 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 20)
+    title.add_theme_font_size_override("font_size", 12)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    detail.add_theme_font_size_override("font_size", 12)
+    detail.add_theme_font_size_override("font_size", 9)
     v.add_child(detail)
 
     daily_days_container = GridContainer.new()
     daily_days_container.name = "DailyDaysGrid"
-    daily_days_container.columns = 4
+    daily_days_container.columns = 3
     daily_days_container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
     daily_days_container.add_theme_constant_override("h_separation", 4)
     daily_days_container.add_theme_constant_override("v_separation", 4)
@@ -4685,8 +4668,8 @@ func build_daily_login_panel() -> void:
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(68, 28)
-        day_button.add_theme_font_size_override("font_size", 8)
+        day_button.custom_minimum_size = Vector2(92, 32)
+        day_button.add_theme_font_size_override("font_size", 9)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
         day_button.set_meta("day_index", day)
@@ -4742,7 +4725,7 @@ func toggle_daily_login() -> void:
     if not daily_login_panel:
         return
     if daily_login_panel.visible:
-        animate_panel_out(daily_login_panel)
+        daily_login_panel.visible = false
         return
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
@@ -4985,7 +4968,7 @@ func toggle_event_panel() -> void:
     if not event_panel:
         return
     if event_panel.visible:
-        animate_panel_out(event_panel)
+        event_panel.visible = false
         return
     close_side_panels("EventPanel")
     event_panel.visible = true
@@ -5196,21 +5179,9 @@ func build_hud() -> void:
     hud_layer.add_child(menu)
 
     # Виртуальный джойстик: только 4 понятных направления.
-    var pad := Panel.new()
-    pad.name = "JoystickVisualPad"
-    pad.position = Vector2(52, 1570)
-    pad.size = Vector2(250, 250)
-    pad.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    pad.add_theme_stylebox_override("panel", make_style(Color(0.12,0.09,0.07,0.42), Color("#76583F"), 125, 2))
-    hud_layer.add_child(pad)
-    var pad_center := Label.new()
-    pad_center.text = "✦"
-    pad_center.position = Vector2(90, 78)
-    pad_center.size = Vector2(70, 70)
-    pad_center.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    pad_center.add_theme_font_size_override("font_size", 30)
-    pad_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    pad.add_child(pad_center)
+    var pad := make_control_button("✦", Vector2(52, 1570))
+    pad.add_theme_font_size_override("font_size", 34)
+    pad.tooltip_text = "Управление клешнью"
 
     var dirs: Array = [
         ["↑", Vector2(141, 1582), 0.0, -0.58],
@@ -5259,7 +5230,7 @@ func make_control_button(text_value: String, pos: Vector2) -> Button:
 func build_result_popup() -> void:
     result_popup = PanelContainer.new()
     result_popup.position = Vector2(90, 520)
-    result_popup.size = Vector2(900, 470)
+    result_popup.size = Vector2(900, 430)
     result_popup.visible = false
     style_panel(result_popup, Color("#A3754D"))
     hud_layer.add_child(result_popup)
@@ -5285,7 +5256,7 @@ func build_result_popup() -> void:
     v.add_child(popup_info_label)
     popup_xp_label = Label.new()
     popup_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    popup_xp_label.add_theme_font_size_override("font_size", 30)
+    popup_xp_label.add_theme_font_size_override("font_size", 32)
     popup_xp_label.modulate = Color("#E1C29A")
     v.add_child(popup_xp_label)
     popup_achievement_label = Label.new()
@@ -5326,7 +5297,7 @@ func build_shop_panel() -> PanelContainer:
     vip_button.custom_minimum_size = Vector2(0, 68)
     style_button(vip_button, Color("#C69A35"))
     vip_button.add_theme_font_size_override("font_size", 20)
-    vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); center_menu_panel(vip_panel); animate_panel_in(vip_panel); update_android_navigation())
+    vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); update_android_navigation())
     root.add_child(vip_button)
 
     var tabs := HBoxContainer.new()
@@ -5581,7 +5552,7 @@ func build_vip_panel() -> PanelContainer:
     var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
     var wallet := Label.new(); wallet.name = "VIPWallet"; wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; wallet.add_theme_font_size_override("font_size", 22); wallet.modulate = GOLD; v.add_child(wallet)
     var list := VBoxContainer.new(); list.name = "VIPList"; list.add_theme_constant_override("separation", 9); v.add_child(list)
-    var close := Button.new(); close.text = "←  В МАГАЗИН"; close.custom_minimum_size = Vector2(0, 80); style_button(close, CYAN); close.pressed.connect(func(): animate_panel_out(vip_panel); shop_panel.visible = true; refresh_shop(); center_menu_panel(shop_panel); animate_panel_in(shop_panel); update_android_navigation()); v.add_child(close)
+    var close := Button.new(); close.text = "←  В МАГАЗИН"; close.custom_minimum_size = Vector2(0, 80); style_button(close, CYAN); close.pressed.connect(func(): vip_panel.visible = false; shop_panel.visible = true; refresh_shop(); update_android_navigation()); v.add_child(close)
     refresh_vip_panel(); return p
 
 func refresh_vip_panel() -> void:
@@ -6355,29 +6326,6 @@ func build_workshop_panel() -> PanelContainer:
     close.pressed.connect(close_gameplay_overlay)
     v.add_child(close)
     return p
-
-func refresh_collection_panel() -> void:
-    if collection_panel and collection_panel.visible:
-        # Коллекция строится из одного каталога игрушек: имя, редкость и коллекция всегда совпадают.
-        var scroll := collection_panel.get_node_or_null("ScrollContainer") as ScrollContainer
-        if scroll:
-            var v := scroll.get_child(0) as VBoxContainer
-            if v:
-                for child in v.get_children():
-                    child.queue_free()
-                var h := Label.new(); h.text = "КОЛЛЕКЦИИ"; h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; h.add_theme_font_size_override("font_size",40); v.add_child(h)
-                for cname in get_collection_names():
-                    var needed := 0; var got := 0
-                    for toy in toys:
-                        if String(toy.get("collection","")) == cname:
-                            needed += 1
-                            if int(toy_inventory_counts.get(String(toy.get("name","")),0)) > 0: got += 1
-                    var title := Label.new(); title.text = ("🏆 " if completed_collections.has(cname) else "▣ ") + cname + " • %d/%d" % [got,needed]; title.add_theme_font_size_override("font_size",24); v.add_child(title)
-                    for toy in toys:
-                        if String(toy.get("collection","")) != cname: continue
-                        var nm := String(toy.get("name","")); var count := int(toy_inventory_counts.get(nm,0))
-                        var row := Label.new(); row.text = ("✓ " if count > 0 else "○ ") + nm + " • " + String(toy.get("rarity","")) + (" ×%d" % count if count > 1 else ""); row.add_theme_font_size_override("font_size",18); row.modulate = Color("#F0E7DC") if count > 0 else Color("#9B8D80"); v.add_child(row)
-                var close := Button.new(); close.text="НАЗАД К АВТОМАТУ"; close.custom_minimum_size=Vector2(0,82); style_button(close); close.pressed.connect(show_main_menu); v.add_child(close)
 
 func build_collection_panel() -> PanelContainer:
     var p := PanelContainer.new()
@@ -7733,23 +7681,13 @@ func show_main_menu() -> void:
     set_gameplay_3d_visible(false)
     set_main_menu_controls(true)
     menu_layer.visible = true
-    menu_layer.modulate.a = 0.0
-    var tween := create_tween()
-    tween.tween_property(menu_layer,"modulate:a",1.0,0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-    update_ui()
-
-func center_menu_panel(panel: Control) -> void:
-    if not panel or not is_instance_valid(panel): return
-    var safe_w := 1080.0
-    var safe_h := 1920.0
-    var x := maxf(12.0,(safe_w - panel.size.x) * 0.5)
-    var y := maxf(125.0,(safe_h - panel.size.y) * 0.5)
-    panel.position = Vector2(x,y)
 
 func open_panel(which: String) -> void:
     if not game_initialized:
         return
-    if which in ["profile","seasons","chests","workshop","season_pass","return_bonus"]:
+    # Окна на экране аппарата работают как переключатель: открыть одно —
+    # автоматически закрыть все остальные. При этом сам аппарат остаётся видимым.
+    if which == "profile" or which == "seasons" or which == "chests" or which == "workshop" or which == "season_pass" or which == "return_bonus":
         close_all_panels()
         menu_layer.visible = false
         set_main_menu_controls(false)
@@ -7757,44 +7695,53 @@ func open_panel(which: String) -> void:
         set_gameplay_3d_visible(true)
         if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
             gameplay_modal_blocker.visible = true
-        match which:
-            "profile": profile_panel.visible = true; refresh_profile_panel(); animate_panel_in(profile_panel)
-            "seasons": seasons_panel.visible = true; refresh_seasons_panel(); animate_panel_in(seasons_panel)
-            "chests": chests_panel.visible = true; refresh_chests_panel(); animate_panel_in(chests_panel)
-            "workshop": workshop_panel.visible = true; refresh_workshop_panel(); animate_panel_in(workshop_panel)
-            "season_pass": season_pass_panel.visible = true; refresh_season_pass_panel(); animate_panel_in(season_pass_panel)
-            "return_bonus": return_bonus_panel.visible = true; refresh_return_bonus_panel(); animate_panel_in(return_bonus_panel)
-        update_android_navigation()
+        if which == "profile":
+            profile_panel.visible = true
+            refresh_profile_panel()
+        elif which == "seasons":
+            seasons_panel.visible = true
+            refresh_seasons_panel()
+        elif which == "chests":
+            chests_panel.visible = true
+            refresh_chests_panel()
+        elif which == "workshop":
+            workshop_panel.visible = true
+            refresh_workshop_panel()
+        elif which == "season_pass":
+            season_pass_panel.visible = true
+            refresh_season_pass_panel()
+        else:
+            return_bonus_panel.visible = true
+            refresh_return_bonus_panel()
         return
+
+    # Обычные пункты меню открываются отдельным экраном, как и раньше.
     close_all_panels()
     set_gameplay_3d_visible(false)
     hud_layer.visible = false
     set_main_menu_controls(false)
     menu_layer.visible = true
-    var panel: Control = null
-    match which:
-        "shop":
-            panel = shop_panel; shop_panel.visible = true; refresh_shop()
-        "collection":
-            panel = collection_panel; collection_panel.visible = true; refresh_collection_panel()
-        "settings":
-            panel = settings_panel; settings_panel.visible = true; update_quality_info()
-        "achievements":
-            panel = achievements_panel; achievements_panel.visible = true; refresh_achievements_panel()
-        "help":
-            panel = help_panel; help_panel.visible = true
-        "referral":
-            panel = referral_panel; referral_panel.visible = true; refresh_referral_panel()
-        "promo":
-            panel = promo_panel; promo_panel.visible = true; refresh_promo_panel()
-        "news":
-            panel = news_panel; news_panel.visible = true; refresh_news_panel()
-        "rating":
-            panel = rating_panel; rating_panel.visible = true; refresh_rating_panel(); request_global_rating()
-        _:
-            return
-    center_menu_panel(panel)
-    animate_panel_in(panel)
+    if which == "shop": shop_panel.visible = true
+    elif which == "collection": collection_panel.visible = true
+    elif which == "settings": settings_panel.visible = true
+    elif which == "achievements":
+        achievements_panel.visible = true
+        refresh_achievements_panel()
+    elif which == "help":
+        help_panel.visible = true
+    elif which == "referral":
+        referral_panel.visible = true
+        refresh_referral_panel()
+    elif which == "promo":
+        promo_panel.visible = true
+        refresh_promo_panel()
+    elif which == "news":
+        news_panel.visible = true
+        refresh_news_panel()
+    elif which == "rating":
+        rating_panel.visible = true
+        refresh_rating_panel()
+        request_global_rating()
     update_android_navigation()
 
 func close_gameplay_overlay() -> void:
@@ -7857,7 +7804,7 @@ func update_ui() -> void:
         machine_status_label.text = "🧸  ПРИЗЫ: %d\n🍀  ИГРУШКА ДНЯ: %s ×3\n🔥  СЕРИЯ ПОБЕД: %d\n📦  ПАРТИЯ: %s%s" % [prize_bodies.size(), lucky_name, current_win_streak, batch_type, active_note]
     update_missions()
     if news_menu_button and is_instance_valid(news_menu_button):
-        news_menu_button.text = "📰  НОВОСТИ"
+        news_menu_button.text = "📰  НОВОСТИ  !" if news_unread > 0 else "📰  НОВОСТИ"
 
 func _process(delta: float) -> void:
     time_alive += delta
@@ -8746,7 +8693,6 @@ func show_achievement_popup() -> void:
     popup_achievement_label.text = pending_achievement_popup_text
     popup_timer = 3.0
     result_popup.visible = true
-    animate_panel_in(result_popup,0.94)
     play_ui_sound("reward")
     pending_new_achievements.clear()
     pending_achievement_rewards.clear()
@@ -8756,22 +8702,17 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
     if not result_popup: return
     popup_name_label.text = toy_name
     popup_info_label.text = "%s  •  %s" % [cname, rarity]
-    var rating_gain := rating_for_rarity(rarity) if cname != "МОНЕТНЫЙ БОНУС" else 0
     if reward_rubles > 0:
-        popup_xp_label.text = "+%d ₽   •   +%d рейтинга   •   +%d XP" % [reward_rubles, rating_gain, xp]
+        popup_xp_label.text = "+%d ₽" % reward_rubles
     else:
-        popup_xp_label.text = "+%d рейтинга   •   +%d XP" % [rating_gain, xp]
-    if pending_achievement_popup_text != "":
-        popup_achievement_label.text = pending_achievement_popup_text
-    elif not pending_new_achievements.is_empty():
-        popup_achievement_label.text = "🏆 ДОСТИЖДЕНИЕ: " + " • ".join(pending_new_achievements)
-    else:
+        popup_xp_label.text = "+%d XP" % xp
+    if pending_new_achievements.is_empty():
         popup_achievement_label.text = ""
+    else:
+        popup_achievement_label.text = "🏆 ДОСТИЖЕНИЕ: " + " • ".join(pending_new_achievements)
     popup_timer = 3.0
     result_popup.visible = true
     pending_new_achievements.clear()
-    pending_achievement_rewards.clear()
-    pending_achievement_popup_text = ""
 
 func rating_for_rarity(rarity: String) -> int:
     match rarity:
@@ -8943,7 +8884,6 @@ func show_sale_offer() -> void:
         keep.pressed.connect(keep_duplicate)
         h.add_child(keep)
     sale_panel.visible = true
-    animate_panel_in(sale_panel,0.96)
 
 func sell_duplicate() -> void:
     if not sale_available: return
