@@ -5939,7 +5939,7 @@ func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     if not skip_confirmation and confirm_rare_chests_on and kind in ["rare", "epic", "legendary", "vip"]:
         var names := {"rare":"РЕДКИЙ", "epic":"ЭПИЧЕСКИЙ", "legendary":"ЛЕГЕНДАРНЫЙ", "vip":"VIP"}
         var need := int(chest_key_costs.get(kind, 1))
-        show_chest_confirmation(String(names.get(kind, kind.to_upper())), need, func(): open_chest(kind, true))
+        confirm_purchase("Открытие редкого сундука", "Открыть «%s» за %d ключей?" % [String(names.get(kind, kind.to_upper())), need], func(): open_chest(kind, true), "ОТКРЫТЬ")
         return
     if _server_ready() and player_token != "":
         if _server_action("chest_open", {"kind":kind}):
@@ -8906,7 +8906,7 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
     else:
         popup_achievement_label.text = "\n".join(pending_achievement_rewards_text)
     # Дубль игрушки: окно выбора должно оставаться до явного решения игрока.
-    popup_timer = 0.0 if sale_available else 3.2
+    popup_timer = 0.0 if sale_available and sale_name == toy_name else 3.2
     if sale_available and sale_name == toy_name:
         if popup_title_label: popup_title_label.text = "ДУБЛЬ ИГРУШКИ"
         popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
@@ -8935,62 +8935,6 @@ func rarity_reward(rarity: String) -> int:
         "ЭПИЧЕСКАЯ": return 50
         "ЛЕГЕНДАРНАЯ": return 150
     return 5
-
-func show_chest_confirmation(chest_name: String, need: int, action: Callable) -> void:
-    # Собственное окно в стиле игры вместо стандартного ConfirmationDialog.
-    var dialog := PanelContainer.new()
-    dialog.name = "ChestConfirmationPanel"
-    dialog.size = Vector2(620, 300)
-    dialog.z_index = 200
-    style_panel(dialog, Color("#6E4B33"), Color("#C09A70"), 22, 3)
-    hud_layer.add_child(dialog)
-
-    var v := VBoxContainer.new()
-    v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 14)
-    dialog.add_child(v)
-
-    var title := Label.new()
-    title.text = "🎁  ОТКРЫТИЕ СУНДУКА"
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 21)
-    title.modulate = Color("#E1C29A")
-    v.add_child(title)
-
-    var message := Label.new()
-    message.text = "Открыть «%s» за %d ключей?" % [chest_name, need]
-    message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    message.add_theme_font_size_override("font_size", 20)
-    message.modulate = Color("#F1E5D6")
-    v.add_child(message)
-
-    var buttons := HBoxContainer.new()
-    buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-    buttons.add_theme_constant_override("separation", 18)
-    v.add_child(buttons)
-
-    var cancel := Button.new()
-    cancel.text = "ОТМЕНА"
-    cancel.custom_minimum_size = Vector2(150, 60)
-    style_button(cancel, Color("#76583F"))
-    cancel.add_theme_font_size_override("font_size", 18)
-    buttons.add_child(cancel)
-
-    var ok := Button.new()
-    ok.text = "ОТКРЫТЬ"
-    ok.custom_minimum_size = Vector2(150, 60)
-    style_button(ok, Color("#C09A70"))
-    ok.add_theme_font_size_override("font_size", 18)
-    buttons.add_child(ok)
-
-    cancel.pressed.connect(func(): dialog.queue_free())
-    ok.pressed.connect(func():
-        action.call()
-        dialog.queue_free()
-    )
-    dialog.position = (get_viewport_rect().size - dialog.size) * 0.5
-    dialog.grab_focus()
 
 func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ") -> void:
     var dialog := ConfirmationDialog.new()
