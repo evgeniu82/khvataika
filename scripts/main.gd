@@ -683,7 +683,6 @@ func _achievement_exists(id: String) -> bool:
     return false
 
 func _ready() -> void:
-    _startup_write_phase("READY")
     # Показываем собственный загрузочный экран как можно раньше.
     # Раньше перед ним выполнялись локальная инициализация и чтение сохранения,
     # из-за чего на Android мог появляться серый кадр между boot splash и игрой.
@@ -2623,23 +2622,19 @@ func initialize_game_async() -> void:
     # обязательно отдаём кадр движку, чтобы загрузочный экран оставался живым.
     await get_tree().process_frame
 
-    _startup_write_phase("LOAD_PROFILE")
     await set_loading_status("ЗАГРУЖАЕМ ПРОФИЛЬ И РЕФЕРАЛЬНЫЕ ДАННЫЕ...")
     ensure_referral_code()
     process_incoming_referral()
     await set_loading_progress(5.0, "ПРОФИЛЬ ПОДГОТОВЛЕН")
-    _startup_write_phase("BUILD_WORLD")
     await set_loading_status("СОЗДАЁМ ИГРОВОЙ МИР И ПРИМЕНЯЕМ КАЧЕСТВО...")
     build_world()
     apply_quality_settings()
     await set_loading_progress(15.0, "МИР СОЗДАН")
-    _startup_write_phase("BUILD_MACHINE")
     await set_loading_status("СОЗДАЁМ АВТОМАТ И АКТИВИРУЕМ СОБЫТИЕ...")
     build_machine()
     if not STARTUP_CONTROL_TEST:
         activate_calendar_event()
     await set_loading_progress(30.0, "АВТОМАТ СОЗДАН")
-    _startup_write_phase("BUILD_CLAW")
     await set_loading_status("СОЗДАЁМ РЕЛЬСЫ, КЛЕШНЮ И ПРИЦЕЛ...")
     build_overhead_rails()
     await get_tree().process_frame
@@ -2648,7 +2643,6 @@ func initialize_game_async() -> void:
     build_aim_marker()
     await get_tree().process_frame
     await set_loading_progress(43.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
-    _startup_write_phase("BUILD_PRIZES")
     await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКИ...")
     await build_prizes_async()
     await get_tree().process_frame
@@ -2656,29 +2650,24 @@ func initialize_game_async() -> void:
 
     # В проекте GPUParticles3D сейчас намеренно отключены. Поэтому не делаем
     # фиктивный тяжёлый этап: здесь только фиксируем реальное состояние эффектов.
-    _startup_write_phase("VISUAL_EFFECTS")
     await set_loading_status("ПРОВЕРЯЕМ ВИЗУАЛЬНЫЕ ЭФФЕКТЫ И ОСВЕЩЕНИЕ...")
     sparkle_particles = null
     await get_tree().process_frame
     await set_loading_progress(72.0, "ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ПРОВЕРЕНЫ")
     await get_tree().process_frame
 
-    _startup_write_phase("BUILD_UI")
     await build_ui()
 
-    _startup_write_phase("BUILD_AUDIO")
     await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
     if not STARTUP_CONTROL_TEST:
         build_audio()
     await get_tree().process_frame
     await set_loading_progress(97.0, "ЗВУК ПОДГОТОВЛЕН")
-    _startup_write_phase("SHOP_VISUALS")
     await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
     if not STARTUP_CONTROL_TEST:
         apply_shop_visuals()
     await get_tree().process_frame
     await set_loading_progress(98.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
-    _startup_write_phase("DAILY_EVENTS")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     if DAILY_ONLY_TEST:
         await set_loading_status("ПРОВЕРЯЕМ ЕЖЕДНЕВНУЮ СЕРИЮ...")
@@ -2702,7 +2691,6 @@ func initialize_game_async() -> void:
 
     # До этой точки НИ ОДНО пользовательское меню и сам игровой экран не
     # должны быть видимы. Всё подготавливаем скрытым под загрузчиком.
-    _startup_write_phase("FINAL_UI")
     await set_loading_status("ФИНАЛЬНАЯ ПРОВЕРКА И ПОДГОТОВКА ИГРОВОГО ЭКРАНА...")
     close_all_panels()
     if menu_layer and is_instance_valid(menu_layer):
@@ -2723,7 +2711,6 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
-    _startup_write_phase("DONE")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.visible = false
