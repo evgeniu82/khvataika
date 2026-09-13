@@ -5,9 +5,6 @@ extends Node3D
 # (duplicates, new-toy popup, collection rewards) remain functional.
 const ENABLE_UPDATED_3D_TOYS: bool = false
 const ENABLE_UNIFIED_TOY_CATALOG: bool = false
-const ENABLE_DUPLICATE_TOY_POPUP: bool = false
-const ENABLE_NEW_TOY_POPUP: bool = false
-const ENABLE_COLLECTION_COMPLETION_REWARD: bool = false
 
 # ХВАТАЙКА — REALISTIC WOOD / METAL / GLASS EDITION
 # Godot 4.7+
@@ -722,9 +719,11 @@ func _ready() -> void:
         call_deferred("setup_android_notifications")
         call_deferred("register_player_remote")
         call_deferred("sync_remote_config")
+    # Инициализация игры запускается единым последовательным потоком.
+    # SFX создаются после первого полноценного игрового кадра в
+    # activate_extra_features_after_startup(), чтобы не конкурировать с
+    # созданием мира и 3D-игрушек во время запуска Android.
     call_deferred("initialize_game_async")
-    if not STARTUP_CONTROL_TEST:
-        call_deferred("build_upgrade_sound_system")
 
 func _is_android_runtime_available() -> bool:
     return OS.has_feature("android") and not Engine.is_editor_hint() and Engine.has_singleton("AndroidRuntime")
@@ -1917,7 +1916,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                             finish_xp = int(data.get("xp_gain", 0))
                         last_prize_xp = finish_xp
                         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, 0)
-                        if bool(data.get("duplicate", false)) and ENABLE_DUPLICATE_TOY_POPUP:
+                        if bool(data.get("duplicate", false)):
                             sale_name = last_prize_name
                             sale_rarity = last_prize_rarity
                             sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
@@ -6346,7 +6345,7 @@ func build_collection_panel() -> PanelContainer:
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
-        if done and ENABLE_COLLECTION_COMPLETION_REWARD:
+        if done:
             var reward := Label.new()
             reward.text = "НАГРАДА: 💰 +100 ₽   •   🔑 +1   •   ⚙ +10 запчастей"
             reward.add_theme_font_size_override("font_size", 17)
@@ -7984,7 +7983,7 @@ func _process(delta: float) -> void:
             current_result = "ГОТОВ К ИГРЕ"
             save_game()
             update_ui()
-    if ENABLE_COLLECTION_COMPLETION_REWARD and collection_reward_pending_timer > 0.0:
+    if collection_reward_pending_timer > 0.0:
         collection_reward_pending_timer -= delta
         if collection_reward_pending_timer <= 0.0 and collection_reward_pending_name != "":
             show_collection_complete_popup(collection_reward_pending_name, collection_reward_pending_rubles, collection_reward_pending_keys, collection_reward_pending_parts)
@@ -8430,8 +8429,6 @@ func resolve_grab() -> bool:
     return true
 
 func check_collection_completion() -> void:
-    if not ENABLE_COLLECTION_COMPLETION_REWARD:
-        return
     if last_prize_collection == "" or completed_collections.has(last_prize_collection):
         return
     var needed := 0
@@ -8535,9 +8532,11 @@ func finalize_delivered_prize() -> void:
     if kind == "toy":
         last_reward_rubles = maxi(0, coins - coins_before_prize)
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
-        if previous_count > 0 and ENABLE_DUPLICATE_TOY_POPUP:
+        if previous_count > 0:
+            # Дубликат остаётся открытым до выбора игрока.
             show_sale_offer()
-        elif previous_count <= 0 and ENABLE_NEW_TOY_POPUP:
+        else:
+            # Новая игрушка показывает полную информацию и закрывается сама.
             show_new_toy_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_reward_rubles, last_prize_xp, rating_gain)
     pending_prize_data.clear()
     save_game()
