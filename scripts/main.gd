@@ -4349,27 +4349,9 @@ func update_android_navigation() -> void:
     _last_nav_context = _visible_navigation_context()
 
 func _dismiss_gameplay_side_panels_on_tap(event_position: Vector2 = Vector2(-1, -1)) -> void:
-    # Окна, открываемые круглыми кнопками на игровом экране, закрываются
-    # обычным касанием в свободную область экрана. Само содержимое окна
-    # остаётся кликабельным, чтобы его кнопки продолжали работать.
-    var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
-    var panels: Array[Control] = []
-    if mission_panel and mission_panel.visible: panels.append(mission_panel)
-    if daily_login_panel and daily_login_panel.visible: panels.append(daily_login_panel)
-    if event_panel and event_panel.visible: panels.append(event_panel)
-    if seasons_panel and seasons_panel.visible: panels.append(seasons_panel)
-    if chests_panel and chests_panel.visible: panels.append(chests_panel)
-    if workshop_panel and workshop_panel.visible: panels.append(workshop_panel)
-    if panels.is_empty(): return
-    if event_position.x >= 0.0:
-        for panel in panels:
-            if panel.get_global_rect().has_point(event_position):
-                return
-    var full_gameplay_panel_open := (seasons_panel and seasons_panel.visible) or (chests_panel and chests_panel.visible) or (workshop_panel and workshop_panel.visible)
-    if full_gameplay_panel_open:
-        close_gameplay_overlay()
-    else:
-        close_side_panels()
+    # Отключено по запросу пользователя. Окна от круглых кнопок
+    # больше не закрываются обычным нажатием по экрану.
+    return
 
 func _on_android_back_pressed() -> void:
     var context := _visible_navigation_context()
@@ -4401,8 +4383,7 @@ func _unhandled_input(event: InputEvent) -> void:
     if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
         get_viewport().set_input_as_handled()
         return
-    # Свободное касание/клик по игровому полю закрывает открытое боковое окно.
-    # Кнопки интерфейса обрабатываются раньше и сюда не попадают.
+    # Автозакрытие боковых окон касанием отключено.
     if event is InputEventScreenTouch and event.pressed:
         _dismiss_gameplay_side_panels_on_tap(event.position)
         return
