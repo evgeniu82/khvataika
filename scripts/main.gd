@@ -198,13 +198,8 @@ var season_pass_level: int = 1
 const SEASON_PASS_MAX_LEVEL: int = 30
 var promo_codes_used: Dictionary = {}
 var promo_status: String = ""
-var news_items: Array[Dictionary] = [
-    {"date":"08.09.2026", "title":"🆕 ХВАТАЙКА v1.8.4", "text":"Добавлен раздел «Новости»: здесь будут появляться обновления, события, новые игрушки и важные объявления."},
-    {"date":"08.09.2026", "title":"🎟 НОВЫЕ ПРОМОКОДЫ", "text":"Следи за новостями — именно здесь будут публиковаться новые промокоды и условия их получения."},
-    {"date":"08.09.2026", "title":"🎁 БОНУС ЗА ВОЗВРАЩЕНИЕ", "text":"Бонус теперь появляется отдельным кружком на игровом экране только тогда, когда он доступен."},
-    {"date":"08.09.2026", "title":"🔔 УВЕДОМЛЕНИЯ", "text":"Система уведомлений продолжает напоминать о наградах, серии, событиях, мастерской и сундуках."}
-]
-var news_unread: int = 4
+var news_items: Array[Dictionary] = []
+var news_unread: int = 0
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
@@ -1838,15 +1833,10 @@ func _apply_remote_config(config: Dictionary) -> void:
         for raw_holiday in server_holidays:
             if raw_holiday is Dictionary: holiday_list.append(raw_holiday)
         if not holiday_list.is_empty(): holiday_calendar = holiday_list
-    var remote_news: Variant = config.get("news", [])
-    if remote_news is Array:
-        remote_news_items.clear()
-        for item in remote_news:
-            if item is Dictionary:
-                remote_news_items.append(item)
-        if not remote_news_items.is_empty():
-            news_items = remote_news_items.duplicate(true)
-            news_unread = maxi(0, int(config.get("unread_news", remote_news_items.size())))
+    # Офлайн-версия держит раздел «Новости» пустым.
+    remote_news_items.clear()
+    news_items.clear()
+    news_unread = 0
     var event: Variant = config.get("active_event", {})
     if event is Dictionary and not event.is_empty():
         active_event_id = String(event.get("id", active_event_id))
@@ -2376,26 +2366,20 @@ func build_news_panel() -> PanelContainer:
     return p
 
 func refresh_news_panel(panel: PanelContainer = null) -> void:
-    var target:=panel if panel != null else news_panel
+    var target := panel if panel != null else news_panel
     if target == null: return
-    var list:=target.get_node_or_null("ScrollContainer/NewsContent/NewsList") as VBoxContainer
+    var list := target.get_node_or_null("ScrollContainer/NewsContent/NewsList") as VBoxContainer
     if list == null: return
     for child in list.get_children(): child.queue_free()
-    for item in news_items:
-        var card:=PanelContainer.new()
-        card.custom_minimum_size=Vector2(0,145)
-        style_panel(card,Color("#241B16"),Color("#76583F"),18,2)
-        var cv:=VBoxContainer.new(); cv.add_theme_constant_override("separation",5); card.add_child(cv)
-        var title:=Label.new(); title.text="%s  •  %s" % [String(item.get("date","")),String(item.get("title",""))]; title.add_theme_font_size_override("font_size",21); title.modulate=Color("#E1C29A"); cv.add_child(title)
-        var body:=Label.new(); body.text=String(item.get("text","")); body.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; body.add_theme_font_size_override("font_size",17); body.modulate=Color("#D8C3AA"); cv.add_child(body)
-        var read_button:=Button.new(); read_button.text="ПРОЧИТАНО"; read_button.custom_minimum_size=Vector2(0,48); style_button(read_button,Color("#76583F")); var news_id:=String(item.get("id","")); read_button.pressed.connect(func():
-            if _server_ready() and player_token != "":
-                _server_action("news_read", {"news_id":news_id})
-            news_unread = maxi(0, news_unread - 1)
-            read_button.disabled = true
-        ); cv.add_child(read_button)
-        list.add_child(card)
-    # Индикатор снимается только после серверного подтверждения прочтения.
+    # Раздел пока намеренно пуст: серверные/старые новости сюда не подмешиваются.
+    var empty := Label.new()
+    empty.text = "НОВОСТЕЙ ПОКА НЕТ"
+    empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    empty.add_theme_font_size_override("font_size", 22)
+    empty.modulate = Color("#BCA996")
+    list.add_child(empty)
+    news_unread = 0
 
 func build_rating_panel() -> PanelContainer:
     var p:=build_info_menu_panel("RatingPanel",Vector2(970,900))
@@ -4364,13 +4348,10 @@ func update_android_navigation() -> void:
         hud_back_button.visible = false
     _last_nav_context = _visible_navigation_context()
 
-func _dismiss_gameplay_side_panels_on_tap() -> void:
-    # Любое свободное касание игрового поля закрывает открытое боковое окно.
-    # Нажатие на другой круг закрывает предыдущее через close_side_panels().
-    var mission_panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
-    var has_side_panel: bool = (mission_panel != null and mission_panel.visible) or (daily_login_panel != null and daily_login_panel.visible) or (event_panel != null and event_panel.visible)
-    if has_side_panel:
-        close_side_panels()
+func _dismiss_gameplay_side_panels_on_tap(event_position: Vector2 = Vector2(-1, -1)) -> void:
+    # Отключено по запросу пользователя. Окна от круглых кнопок
+    # больше не закрываются обычным нажатием по экрану.
+    return
 
 func _on_android_back_pressed() -> void:
     var context := _visible_navigation_context()
@@ -4405,10 +4386,10 @@ func _unhandled_input(event: InputEvent) -> void:
     # Свободное касание/клик по игровому полю закрывает открытое боковое окно.
     # Кнопки интерфейса обрабатываются раньше и сюда не попадают.
     if event is InputEventScreenTouch and event.pressed:
-        _dismiss_gameplay_side_panels_on_tap()
+        _dismiss_gameplay_side_panels_on_tap(event.position)
         return
     if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-        _dismiss_gameplay_side_panels_on_tap()
+        _dismiss_gameplay_side_panels_on_tap(event.position)
         return
 
     # Android system Back закрывает окно сначала, а не игру.
@@ -7603,89 +7584,32 @@ func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
 
 func build_help_panel() -> PanelContainer:
     var p := PanelContainer.new()
-    # Большой справочник игрока: весь материал находится внутри одного блока
-    # и прокручивается, поэтому на Android ничего не обрезается.
-    p.position = Vector2(35, 55)
-    p.size = Vector2(1010, 1580)
+    p.position = Vector2(80, 300)
+    p.size = Vector2(920, 900)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
-
-    var root := VBoxContainer.new()
-    root.add_theme_constant_override("separation", 10)
-    p.add_child(root)
-
+    var v := VBoxContainer.new()
+    v.add_theme_constant_override("separation", 16)
+    p.add_child(v)
     var h := Label.new()
-    h.text = "❓  ПОМОЩЬ И СПРАВКА"
+    h.text = "❓ ПОМОЩЬ"
     h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     h.add_theme_font_size_override("font_size", 36)
     h.modulate = Color("#E1C29A")
-    root.add_child(h)
-
-    var sub := Label.new()
-    sub.text = "Всё, что нужно знать для игры в «Хватайку»"
-    sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    sub.add_theme_font_size_override("font_size", 17)
-    sub.modulate = Color("#BCA996")
-    root.add_child(sub)
-
-    var scroll := ScrollContainer.new()
-    scroll.name = "HelpScroll"
-    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    root.add_child(scroll)
-
-    var content := VBoxContainer.new()
-    content.name = "HelpContent"
-    content.custom_minimum_size = Vector2(930, 0)
-    content.add_theme_constant_override("separation", 10)
-    scroll.add_child(content)
-
-    var add_help_section := func(title: String, body: String) -> void:
-        var card := PanelContainer.new()
-        card.custom_minimum_size = Vector2(0, 10)
-        style_panel(card, Color("#2D211A"), Color("#6E513A"), 18, 2)
-        content.add_child(card)
-        var box := VBoxContainer.new()
-        box.add_theme_constant_override("separation", 6)
-        card.add_child(box)
-        var t := Label.new()
-        t.text = title
-        t.add_theme_font_size_override("font_size", 24)
-        t.modulate = Color("#E1C29A")
-        box.add_child(t)
-        var b := Label.new()
-        b.text = body
-        b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        b.add_theme_font_size_override("font_size", 18)
-        b.modulate = Color("#F0E1CE")
-        box.add_child(b)
-
-    add_help_section("🎮  1. КАК ИГРАТЬ", "Перемещай клешню по автомату с помощью кнопок управления. Наведи клешню над нужной игрушкой и нажми «ЗАХВАТ». После опускания клешня пытается захватить приз, поднять его и доставить к выдаче. Успешно доставленная игрушка засчитывается в коллекцию и приносит награды.")
-    add_help_section("🕹  2. УПРАВЛЕНИЕ КЛЕШНЁЙ", "Используй стрелки или экранные кнопки для движения влево, вправо, вперёд и назад. Перед захватом постарайся поставить клешню максимально точно над центром игрушки. После нажатия «ЗАХВАТ» дождись завершения попытки и не запускай следующую попытку раньше времени.")
-    add_help_section("🎯  3. КАК ПОВЫСИТЬ ШАНС ЗАХВАТА", "Выбирай игрушки, которые лежат сверху и к которым клешне легко подойти. Тяжёлые, скользкие и неудобно лежащие игрушки сложнее удержать. Улучшения, характеристики клешни и мастерская помогают сделать захват стабильнее. Игрушка дня может давать дополнительный бонус.")
-    add_help_section("🧸  4. ИГРУШКИ И КОЛЛЕКЦИЯ", "Каждая успешно доставленная игрушка попадает в коллекцию. Повторные игрушки также учитываются и могут быть проданы за рубли, если игра предложит продажу дубликата. Собирай разные игрушки и целые коллекции, чтобы открывать достижения и получать дополнительный прогресс.")
-    add_help_section("⭐  5. ОПЫТ И УРОВЕНЬ", "Опыт начисляется за успешно полученные игрушки. Чем выше редкость приза, тем больше опыта можно получить. Когда шкала опыта заполнена, повышается уровень игрока. Новый уровень открывает дальнейший прогресс и даёт награду в рублях.")
-    add_help_section("🏆  6. РЕЙТИНГ", "Рейтинг начисляется только за реальные достижения: успешно доставленные игрушки и новые уровни. За сам факт запуска игры, проигрыш или обычную серию попыток рейтинг не увеличивается. Количество очков небольшое, поэтому рейтинг растёт постепенно вместе с настоящим прогрессом игрока.")
-    add_help_section("🛒  7. МАГАЗИН", "В магазине находятся улучшения и косметические предметы. Скин покупается только один раз. После покупки нажми на нужный скин ещё раз, чтобы установить его. Номер скина соответствует его позиции: №1 выбирает первый скин, №2 — второй, №3 — третий и так далее. Установленный скин сохраняется после выхода из игры.")
-    add_help_section("🎨  8. СКИНЫ", "Скины клешни меняют внешний вид клешни. Скины игрушек меняют оформление призов. Скины аппарата меняют корпус и подсветку автомата. Скин не должен менять порядковый номер другого скина: выбранный номер всегда соответствует выбранному предмету.")
-    add_help_section("⚙  9. УЛУЧШЕНИЯ", "Игровые улучшения усиливают характеристики автомата. Покупай их постепенно и следи за текущим уровнем каждого улучшения. Максимально прокачанные параметры больше не требуют покупки до следующего предусмотренного системой этапа.")
-    add_help_section("🛠  10. МАСТЕРСКАЯ", "В мастерской можно развивать инженерные возможности автомата: детали, модули, чертежи, калибровку и другие улучшения. Некоторые действия требуют времени. Возвращайся после завершения задания, чтобы забрать результат.")
-    add_help_section("🎯  11. ЕЖЕДНЕВНЫЕ И НЕДЕЛЬНЫЕ ЗАДАНИЯ", "Выполняй задания, которые отображаются в круглых кнопках справа на игровом экране. Они помогают получать дополнительные награды и поддерживать регулярный прогресс. Недельные события и ежедневная серия имеют отдельные окна.")
-    add_help_section("🎁  12. СУНДУКИ И НАГРАДЫ", "Сундуки могут содержать ценные награды, игрушки и эксклюзивные предметы. Следи за количеством ключей и открывай доступные сундуки. Редкие награды могут значительно помочь в коллекции и косметическом оформлении.")
-    add_help_section("🎟  13. СЕЗОННЫЙ ПРОПУСК И СОБЫТИЯ", "Сезоны и события добавляют временные цели и тематические награды. Следи за активным сезоном, выполняй доступные задачи и забирай награды до окончания события.")
-    add_help_section("👤  14. ПРОФИЛЬ И СТАТИСТИКА", "В профиле отображается имя игрока, аватар и накопленный прогресс. В статистике можно следить за количеством игр, успешных захватов, достижений и другими показателями.")
-    add_help_section("💡  15. ПОЛЕЗНЫЕ СОВЕТЫ", "Не всегда самая крупная игрушка — лучший выбор. Сначала оцени положение приза, доступность клешни и возможную траекторию подъёма. Точность часто важнее скорости. Собирай коллекции, выполняй задания и постепенно улучшай автомат.")
-    add_help_section("💾  16. СОХРАНЕНИЕ ПРОГРЕССА", "Эта версия игры работает в локальном офлайн-режиме. Прогресс, покупки, выбранные скины, коллекции и настройки сохраняются локально на устройстве. Для надёжности не закрывай игру прямо во время сохранения результата операции.")
-    add_help_section("🔔  17. УВЕДОМЛЕНИЯ", "Если уведомления разрешены на устройстве, игра может напоминать о некоторых игровых событиях и завершившихся заданиях. Управление уведомлениями находится в настройках игры.")
-    add_help_section("❓  18. ЕСЛИ ЧТО-ТО НЕ ПОЛУЧИЛОСЬ", "Если кнопка не реагирует, сначала закрой открытое окно и попробуй снова. Если открыт круговой информационный блок на игровом экране, нажми в свободное место экрана — такое окно закрывается и можно продолжить игру. При проблемах с отображением перезапусти игру: локальный прогресс при этом не должен сбрасываться.")
-
+    v.add_child(h)
+    var text := Label.new()
+    text.text = "КАК ИГРАТЬ?\n\n1. Перемещай клешню стрелками или джойстиком.\n2. Наведи прицел на подходящую игрушку.\n3. Следи за индикатором шанса захвата.\n4. Нажми «ЗАХВАТ» и дождись результата.\n5. Тяжёлые и скользкие игрушки сложнее удержать.\n6. Выполняй ежедневные и недельные задания.\n7. Ищи счастливую игрушку дня — она даёт x3.\n8. Следи за профилем, коллекцией и прогрессом.\n\nПодсказка: не всегда выгодно брать самую большую игрушку!"
+    text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    text.add_theme_font_size_override("font_size", 21)
+    text.modulate = Color("#F0E1CE")
+    v.add_child(text)
     var close := Button.new()
-    close.text = "←  НАЗАД В МЕНЮ"
-    close.custom_minimum_size = Vector2(0, 82)
+    close.text = "←  НАЗАД"
+    close.custom_minimum_size = Vector2(0, 90)
     style_button(close, Color("#9A7653"))
-    close.add_theme_font_size_override("font_size", 20)
     close.pressed.connect(func(): show_main_menu())
-    root.add_child(close)
+    v.add_child(close)
     return p
 
 func start_game() -> void:
