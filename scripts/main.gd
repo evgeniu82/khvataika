@@ -4734,10 +4734,10 @@ func update_mission_timers_light() -> void:
         var timer_label := panel.get_node_or_null("MissionDetailVBox/MissionDetailTimer") as Label
         if timer_label:
             if is_daily and daily_mission_claimed:
-                timer_label.text = "⏳ НОВАЯ МИССИЯ ЧЕРЕЗ %s" % _format_reset_timer(_seconds_to_next_day())
+                timer_label.text = "НОВАЯ МИССИЯ ЧЕРЕЗ %s" % _format_reset_timer(_seconds_to_next_day())
                 timer_label.visible = true
             elif not is_daily and weekly_mission_claimed:
-                timer_label.text = "⏳ НОВОЕ ЗАДАНИЕ ЧЕРЕЗ %s" % _format_reset_timer(_seconds_to_next_week())
+                timer_label.text = "НОВОЕ ЗАДАНИЕ ЧЕРЕЗ %s" % _format_reset_timer(_seconds_to_next_week())
                 timer_label.visible = true
             else:
                 timer_label.visible = false
@@ -4828,7 +4828,7 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Карточка открывается непосредственно рядом с кнопкой ежедневной серии,
     # как остальные правые информационные окна. Размер по высоте не меняем.
-    daily_login_panel.position = Vector2(630, 335)
+    daily_login_panel.position = Vector2(630, 360)
     daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.custom_minimum_size = Vector2(300, 165)
     daily_login_panel.visible = false
@@ -4954,8 +4954,8 @@ func toggle_daily_login() -> void:
         gameplay_modal_blocker.visible = true
     # Окно появляется непосредственно рядом с правым кругом и уезжает влево.
     # Высота и размер окна остаются прежними.
-    var final_pos := Vector2(630, 335)
-    daily_login_panel.position = Vector2(940, 335)
+    var final_pos := Vector2(630, 360)
+    daily_login_panel.position = Vector2(940, 360)
     daily_login_panel.modulate.a = 0.0
     var tween := create_tween()
     tween.set_parallel(true)
