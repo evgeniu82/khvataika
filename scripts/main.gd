@@ -8667,44 +8667,6 @@ func award_toy_xp(rarity: String) -> int:
         player_xp = xp_to_next
     return gained
 
-func collection_completion_reward(collection_name: String) -> Dictionary:
-    var needed := 0
-    for toy in toys:
-        if String(toy.get("collection", "")) == collection_name:
-            needed += 1
-    # Небольшая награда: чем больше коллекция, тем чуть выше ценность.
-    var rubles := 30 if needed <= 4 else (40 if needed <= 5 else 50)
-    var parts := 1 if needed >= 5 else 0
-    var keys := 1 if needed >= 5 else 0
-    return {"rubles":rubles, "parts":parts, "keys":keys}
-
-func collection_completion_reward_text(collection_name: String) -> String:
-    var r := collection_completion_reward(collection_name)
-    var items: Array[String] = []
-    if int(r.get("rubles", 0)) > 0: items.append("%d ₽" % int(r["rubles"]))
-    if int(r.get("parts", 0)) > 0: items.append("%d запчасть" % int(r["parts"]))
-    if int(r.get("keys", 0)) > 0: items.append("%d ключ" % int(r["keys"]))
-    return "Награда за полную коллекцию: " + " + ".join(items)
-
-func show_collection_completion_popup() -> void:
-    if pending_collection_completion.is_empty() or not result_popup:
-        return
-    var cname := String(pending_collection_completion.get("name", ""))
-    var reward_text := String(pending_collection_completion.get("reward_text", ""))
-    if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
-    popup_name_label.text = cname
-    popup_info_label.text = "Все игрушки коллекции собраны"
-    popup_xp_label.text = reward_text
-    if popup_rating_label: popup_rating_label.text = ""
-    popup_achievement_label.text = "Поздравляем! Коллекция полностью собрана."
-    popup_timer = 4.0
-    result_popup.visible = true
-    pending_collection_completion.clear()
-
-func check_collection_completion(collection_name: String) -> void:
-    # Функция отключена: награда за полную коллекцию больше не используется.
-    return
-
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
         "toys": return total_prizes_won
