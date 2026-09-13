@@ -78,6 +78,12 @@ var login_streak: int = 0
 var last_login_claim_date: String = ""
 var daily_claim_available: bool = false
 var daily_claim_button: Button
+var daily_mission_button: Button
+var weekly_mission_button: Button
+var daily_mission_timer_label: Label
+var weekly_mission_timer_label: Label
+var daily_streak_timer_label: Label
+var hud_countdown_timer: float = 0.0
 var daily_login_panel: PanelContainer
 var daily_days_container: GridContainer
 var daily_day_buttons: Array[Button] = []
@@ -4471,6 +4477,7 @@ func build_extra_hud() -> void:
     hud_layer.add_child(workshop_btn)
 
     var daily_btn := Button.new()
+    daily_mission_button = daily_btn
     daily_btn.text = "🎯"
     daily_btn.position = Vector2(948, 185)
     daily_btn.size = Vector2(82, 82)
@@ -4482,8 +4489,10 @@ func build_extra_hud() -> void:
     daily_btn.tooltip_text = "Миссия дня"
     daily_btn.pressed.connect(toggle_daily_mission)
     hud_layer.add_child(daily_btn)
+    daily_mission_timer_label = make_hud_countdown_label(daily_btn)
 
     var weekly_btn := Button.new()
+    weekly_mission_button = weekly_btn
     weekly_btn.text = "🏆"
     weekly_btn.position = Vector2(948, 280)
     weekly_btn.size = Vector2(82, 82)
@@ -4495,6 +4504,7 @@ func build_extra_hud() -> void:
     weekly_btn.tooltip_text = "Недельная миссия"
     weekly_btn.pressed.connect(toggle_weekly_mission)
     hud_layer.add_child(weekly_btn)
+    weekly_mission_timer_label = make_hud_countdown_label(weekly_btn)
 
     daily_claim_button = Button.new()
     daily_claim_button.text = "🎁"
@@ -4506,6 +4516,7 @@ func build_extra_hud() -> void:
     daily_claim_button.tooltip_text = "Ежедневная серия"
     daily_claim_button.pressed.connect(toggle_daily_login)
     hud_layer.add_child(daily_claim_button)
+    daily_streak_timer_label = make_hud_countdown_label(daily_claim_button)
 
     # Правый нижний круг — именно НЕДЕЛЬНЫЕ СОБЫТИЯ, отдельно от сезонов и праздников.
     event_button = Button.new()
@@ -4549,6 +4560,61 @@ func build_extra_hud() -> void:
     md.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     md.add_theme_font_size_override("font_size", 18)
     mv.add_child(md)
+
+func make_hud_countdown_label(parent: Button) -> Label:
+    var label := Label.new()
+    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    label.add_theme_font_size_override("font_size", 10)
+    label.add_theme_color_override("font_color", Color("#E8D6C0"))
+    label.add_theme_color_override("font_shadow_color", Color("#000000", 0.85))
+    label.add_theme_constant_override("shadow_offset_x", 1)
+    label.add_theme_constant_override("shadow_offset_y", 1)
+    label.position = Vector2(4, 61)
+    label.size = Vector2(74, 16)
+    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    parent.add_child(label)
+    return label
+
+func _seconds_until_next_midnight() -> int:
+    var now_unix := int(Time.get_unix_time_from_system())
+    var dt := Time.get_datetime_dict_from_system()
+    var midnight := Time.get_unix_time_from_datetime_dict({
+        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + 1,
+        "hour":0, "minute":0, "second":0
+    })
+    return maxi(0, int(midnight) - now_unix)
+
+func _seconds_until_next_week_reset() -> int:
+    var now_unix := int(Time.get_unix_time_from_system())
+    var dt := Time.get_datetime_dict_from_system()
+    var weekday := int(dt.get("weekday", 0)) # 0=воскресенье, 1=понедельник
+    var days_until_monday := 7 if weekday == 1 else ((8 - weekday) % 7)
+    var reset_unix := Time.get_unix_time_from_datetime_dict({
+        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + days_until_monday,
+        "hour":0, "minute":0, "second":0
+    })
+    return maxi(0, int(reset_unix) - now_unix)
+
+func _format_hud_countdown(seconds_left: int, weekly: bool = false) -> String:
+    var total := maxi(0, seconds_left)
+    var days := int(total / 86400)
+    var hours := int((total % 86400) / 3600)
+    var minutes := int((total % 3600) / 60)
+    var seconds := int(total % 60)
+    if weekly:
+        return "%dд %02d:%02d" % [days, hours, minutes]
+    return "%02d:%02d:%02d" % [hours, minutes, seconds]
+
+func update_hud_countdown_timers() -> void:
+    var daily_text := _format_hud_countdown(_seconds_until_next_midnight())
+    var weekly_text := _format_hud_countdown(_seconds_until_next_week_reset(), true)
+    if daily_mission_timer_label and is_instance_valid(daily_mission_timer_label):
+        daily_mission_timer_label.text = daily_text
+    if weekly_mission_timer_label and is_instance_valid(weekly_mission_timer_label):
+        weekly_mission_timer_label.text = weekly_text
+    if daily_streak_timer_label and is_instance_valid(daily_streak_timer_label):
+        daily_streak_timer_label.text = daily_text
 
 func animate_panel_in(panel: Control, from_scale: float = 0.94) -> void:
     if not panel or not is_instance_valid(panel): return
@@ -5939,7 +6005,7 @@ func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     if not skip_confirmation and confirm_rare_chests_on and kind in ["rare", "epic", "legendary", "vip"]:
         var names := {"rare":"РЕДКИЙ", "epic":"ЭПИЧЕСКИЙ", "legendary":"ЛЕГЕНДАРНЫЙ", "vip":"VIP"}
         var need := int(chest_key_costs.get(kind, 1))
-        confirm_purchase("Открытие редкого сундука", "Открыть «%s» за %d ключей?" % [String(names.get(kind, kind.to_upper())), need], func(): open_chest(kind, true), "ОТКРЫТЬ")
+        show_chest_confirmation(String(names.get(kind, kind.to_upper())), need, func(): open_chest(kind, true))
         return
     if _server_ready() and player_token != "":
         if _server_action("chest_open", {"kind":kind}):
@@ -7971,6 +8037,10 @@ func update_ui() -> void:
 
 func _process(delta: float) -> void:
     time_alive += delta
+    hud_countdown_timer -= delta
+    if hud_countdown_timer <= 0.0:
+        hud_countdown_timer = 1.0
+        update_hud_countdown_timers()
     if notification_permission_waiting and OS.has_feature("android") and fmod(time_alive, 1.0) < delta:
         if _android_notification_permission_granted():
             notification_permission_waiting = false
@@ -8905,7 +8975,12 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
         popup_achievement_label.text = ""
     else:
         popup_achievement_label.text = "\n".join(pending_achievement_rewards_text)
-    popup_timer = 3.2
+    # Дубль требует выбора игрока, поэтому окно не исчезает само.
+    popup_timer = 0.0 if sale_available and sale_name == toy_name else 3.2
+    if sale_available and sale_name == toy_name:
+        if popup_title_label: popup_title_label.text = "ДУБЛЬ ИГРУШКИ"
+        popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
+        popup_achievement_label.text = "Игрушка уже есть в коллекции. Выберите: продать дубль или оставить его."
     result_popup.visible = true
     pending_new_achievements.clear()
     pending_achievement_rewards_text.clear()
@@ -8930,6 +9005,43 @@ func rarity_reward(rarity: String) -> int:
         "ЭПИЧЕСКАЯ": return 50
         "ЛЕГЕНДАРНАЯ": return 150
     return 5
+
+func show_chest_confirmation(chest_name: String, need: int, action: Callable) -> void:
+    var dialog := ConfirmationDialog.new()
+    dialog.title = "🎁  ОТКРЫТИЕ СУНДУКА"
+    dialog.dialog_text = "Открыть «%s» за %d ключей?" % [chest_name, need]
+    dialog.ok_button_text = "ОТКРЫТЬ"
+    dialog.cancel_button_text = "ОТМЕНА"
+    dialog.min_size = Vector2(620, 300)
+    menu_layer.add_child(dialog)
+    # Принудительно оформляем стандартное окно в палитре игры, чтобы на Android
+    # вместо серого системного диалога использовалась наша коричневая тема.
+    dialog.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#8A684C"), 22, 3))
+    dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
+    dialog.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
+    dialog.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+    dialog.add_theme_font_size_override("font_size", 20)
+    var panel := dialog.get_node_or_null("Panel") as Panel
+    if panel:
+        panel.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#8A684C"), 22, 3))
+    var label := dialog.get_label()
+    if label:
+        label.add_theme_color_override("font_color", Color("#E1C29A"))
+        label.add_theme_font_size_override("font_size", 22)
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    var ok := dialog.get_ok_button()
+    if ok:
+        style_button(ok, Color("#C09A70"))
+        ok.add_theme_font_size_override("font_size", 20)
+    var cancel := dialog.get_cancel_button()
+    if cancel:
+        style_button(cancel, Color("#76583F"))
+        cancel.add_theme_font_size_override("font_size", 20)
+    dialog.confirmed.connect(action)
+    dialog.confirmed.connect(func(): dialog.queue_free())
+    dialog.canceled.connect(func(): dialog.queue_free())
+    dialog.close_requested.connect(func(): dialog.queue_free())
+    dialog.popup_centered(Vector2(620, 300))
 
 func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ") -> void:
     var dialog := ConfirmationDialog.new()
