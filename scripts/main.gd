@@ -128,11 +128,13 @@ var weekly_mission_progress: int = 0
 var weekly_mission_target: int = 12
 var weekly_mission_key: String = ""
 var weekly_mission_claimed: bool = false
-# Временные метки завершения/получения для локальных таймеров перезапуска.
+# Лёгкие метки для таймеров: сохраняем только момент получения/завершения.
 var daily_mission_completed_at: int = 0
 var weekly_mission_completed_at: int = 0
 var daily_series_claimed_at: int = 0
-var mission_timer_second: int = -1
+var mission_timer_ui_accum: float = 0.0
+var mission_timer_last_day: String = ""
+var mission_timer_last_week: String = ""
 var lucky_toy_index: int = 0
 var lucky_toy_date: String = ""
 var refill_animation_timer: float = 0.0
@@ -4638,7 +4640,7 @@ func build_extra_hud() -> void:
     var mtimer := Label.new()
     mtimer.name = "MissionDetailTimer"
     mtimer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    mtimer.add_theme_font_size_override("font_size", 13)
+    mtimer.add_theme_font_size_override("font_size", 11)
     mtimer.modulate = Color("#D6A14A")
     mtimer.visible = false
     mv.add_child(mtimer)
@@ -4687,90 +4689,66 @@ func close_side_panels(except_name: String = "") -> void:
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = side_open
     update_android_navigation()
-func _format_countdown(seconds: int) -> String:
+func _format_reset_timer(seconds: int) -> String:
     var s := maxi(0, seconds)
     var days := int(s / 86400)
     var hours := int((s % 86400) / 3600)
     var minutes := int((s % 3600) / 60)
     var secs := s % 60
     if days > 0:
-        return "%dд %02d:%02d:%02d" % [days, hours, minutes, secs]
+        return "%dд %02d:%02d" % [days, hours, minutes]
     return "%02d:%02d:%02d" % [hours, minutes, secs]
 
-func _seconds_until_next_daily_reset() -> int:
+func _seconds_to_next_day() -> int:
     var dt := Time.get_datetime_dict_from_system()
     var elapsed := int(dt.get("hour", 0)) * 3600 + int(dt.get("minute", 0)) * 60 + int(dt.get("second", 0))
     return maxi(0, 86400 - elapsed)
 
-func _seconds_until_next_week_reset() -> int:
-    # Сохраняем ту же семидневную границу, которая уже используется weekly_mission_key.
+func _seconds_to_next_week() -> int:
     var now := int(Time.get_unix_time_from_system())
     var day_number := int(floor(float(now) / 86400.0))
-    var next_day := (int(floor(float(day_number) / 7.0)) + 1) * 7
-    return maxi(0, next_day * 86400 - now)
+    var next_week_day := (int(floor(float(day_number) / 7.0)) + 1) * 7
+    return maxi(0, next_week_day * 86400 - now)
 
-func _daily_mission_timer_text() -> String:
-    if not daily_mission_claimed or daily_mission_completed_at <= 0:
-        return ""
-    var left := _seconds_until_next_daily_reset()
-    return "⏳ НОВАЯ МИССИЯ ЧЕРЕЗ: %s" % _format_countdown(left)
-
-func _weekly_mission_timer_text() -> String:
-    if not weekly_mission_claimed or weekly_mission_completed_at <= 0:
-        return ""
-    var left := _seconds_until_next_week_reset()
-    return "⏳ НОВОЕ ЗАДАНИЕ ЧЕРЕЗ: %s" % _format_countdown(left)
-
-func _daily_series_timer_text() -> String:
-    if daily_claim_available or daily_series_claimed_at <= 0:
-        return ""
-    var left := _seconds_until_next_daily_reset()
-    return "⏳ НОВАЯ СЕРИЯ ЧЕРЕЗ: %s" % _format_countdown(left)
-
-func update_mission_timers() -> void:
-    if not hud_layer or not is_instance_valid(hud_layer):
+func update_mission_timers_light() -> void:
+    # Максимально лёгкий таймер: обновляется раз в секунду и только для открытых окон.
+    if not game_initialized or not hud_layer or not is_instance_valid(hud_layer):
         return
-    var now_second := int(Time.get_unix_time_from_system())
-    if now_second == mission_timer_second:
-        return
-    mission_timer_second = now_second
-
-    # Если наступил новый календарный день/неделя, сразу открываем новый цикл.
     var today := Time.get_date_string_from_system()
-    var current_day_number := int(floor(Time.get_unix_time_from_system() / 86400.0))
-    var current_week_key := str(int(floor(float(current_day_number) / 7.0)))
-    if daily_mission_date != today:
+    var day_number := int(floor(float(Time.get_unix_time_from_system()) / 86400.0))
+    var week_key := str(int(floor(float(day_number) / 7.0)))
+    if mission_timer_last_day != today:
+        mission_timer_last_day = today
         setup_daily_systems()
-    elif weekly_mission_key != current_week_key:
+        if last_login_claim_date != "" and last_login_claim_date != today and not daily_claim_available:
+            setup_login_streak()
+    if mission_timer_last_week != week_key:
+        mission_timer_last_week = week_key
         setup_daily_systems()
-    if last_login_claim_date != "" and last_login_claim_date != today and not daily_claim_available:
-        setup_login_streak()
 
     var panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
     if panel and panel.visible:
         var is_daily := String(panel.get_meta("mission_type", "daily")) == "daily"
-        var title := panel.get_node_or_null("MissionDetailVBox/MissionDetailTitle") as Label
-        var detail := panel.get_node_or_null("MissionDetailVBox/MissionDetailText") as Label
         var timer_label := panel.get_node_or_null("MissionDetailVBox/MissionDetailTimer") as Label
-        if title and detail:
-            if is_daily:
-                title.text = "🎯 МИССИЯ ДНЯ"
-                detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +%d ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target, daily_mission_reward]
-                if timer_label:
-                    timer_label.text = _daily_mission_timer_text()
-                    timer_label.visible = daily_mission_claimed and daily_mission_completed_at > 0
+        if timer_label:
+            if is_daily and daily_mission_claimed:
+                timer_label.text = "⏳ НОВАЯ МИССИЯ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_day())
+                timer_label.visible = true
+            elif not is_daily and weekly_mission_claimed:
+                timer_label.text = "⏳ НОВОЕ ЗАДАНИЕ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_week())
+                timer_label.visible = true
             else:
-                title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
-                detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +%d ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target, weekly_mission_reward]
-                if timer_label:
-                    timer_label.text = _weekly_mission_timer_text()
-                    timer_label.visible = weekly_mission_claimed and weekly_mission_completed_at > 0
+                timer_label.visible = false
 
     if daily_login_panel and is_instance_valid(daily_login_panel) and daily_login_panel.visible:
         var hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
         if hint:
-            var timer_text := _daily_series_timer_text()
-            hint.text = timer_text if timer_text != "" else "Нажми на день, который доступен сейчас"
+            if daily_claim_available:
+                hint.text = "Нажми на день, который доступен сейчас"
+            elif daily_series_claimed_at > 0:
+                hint.text = "⏳ НОВАЯ СЕРИЯ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_day())
+            else:
+                hint.text = "Нажми на день, который доступен сейчас"
 
 func toggle_daily_mission() -> void:
     toggle_mission_detail(true)
@@ -4798,8 +4776,8 @@ func toggle_mission_detail(is_daily: bool) -> void:
         title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
         detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
     panel.visible = true
-    mission_timer_second = -1
-    update_mission_timers()
+    mission_timer_ui_accum = 1.0
+    update_mission_timers_light()
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
     animate_panel_in(panel)
@@ -4911,11 +4889,9 @@ func update_daily_login_ui() -> void:
         var reward := 20 + current_day * 5
         if detail:
             detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
-        if daily_login_panel and is_instance_valid(daily_login_panel):
-            var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
-            if daily_hint:
-                var series_timer := _daily_series_timer_text()
-                daily_hint.text = series_timer if series_timer != "" else "Нажми на день, который доступен сейчас"
+        var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
+        if daily_hint and not daily_claim_available and daily_series_claimed_at > 0:
+            daily_hint.text = "⏳ НОВАЯ СЕРИЯ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_day())
 
         for i in range(daily_day_buttons.size()):
             var day := i + 1
@@ -4937,7 +4913,6 @@ func update_daily_login_ui() -> void:
             else:
                 btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
                 style_button(btn, Color("#5B5B66"))
-        update_mission_timers()
 
 func toggle_daily_login() -> void:
     if not daily_login_panel:
@@ -5012,9 +4987,8 @@ func claim_login_reward_for_day(day: int) -> void:
     var reward := server_reward_amount(20 + login_streak * 5)
     coins += reward
     last_login_claim_date = today
-    daily_series_claimed_at = int(Time.get_unix_time_from_system())
-    mission_timer_second = -1
     daily_claim_available = false
+    daily_series_claimed_at = int(Time.get_unix_time_from_system())
     current_result = "🎁 ЕЖЕДНЕВНАЯ НАГРАДА • ДЕНЬ %d • +%d ₽" % [login_streak, reward]
     save_game()
     update_ui()
@@ -8166,7 +8140,11 @@ func update_ui() -> void:
 
 func _process(delta: float) -> void:
     time_alive += delta
-    update_mission_timers()
+    # Таймер не участвует в старте: после запуска проверяем его максимум раз в секунду.
+    mission_timer_ui_accum += delta
+    if game_initialized and mission_timer_ui_accum >= 1.0:
+        mission_timer_ui_accum = 0.0
+        update_mission_timers_light()
     if notification_permission_waiting and OS.has_feature("android") and fmod(time_alive, 1.0) < delta:
         if _android_notification_permission_granted():
             notification_permission_waiting = false
@@ -9476,15 +9454,10 @@ func update_missions() -> void:
         var detail := panel.get_node("MissionDetailVBox/MissionDetailText") as Label
         if is_daily:
             title.text = "🎯 МИССИЯ ДНЯ"
-            detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +%d ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target, daily_mission_reward]
-            if daily_mission_claimed:
-                detail.text += "\n" + _daily_mission_timer_text()
+            detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +50 ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target]
         else:
             title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
-            detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +%d ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target, weekly_mission_reward]
-            if weekly_mission_claimed:
-                detail.text += "\n" + _weekly_mission_timer_text()
-    update_mission_timers()
+            detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
 
 func show_waiting_screen() -> void:
     if not auto_tips_on:
@@ -9518,7 +9491,6 @@ func complete_daily_mission_if_ready() -> void:
         daily_mission_progress = daily_mission_target
         daily_mission_claimed = true
         daily_mission_completed_at = int(Time.get_unix_time_from_system())
-        mission_timer_second = -1
         total_daily_claims += 1
         current_result = "🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(daily_mission_reward)
         notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +50 ₽ уже получена!")
@@ -9532,7 +9504,6 @@ func complete_weekly_mission_if_ready() -> void:
         weekly_mission_progress = weekly_mission_target
         weekly_mission_claimed = true
         weekly_mission_completed_at = int(Time.get_unix_time_from_system())
-        mission_timer_second = -1
         total_weekly_claims += 1
         current_result = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(weekly_mission_reward)
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
@@ -9752,9 +9723,6 @@ func save_game() -> void:
             "weekly_mission_progress": weekly_mission_progress,
             "weekly_mission_key": weekly_mission_key,
             "weekly_mission_claimed": weekly_mission_claimed,
-            "daily_mission_completed_at": daily_mission_completed_at,
-            "weekly_mission_completed_at": weekly_mission_completed_at,
-            "daily_series_claimed_at": daily_series_claimed_at,
             "lucky_toy_index": lucky_toy_index,
             "lucky_toy_date": lucky_toy_date,
             "prizes": serialize_prizes(),
@@ -9932,9 +9900,6 @@ func load_save() -> void:
     weekly_mission_progress = maxi(0, int(data.get("weekly_mission_progress", 0)))
     weekly_mission_key = String(data.get("weekly_mission_key", ""))
     weekly_mission_claimed = bool(data.get("weekly_mission_claimed", false))
-    daily_mission_completed_at = int(data.get("daily_mission_completed_at", 0))
-    weekly_mission_completed_at = int(data.get("weekly_mission_completed_at", 0))
-    daily_series_claimed_at = int(data.get("daily_series_claimed_at", 0))
     lucky_toy_index = clampi(int(data.get("lucky_toy_index", 0)), 0, toys.size() - 1)
     lucky_toy_date = String(data.get("lucky_toy_date", ""))
     var saved_completed: Variant = data.get("completed_collections", {})
