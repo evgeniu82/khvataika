@@ -92,6 +92,34 @@ jobs:
           touch android/build/.gdignore
           printf '%s\n' "${GODOT_VERSION}.stable" > android/.build_version
 
+          # Android 15/16 devices may use 16 KB memory pages. Package the
+          # Godot native .so files compressed to avoid 16 KB ZIP-alignment
+          # installation failures on devices that require 16 KB pages.
+          APP_GRADLE="$(find android/build -path '*/app/build.gradle' -type f -print -quit)"
+          test -n "$APP_GRADLE"
+          python3 - "$APP_GRADLE" <<'PY2'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+s = p.read_text()
+if 'useLegacyPackaging true' not in s:
+    marker = 'android {'
+    pos = s.find(marker)
+    if pos < 0:
+        raise SystemExit('android block not found in app/build.gradle')
+    insert = '''android {
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
+        }
+    }'''
+    s = insert + s[pos + len(marker):]
+    p.write_text(s)
+print(f'Enabled legacy JNI packaging in {p}')
+PY2
+          test -f "$APP_GRADLE"
+          grep -q 'useLegacyPackaging true' "$APP_GRADLE"
+
           test -f android/.build_version
           test -f android/build/gradlew
           TEMPLATE_VERSION="$(tr -d '\r\n' < android/.build_version)"
@@ -120,12 +148,12 @@ jobs:
           set -euo pipefail
           test -f project.godot
           test -f VERSION.txt
-          test "$(tr -d '[:space:]' < VERSION.txt)" = "1.18.12"
+          test "$(tr -d '[:space:]' < VERSION.txt)" = "1.18.14"
           test -f export_presets.cfg
           grep -q 'name="Android RuStore AAB"' export_presets.cfg
-          grep -q 'config/version="1.18.12"' project.godot
-          grep -q 'version/name="1.18.12"' export_presets.cfg
-          grep -q 'export_path="build/rustore/khvataika-1.18.12.aab"' export_presets.cfg
+          grep -q 'config/version="1.18.14"' project.godot
+          grep -q 'version/name="1.18.14"' export_presets.cfg
+          grep -q 'export_path="build/rustore/khvataika-1.18.14.aab"' export_presets.cfg
           grep -q 'textures/vram_compression/import_etc2_astc=true' project.godot
           test -f audio/claw_move.wav
           test -s audio/claw_move.wav
@@ -156,16 +184,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/rustore
-          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.18.12.aab
-          test -s build/rustore/khvataika-1.18.12.aab
-          file build/rustore/khvataika-1.18.12.aab
+          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.18.14.aab
+          test -s build/rustore/khvataika-1.18.14.aab
+          file build/rustore/khvataika-1.18.14.aab
           echo "AAB export completed"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: khvataika-1.18.12-rustore-aab
-          path: build/rustore/khvataika-1.18.12.aab
+          name: khvataika-1.18.14-rustore-aab
+          path: build/rustore/khvataika-1.18.14.aab
           if-no-files-found: error
           retention-days: 14
 
@@ -179,22 +207,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/rustore
-          rm -f build/rustore/khvataika-1.18.12.apk
+          rm -f build/rustore/khvataika-1.18.14.apk
           echo "Exporting final signed APK..."
           "$HOME/godot/godot" \
             --headless \
             --path . \
             --export-release \
             "Android" \
-            "build/rustore/khvataika-1.18.12.apk"
-          test -s build/rustore/khvataika-1.18.12.apk
-          file build/rustore/khvataika-1.18.12.apk
+            "build/rustore/khvataika-1.18.14.apk"
+          test -s build/rustore/khvataika-1.18.14.apk
+          file build/rustore/khvataika-1.18.14.apk
           echo "APK export completed"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: khvataika-1.18.12-apk
-          path: build/rustore/khvataika-1.18.12.apk
+          name: khvataika-1.18.14-apk
+          path: build/rustore/khvataika-1.18.14.apk
           if-no-files-found: error
           retention-days: 14
