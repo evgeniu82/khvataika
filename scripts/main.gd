@@ -6006,7 +6006,14 @@ func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     if not skip_confirmation and confirm_rare_chests_on:
         var names := {"common":"ОБЫЧНЫЙ", "rare":"РЕДКИЙ", "epic":"ЭПИЧЕСКИЙ", "legendary":"ЛЕГЕНДАРНЫЙ", "vip":"VIP"}
         var need := int(chest_key_costs.get(kind, 1))
-        confirm_purchase("Открытие сундука", "Открыть «%s» за %d ключей?" % [String(names.get(kind, kind.to_upper())), need], func(): open_chest(kind, true), "ОТКРЫТЬ", true)
+        var guaranteed := chest_guaranteed_reward(kind)
+        var chest_name := String(names.get(kind, kind.to_upper()))
+        var reward := String(guaranteed.get("n", "НАГРАДА"))
+        var message := "🎁  ОТКРЫТИЕ СУНДУКА\n\n"
+        message += "СУНДУК: %s\n" % chest_name
+        message += "🔑  БУДЕТ ПОТРАЧЕНО КЛЮЧЕЙ: %d\n" % need
+        message += "🏆  ГАРАНТИРОВАННЫЙ ПРИЗ: %s" % reward
+        confirm_purchase("Открытие сундука", message, func(): open_chest(kind, true), "ОТКРЫТЬ", true)
         return
     if _server_ready() and player_token != "":
         if _server_action("chest_open", {"kind":kind}):
@@ -9010,9 +9017,12 @@ func confirm_purchase(title_text: String, message_text: String, action: Callable
     dialog.ok_button_text = ok_text
     dialog.cancel_button_text = "ОТМЕНА"
 
-    # Для открытия сундуков используем обычный надёжный ConfirmationDialog,
-    # но полностью оформляем его в фирменной коричневой гамме игры.
+    # Для сундуков оставляем штатный надёжный ConfirmationDialog,
+    # но убираем серую системную рамку/заголовок и оформляем содержимое
+    # полностью в фирменной коричневой гамме игры.
     if chest_style:
+        dialog.borderless = true
+        dialog.transparent_bg = true
         var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
         panel_style.content_margin_left = 28.0
         panel_style.content_margin_right = 28.0
@@ -9021,7 +9031,15 @@ func confirm_purchase(title_text: String, message_text: String, action: Callable
         dialog.add_theme_stylebox_override("panel", panel_style)
         dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
         dialog.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
-        dialog.add_theme_font_size_override("font_size", 21)
+        dialog.add_theme_font_size_override("font_size", 27)
+
+        var chest_label := dialog.get_label()
+        if chest_label:
+            chest_label.add_theme_color_override("font_color", Color("#F1E5D6"))
+            chest_label.add_theme_font_size_override("font_size", 27)
+            chest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            chest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            chest_label.custom_minimum_size = Vector2(620, 210)
 
         var ok := dialog.get_ok_button()
         var cancel := dialog.get_cancel_button()
@@ -9037,7 +9055,10 @@ func confirm_purchase(title_text: String, message_text: String, action: Callable
     dialog.confirmed.connect(func(): dialog.queue_free())
     dialog.canceled.connect(func(): dialog.queue_free())
     dialog.close_requested.connect(func(): dialog.queue_free())
-    dialog.popup_centered(Vector2(700, 320))
+    if chest_style:
+        dialog.popup_centered(Vector2(700, 390))
+    else:
+        dialog.popup_centered(Vector2(700, 320))
 
 func buy_claw(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= claw_specs.size(): return
