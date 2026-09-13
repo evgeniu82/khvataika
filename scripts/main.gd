@@ -1692,8 +1692,14 @@ func sync_player_to_server() -> void:
         remote_request_kind = ""
         remote_sync_status = "ОШИБКА СИНХРОНИЗАЦИИ"
 
+func get_player_rating_score() -> int:
+    # Рейтинг начисляется только за реальные достижения игрока:
+    # успешный захват игрушки и повышение уровня. Игры, поражения и серия
+    # побед сами по себе рейтинг не дают. Значения намеренно небольшие.
+    return total_prizes_won * 5 + maxi(0, player_level - 1) * 3
+
 func get_player_online_score() -> int:
-    return total_games * 12 + total_prizes_won * 35 + player_level * 180 + best_win_streak * 25
+    return get_player_rating_score()
 
 func request_global_rating() -> void:
     if not _server_ready():
@@ -2131,7 +2137,7 @@ func redeem_promo_code(code: String) -> void:
     refresh_live_systems_panel()
 
 func get_local_leaderboard() -> Array[Dictionary]:
-    var score := total_games * 12 + total_prizes_won * 35 + player_level * 180 + best_win_streak * 25
+    var score := get_player_rating_score()
     var rows: Array[Dictionary] = [
         {"name":"NEONFOX","score":score + 4200}, {"name":"CLAWMASTER","score":score + 3100},
         {"name":"TOYHUNTER","score":score + 2050}, {"name":player_name,"score":score},
@@ -2408,7 +2414,7 @@ func refresh_rating_panel() -> void:
     var note:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/RatingNote") as Label
     var rows: Array = get_local_leaderboard() if not SERVER_AUTHORITATIVE else remote_leaderboard
     if note:
-        note.text = "🏠 ЛОКАЛЬНЫЙ РЕЙТИНГ • работает полностью без сервера" if not SERVER_AUTHORITATIVE else "🌐 ОБЩИЙ ОНЛАЙН-РЕЙТИНГ • данные игроков загружаются с сервера"
+        note.text = "🏠 Рейтинг: +5 за каждую достанутую игрушку и +3 за каждый новый уровень" if not SERVER_AUTHORITATIVE else "🌐 Рейтинг: очки начисляются только за достанные игрушки и новые уровни"
     for c in list.get_children():c.queue_free()
     if rows.is_empty():
         var empty := Label.new(); empty.text="Рейтинг пока пуст."; empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; empty.add_theme_font_size_override("font_size",19); list.add_child(empty); return
@@ -2672,7 +2678,7 @@ func create_loading_screen() -> void:
     loading_screen.add_child(footer)
 
     var version := Label.new()
-    version.text = "MOBILE EDITION  •  v1.14.1"
+    version.text = "MOBILE EDITION  •  v1.14.2"
     version.position = Vector2(70, 1795)
     version.size = Vector2(940, 38)
     version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5305,7 +5311,9 @@ func build_shop_panel() -> PanelContainer:
     var tabs := HBoxContainer.new()
     tabs.add_theme_constant_override("separation", 7)
     root.add_child(tabs)
-    var tab_specs := [["⚙  УЛУЧШЕНИЯ", "upgrades"], ["🦾  КЛЕШНИ", "claws"], ["🎨  СКИНЫ КЛЕШНИ", "claw_skins"], ["🧸  СКИНЫ ИГРУШЕК", "toy_skins"], ["🏪  СКИНЫ АППАРАТА", "machine_skins"]]
+    # В магазине оставлены только четыре нужных раздела. Отдельного
+    # раздела «КЛЕШНИ» больше нет — покупка/выбор самой клешни здесь не показывается.
+    var tab_specs := [["⚙  УЛУЧШЕНИЯ", "upgrades"], ["🎨  СКИНЫ КЛЕШНИ", "claw_skins"], ["🧸  СКИНЫ ИГРУШЕК", "toy_skins"], ["🏪  СКИНЫ АППАРАТА", "machine_skins"]]
     for spec in tab_specs:
         var b := Button.new()
         b.text = String(spec[0])
@@ -7595,8 +7603,10 @@ func mark_localized(control: Control, ru_text: String, en_text: String) -> void:
 
 func build_help_panel() -> PanelContainer:
     var p := PanelContainer.new()
-    p.position = Vector2(80, 300)
-    p.size = Vector2(920, 900)
+    # Окно помощи теперь начинается там же, где остальные полноэкранные
+    # панели. Убрано большое пустое пространство сверху.
+    p.position = Vector2(55, 80)
+    p.size = Vector2(970, 1120)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
