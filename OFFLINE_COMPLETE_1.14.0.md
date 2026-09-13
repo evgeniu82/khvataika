@@ -1,4 +1,4 @@
-# ХВАТАЙКА 1.14.1 — LOCAL / OFFLINE COMPLETE
+# ХВАТАЙКА 1.14.2 — LOCAL / OFFLINE COMPLETE
 
 This build is the local-first milestone. The server code is retained for the later online phase, but gameplay is explicitly offline and does not use server authority.
 
