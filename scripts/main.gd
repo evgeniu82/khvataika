@@ -210,13 +210,6 @@ const SERVER_AUTHORITATIVE: bool = false
 const STARTUP_CONTROL_TEST: bool = false
 # TEST 1: daily login/mission systems only. All other new startup features remain isolated.
 const DAILY_ONLY_TEST: bool = false
-
-# Features intentionally removed for this rollback build.
-const ENABLE_UPDATED_3D_TOYS: bool = false
-const ENABLE_UNIFIED_TOY_CATALOG: bool = false
-const ENABLE_DUPLICATE_TOY_POPUP: bool = false
-const ENABLE_NEW_TOY_POPUP: bool = false
-const ENABLE_COLLECTION_COMPLETION_REWARD: bool = false
 var server_url: String = ""
 var player_id: String = ""
 var player_token: String = ""
@@ -498,8 +491,6 @@ var popup_xp_label: Label
 var popup_rating_label: Label
 var popup_title_label: Label
 var popup_timer: float = 0.0
-var active_touch_scroll: ScrollContainer = null
-var active_touch_id: int = -1
 var popup_achievement_label: Label
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
@@ -614,10 +605,16 @@ var toys: Array[Dictionary] = [
 ]
 
 func get_collection_names() -> Array[String]:
-    # Legacy collection list. The unified/extended catalog UI is disabled.
+    var result: Array[String] = []
+    for toy in toys:
+        var name := String(toy.get("collection", ""))
+        if name != "" and not result.has(name): result.append(name)
+    if not result.is_empty(): return result
     return [
         "ЛЕСНЫЕ ДРУЗЬЯ", "МИЛЫЕ МАЛЫШИ", "ДЖУНГЛИ", "ОКЕАН",
-        "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР"
+        "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР",
+        "ДИНОЗАВРЫ", "СУПЕРГЕРОИ", "СЛАДКИЙ МИР", "ПИРАТЫ",
+        "РОБОТЫ", "ФАНТАСТИКА", "СПОРТ", "МИР МОНСТРОВ"
     ]
 
 func add_extended_collections() -> void:
@@ -779,6 +776,7 @@ func _ready() -> void:
         return
 
     if not STARTUP_CONTROL_TEST:
+        add_extended_collections()
         add_progressive_achievements()
         add_diverse_achievements()
         owned_claw_skins.resize(claw_skin_specs.size())
@@ -1999,6 +1997,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                             finish_xp = int(data.get("xp_gain", 0))
                         last_prize_xp = finish_xp
                         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, 0)
+                        if bool(data.get("duplicate", false)):
+                            sale_name = last_prize_name
+                            sale_rarity = last_prize_rarity
+                            sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
+                            sale_available = true
+                            show_sale_offer()
                     elif not bool(data.get("success", false)):
                         current_result = "НЕ УДЕРЖАЛА 😅 • РЕЗУЛЬТАТ ПОДТВЕРЖДЁН СЕРВЕРОМ"
                 "action:promo_redeem":
@@ -3316,7 +3320,7 @@ func build_prizes() -> void:
             var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor)
             body.rotation = rot
             prize_bodies.append(body)
-            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+            prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
     if prize_bodies.is_empty():
         spawn_random_prizes(INITIAL_PRIZE_COUNT)
@@ -3377,7 +3381,7 @@ func build_prizes_async() -> void:
             var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor)
             body.rotation = rot
             prize_bodies.append(body)
-            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+            prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
         var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
         await set_loading_progress(saved_progress, "ИГРУШКА %d ИЗ %d ВОССТАНОВЛЕНА" % [loaded_count, valid_saved_count])
 
@@ -3415,7 +3419,7 @@ func spawn_one_random_prize(n: int) -> void:
     var body := make_physics_toy(source_index, toys[source_index], Vector3(x, y, z), variant_color, size_factor)
     body.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-PI, PI), rng.randf_range(-0.25, 0.25))
     prize_bodies.append(body)
-    prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+    prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
 func get_thematic_toy_indices() -> Array[int]:
     var result: Array[int] = []
@@ -3535,7 +3539,7 @@ func spawn_random_prizes(count: int, animate_refill: bool = false) -> void:
                 body.set_meta("refill_active", true)
                 body.set_meta("refill_delay", float(n) * 0.10)
             prize_bodies.append(body)
-            prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
+            prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
 func make_coin_capsule(pos: Vector3) -> RigidBody3D:
     var body := RigidBody3D.new()
@@ -3626,6 +3630,10 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
     var toy_weight: float = float(data.get("weight", 38.0))
     body.mass = clampf(toy_weight / 55.0, 0.20, 1.15)
     body.set_meta("toy_weight", toy_weight)
+    body.set_meta("toy_name", String(data.get("name", "Игрушка")))
+    body.set_meta("toy_collection", String(data.get("collection", "")))
+    body.set_meta("toy_rarity", String(data.get("rarity", "ОБЫЧНАЯ")))
+    body.set_meta("toy_source_index", index)
     body.set_meta("slippery", randf() < (0.10 if String(data.get("rarity", "")) == "ОБЫЧНАЯ" else 0.18))
     body.scale = Vector3(TOY_SCALE * size_factor, TOY_SCALE * size_factor, TOY_SCALE * size_factor)
     body.linear_damp = 2.4
@@ -3645,10 +3653,6 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
 
     var render_color: Color = data["color"] if visual_color.a < 0.0 else visual_color
     make_toy_visual(body, index, String(data["rarity"]), render_color)
-    body.set_meta("toy_source_index", index)
-    body.set_meta("toy_name", String(data.get("name", "Игрушка")))
-    body.set_meta("toy_collection", String(data.get("collection", "")))
-    body.set_meta("toy_rarity", String(data.get("rarity", "ОБЫЧНАЯ")))
     body.rotation.y = randf_range(-0.5, 0.5)
     return body
 
@@ -3658,15 +3662,11 @@ func plush_piece(root: Node3D, pos: Vector3, scale: Vector3, mat: Material, name
     return n
 
 func plush_face(root: Node3D, face_y: float, face_z: float, white: Material, dark: Material, pink: Material) -> void:
-    # Масштаб игрушек не увеличиваем. Исправляем только геометрию лица:
-    # глаза симметричны, нос строго между ними, рот находится под носом.
-    make_sphere(root, 0.075, Vector3(-0.16, face_y, face_z + 0.015), dark, "EyeL")
-    make_sphere(root, 0.075, Vector3(0.16, face_y, face_z + 0.015), dark, "EyeR")
-    make_sphere(root, 0.030, Vector3(-0.135, face_y + 0.025, face_z + 0.070), white, "EyeSparkL")
-    make_sphere(root, 0.030, Vector3(0.135, face_y + 0.025, face_z + 0.070), white, "EyeSparkR")
-    make_sphere(root, 0.055, Vector3(0, face_y - 0.17, face_z + 0.060), pink, "Nose")
-    var mouth := make_sphere(root, 0.060, Vector3(0, face_y - 0.285, face_z + 0.055), dark, "Mouth")
-    mouth.scale = Vector3(1.35, 0.45, 0.55)
+    make_sphere(root, 0.075, Vector3(-0.16, face_y, face_z), dark, "EyeL")
+    make_sphere(root, 0.075, Vector3(0.16, face_y, face_z), dark, "EyeR")
+    make_sphere(root, 0.030, Vector3(-0.135, face_y + 0.025, face_z + 0.055), white, "EyeSparkL")
+    make_sphere(root, 0.030, Vector3(0.185, face_y + 0.025, face_z + 0.055), white, "EyeSparkR")
+    make_sphere(root, 0.055, Vector3(0, face_y - 0.17, face_z + 0.045), pink, "Nose")
 
 func add_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     plush_piece(root, Vector3(0,0.55,0), Vector3(1.12,1.02,0.88), mat, "RoundBody")
@@ -3739,8 +3739,6 @@ func add_turtle(root: Node3D, mat: Material, dark: Material, white: Material, pi
         plush_piece(root,pos,Vector3(0.36,0.22,0.30),mat,"Flipper")
     make_sphere(root,0.06,Vector3(-0.16,0.93,0.76),dark,"EyeL")
     make_sphere(root,0.06,Vector3(0.16,0.93,0.76),dark,"EyeR")
-    var turtle_mouth := make_sphere(root,0.055,Vector3(0,0.82,0.79),dark,"TurtleMouth")
-    turtle_mouth.scale=Vector3(1.45,0.42,0.45)
 
 func add_monkey(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     add_bear(root,mat,dark,white,pink)
@@ -3893,16 +3891,57 @@ func get_toy_variant_color(base: Color, variant: int) -> Color:
             return base
 
 func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> void:
-    # Legacy lightweight toy visual. The detailed 3D plush rework is disabled.
-    var mat := make_mat(color, 0.35, 0.55)
-    var body := make_sphere(root, 0.72, Vector3(0, 0.72, 0), mat, "ToyBody")
-    body.scale = Vector3(1.0, 1.0, 0.92)
+    # Все призы сделаны как единая линейка мягких коллекционных игрушек:
+    # крупные мягкие формы, вышитое лицо, характерные детали каждой коллекции.
+    var body_mat := make_fur_mat(color)
+    var white := make_fur_mat(Color("#E2B66B"))
+    var dark := make_mat(Color("#172033"), 0.03, 0.48)
+    var pink := make_fur_mat(Color("#FF789F"))
+
+    match index:
+        0: add_bear(root,body_mat,dark,white,pink)
+        1: add_fox(root,body_mat,dark,white,pink)
+        2: add_bunny(root,body_mat,dark,white,pink)
+        3: add_panda(root,body_mat,dark,white,pink)
+        4: add_duck(root,body_mat,dark,white,pink)
+        5: add_cat(root,body_mat,dark,white,pink)
+        6: add_dog(root,body_mat,dark,white,pink)
+        7: add_koala(root,body_mat,dark,white,pink)
+        8: add_frog(root,body_mat,dark,white,pink)
+        9: add_turtle(root,body_mat,dark,white,pink)
+        10: add_monkey(root,body_mat,dark,white,pink)
+        11: add_tiger(root,body_mat,dark,white,pink)
+        12: add_shark(root,body_mat,dark,white,pink)
+        13: add_penguin(root,body_mat,dark,white,pink)
+        14: add_cat(root,body_mat,dark,white,pink)
+        15: add_whale(root,body_mat,dark,white,pink)
+        16: add_space_shark(root,body_mat,dark,white,pink)
+        17: add_space_cat(root,body_mat,dark,white,pink)
+        18: add_space_cat(root,body_mat,dark,white,pink)
+        19: add_star_panda(root,body_mat,dark,white,pink)
+        20: add_dragon(root,body_mat,dark,white,pink,false)
+        21: add_dragon(root,body_mat,dark,white,pink,true)
+        22: add_dragon(root,body_mat,dark,white,pink,true)
+        23: add_dragon(root,body_mat,dark,white,pink,true)
+        24: add_unicorn(root,body_mat,dark,white,pink,false)
+        25: add_unicorn(root,body_mat,dark,white,pink,true)
+        26: add_fairy_plush(root,body_mat,dark,white,pink)
+        27: add_griffin_plush(root,body_mat,dark,white,pink)
+        28: add_robot(root,body_mat,dark,white,pink,false)
+        29: add_cyber_cat(root,body_mat,dark,white,pink)
+        30: add_mecha_bear(root,body_mat,dark,white,pink)
+        31: add_robot(root,body_mat,dark,white,pink,true)
+        _: add_bear(root,body_mat,dark,white,pink)
+
+    # Мягкая тканевая "сигнатура" коллекции: маленькая нашивка на груди.
     if rarity == "ЛЕГЕНДАРНАЯ":
-        var badge := make_sphere(root, 0.09, Vector3(0, 1.30, 0.60), make_mat(Color("#C6A45D"), 0.4, 0.25), "ToyBadge")
-        badge.scale = Vector3(1.0, 0.55, 0.35)
+        var badge_color = make_mat(Color("#C6A45D"),0.40,0.24)
+        plush_piece(root,Vector3(0,0.72,0.58),Vector3(0.16,0.16,0.06),badge_color,"LegendBadge")
+        make_sphere(root,0.075,Vector3(0,1.98,0),badge_color,"LegendSpark")
     elif rarity == "ЭПИЧЕСКАЯ":
-        var badge := make_sphere(root, 0.075, Vector3(0, 1.28, 0.60), make_mat(Color("#8A6E8D"), 0.25, 0.3), "ToyBadge")
-        badge.scale = Vector3(1.0, 0.55, 0.35)
+        var badge_color = make_mat(Color("#8A6E8D"),0.25,0.28)
+        plush_piece(root,Vector3(0,0.72,0.58),Vector3(0.15,0.15,0.06),badge_color,"EpicBadge")
+
 
 func build_particles() -> void:
     # Неоновые частицы отключены: стиль автомата — дерево, металл и стекло.
@@ -4181,7 +4220,6 @@ func build_ui() -> void:
     setup_android_ui_navigation()
     await get_tree().process_frame
     await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
-    await get_tree().process_frame
     await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
     setup_android_scrolls()
     await get_tree().process_frame
@@ -4211,45 +4249,9 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
         scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     else:
+        # Горизонтальные категории листаются влево/вправо отдельно.
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     scroll.mouse_filter = Control.MOUSE_FILTER_STOP
-
-func _find_scroll_under_point(node: Node, point: Vector2) -> ScrollContainer:
-    var result: ScrollContainer = null
-    for child in node.get_children():
-        if not (child is CanvasItem) or not child.is_visible_in_tree():
-            continue
-        var found := _find_scroll_under_point(child, point)
-        if found:
-            result = found
-    if node is ScrollContainer and node.is_visible_in_tree():
-        var sc := node as ScrollContainer
-        if sc.get_global_rect().has_point(point):
-            result = sc
-    return result
-
-func _input(event: InputEvent) -> void:
-    if event is InputEventScreenTouch:
-        if event.pressed:
-            active_touch_id = event.index
-            active_touch_scroll = _find_scroll_under_point(self, event.position)
-        elif event.index == active_touch_id:
-            active_touch_id = -1
-            active_touch_scroll = null
-        return
-    if event is InputEventScreenDrag and event.index == active_touch_id and active_touch_scroll and is_instance_valid(active_touch_scroll) and active_touch_scroll.is_visible_in_tree():
-        var scroll := active_touch_scroll
-        var delta := event.relative
-        if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-            var bar := scroll.get_v_scroll_bar()
-            var max_scroll := maxi(0, int(bar.max_value - bar.page))
-            scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(delta.y)), 0, max_scroll)
-            get_viewport().set_input_as_handled()
-        elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-            var hbar := scroll.get_h_scroll_bar()
-            var max_scroll_h := maxi(0, int(hbar.max_value - hbar.page))
-            scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(delta.x)), 0, max_scroll_h)
-            get_viewport().set_input_as_handled()
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -4617,7 +4619,6 @@ func toggle_mission_detail(is_daily: bool) -> void:
     else:
         title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
         detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
-    panel.z_index = 20
     panel.visible = true
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
@@ -4763,7 +4764,6 @@ func toggle_daily_login() -> void:
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
     daily_login_panel.visible = true
-    daily_login_panel.z_index = 20
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
     # Окно появляется у правого круга и уезжает строго влево.
@@ -5009,7 +5009,6 @@ func toggle_event_panel() -> void:
         return
     close_side_panels("EventPanel")
     event_panel.visible = true
-    event_panel.z_index = 20
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
     update_event_panel()
@@ -7721,7 +7720,7 @@ func build_help_panel() -> PanelContainer:
 
     var vk := Button.new()
     vk.text = "◉  VK  ВКонтакте"
-    vk.custom_minimum_size = Vector2(260, 62)
+    vk.custom_minimum_size = Vector2(300, 62)
     style_button(vk, Color("#526F8E"))
     vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
@@ -7730,20 +7729,9 @@ func build_help_panel() -> PanelContainer:
     )
     social_row.add_child(vk)
 
-    var rate := Button.new()
-    rate.text = "★  ОЦЕНИТЬ ИГРУ"
-    rate.custom_minimum_size = Vector2(260, 62)
-    style_button(rate, Color("#B58A43"))
-    rate.add_theme_font_size_override("font_size", 18)
-    rate.pressed.connect(func():
-        current_result = "ОЦЕНКА ИГРЫ: СТРАНИЦА МАГАЗИНА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
-        update_ui()
-    )
-    social_row.add_child(rate)
-
     var max_btn := Button.new()
     max_btn.text = "◆  MAX"
-    max_btn.custom_minimum_size = Vector2(260, 62)
+    max_btn.custom_minimum_size = Vector2(300, 62)
     style_button(max_btn, Color("#7A5D91"))
     max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
@@ -8341,20 +8329,8 @@ func move_z(amount: float) -> void:
     register_game_activity()
     claw_move_target.z = clampf(claw_move_target.z + amount * joystick_sensitivity * claw_move_multiplier(), CLAW_MIN.z, CLAW_MAX.z)
 
-func is_claw_over_prize_hole() -> bool:
-    var dx := claw_pos.x - PRIZE_HOLE.x
-    var dz := claw_pos.z - PRIZE_HOLE.z
-    return sqrt(dx * dx + dz * dz) <= 0.72
-
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
-    # Если клешня уже непосредственно над отверстием, захват не запускаем.
-    # Это проверяется до звука, счётчика игры и серверного запроса.
-    if is_claw_over_prize_hole():
-        current_result = "НАД ОТВЕРСТИЕМ — ЗАХВАТ НЕВОЗМОЖЕН"
-        play_upgrade_sound("fail")
-        update_ui()
-        return
     play_upgrade_sound("grab")
     register_game_activity()
     if _server_ready():
@@ -8563,19 +8539,26 @@ func finalize_delivered_prize() -> void:
             if last_prize_xp > best_result_xp:
                 best_result_xp = last_prize_xp
                 best_result = "%s • +%d XP" % [last_prize_name, last_prize_xp]
+        check_collection_completion(last_prize_collection)
         current_result = "🎉 ДОСТАЛ: %s • %s" % [last_prize_name, last_prize_rarity]
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
         play_upgrade_sound("win")
+    if kind == "toy" and previous_count > 0 and not sale_available:
+        # Только дубль уже имеющейся игрушки можно продать.
+        sale_name = last_prize_name
+        sale_rarity = last_prize_rarity
+        sale_price = maxi(3, int(round(float(rarity_reward(last_prize_rarity)) * 0.65)))
+        sale_available = true
+        show_sale_offer()
     complete_daily_mission_if_ready()
     complete_weekly_mission_if_ready()
     check_achievements()
     update_missions()
     if kind == "toy":
         last_reward_rubles = maxi(0, coins - coins_before_prize)
-        # Legacy behavior: no duplicate choice window and no new-toy popup.
-        # The ordinary result window remains the only result presentation.
-        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, 0)
+        var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
+        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8710,6 +8693,23 @@ func award_toy_xp(rarity: String) -> int:
         player_xp = xp_to_next
     return gained
 
+func check_collection_completion(collection_name: String) -> void:
+    if completed_collections.has(collection_name):
+        return
+    var needed: int = 0
+    var got: int = 0
+    for toy in toys:
+        if String(toy["collection"]) == collection_name:
+            needed += 1
+            if collection.has(String(toy["name"])):
+                got += 1
+    if needed > 0 and got >= needed:
+        completed_collections[collection_name] = true
+        var reward: int = 60 + needed * 10
+        coins += reward
+        current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
+        check_achievements()
+
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
         "toys": return total_prizes_won
@@ -8834,18 +8834,6 @@ func check_achievements() -> void:
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         if pending_prize_data.is_empty():
             show_achievement_popup()
-
-func show_new_toy_popup(toy_name: String, cname: String, rarity: String, rubles: int, xp: int, rating_gain: int) -> void:
-    if not result_popup: return
-    if popup_title_label: popup_title_label.text = "🆕 НОВАЯ ИГРУШКА!"
-    popup_name_label.text = toy_name
-    popup_info_label.text = "КОЛЛЕКЦИЯ: %s\nРЕДКОСТЬ: %s" % [cname, rarity]
-    popup_xp_label.text = "💰 РУБЛИ: +%d ₽   •   ✨ XP: +%d" % [rubles, xp]
-    if popup_rating_label:
-        popup_rating_label.text = "🏆 РЕЙТИНГ: +%d" % maxi(0, rating_gain)
-    popup_achievement_label.text = "Новая игрушка добавлена в коллекцию."
-    popup_timer = 4.0
-    result_popup.visible = true
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
@@ -8980,12 +8968,10 @@ func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
 
 func show_sale_offer() -> void:
     if not result_popup: return
-    if popup_title_label: popup_title_label.text = "🧸 ИГРУШКА УЖЕ В КОЛЛЕКЦИИ"
-    popup_name_label.text = sale_name
-    popup_info_label.text = "%s  •  %s" % [last_prize_collection, last_prize_rarity]
+    if popup_title_label: popup_title_label.text = "ДУБЛЬ ИГРУШКИ"
     if popup_rating_label: popup_rating_label.text = ""
-    popup_xp_label.text = "Это дубль • продать за %d ₽?" % sale_price
-    popup_achievement_label.text = "Игрушка уже есть в коллекции. Выберите: оставить дубль или продать его."
+    popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
+    popup_achievement_label.text = "Игрушка уже есть в коллекции. Можно оставить дубль или продать его."
     popup_timer = 0.0
     result_popup.visible = true
     if not sale_panel:
