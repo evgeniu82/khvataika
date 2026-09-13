@@ -4748,7 +4748,7 @@ func update_mission_timers_light() -> void:
         if daily_timer:
             daily_timer.visible = false
             if not daily_claim_available:
-                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.text = "СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
                 daily_timer.visible = true
         if hint:
             if daily_claim_available:
@@ -4838,6 +4838,7 @@ func build_daily_login_panel() -> void:
 
     var v := VBoxContainer.new()
     v.alignment = BoxContainer.ALIGNMENT_CENTER
+    v.custom_minimum_size = Vector2(284, 0)
     v.add_theme_constant_override("separation", 2)
     daily_login_panel.add_child(v)
 
@@ -4845,12 +4846,15 @@ func build_daily_login_panel() -> void:
     title.name = "DailyLoginTitle"
     title.text = "🎁 ЕЖЕДНЕВНАЯ СЕРИЯ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.custom_minimum_size = Vector2(284, 0)
     title.add_theme_font_size_override("font_size", 12)
     v.add_child(title)
 
     var detail := Label.new()
     detail.name = "DailyLoginText"
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    detail.custom_minimum_size = Vector2(284, 0)
     detail.add_theme_font_size_override("font_size", 9)
     v.add_child(detail)
 
@@ -4865,6 +4869,7 @@ func build_daily_login_panel() -> void:
     var daily_timer := Label.new()
     daily_timer.name = "DailyLoginTimer"
     daily_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    daily_timer.custom_minimum_size = Vector2(284, 14)
     daily_timer.add_theme_font_size_override("font_size", 13)
     daily_timer.modulate = Color("#D6A14A")
     daily_timer.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
@@ -4891,6 +4896,8 @@ func build_daily_login_panel() -> void:
     hint.name = "DailyLoginHint"
     hint.text = "Нажми на день, который доступен сейчас"
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    hint.custom_minimum_size = Vector2(284, 0)
     hint.add_theme_font_size_override("font_size", 8)
     v.add_child(hint)
 
@@ -4912,7 +4919,7 @@ func update_daily_login_ui() -> void:
         if daily_timer:
             daily_timer.visible = false
             if not daily_claim_available:
-                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.text = "СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
                 daily_timer.visible = true
         if daily_hint:
             daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен —\nжди новый"
