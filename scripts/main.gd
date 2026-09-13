@@ -25,6 +25,11 @@ const MAX_PRIZE_CENTER_Y: float = 5.12
 const GRAB_SLIP_CHANCE: float = 0.22
 const CAPSULE_CHANCE: float = 0.055
 
+# Startup 3D optimization: reuse the expensive procedural plush shader/materials
+# instead of compiling a new shader for every part of every toy.
+var _fur_shader_cache: Shader
+var _fur_material_cache: Dictionary = {}
+
 const CYAN := Color("#28E8FF")
 const BLUE := Color("#146BFF")
 const PURPLE := Color("#8A4DFF")
@@ -2868,10 +2873,17 @@ func _notification(what: int) -> void:
             _on_android_back_pressed()
 
 func make_fur_mat(color: Color) -> ShaderMaterial:
-    # Процедурный материал мягкого плюша: матовая ткань, мелкая неоднородность
-    # и лёгкий "ворс" по краям без тяжёлых внешних 3D-моделей.
-    var shader := Shader.new()
-    shader.code = """
+    # Критически важная оптимизация старта: один Shader на весь проект и
+    # переиспользуемый материал для одинаковых цветов. Раньше каждый вызов
+    # создавал и компилировал новый Shader, что давало большой пик нагрузки
+    # при массовом создании 3D-игрушек на Android.
+    var key := color.to_html(false)
+    if _fur_material_cache.has(key):
+        return _fur_material_cache[key] as ShaderMaterial
+
+    if _fur_shader_cache == null:
+        _fur_shader_cache = Shader.new()
+        _fur_shader_cache.code = """
 shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
 
@@ -2901,11 +2913,14 @@ void fragment() {
     SPECULAR = 0.12;
 }
 """
-    shader.set_code(shader.code)
+        # set_code only once, not once per plush part.
+        _fur_shader_cache.set_code(_fur_shader_cache.code)
+
     var mat := ShaderMaterial.new()
-    mat.shader = shader
+    mat.shader = _fur_shader_cache
     mat.set_shader_parameter("base_color", color)
     mat.set_shader_parameter("fuzz", 0.035)
+    _fur_material_cache[key] = mat
     return mat
 
 func make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emission_strength: float = 0.0) -> StandardMaterial3D:
@@ -3347,7 +3362,7 @@ func build_prizes_async() -> void:
     if saved_prizes.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
             await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКУ %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
-            spawn_one_random_prize(i)
+            await spawn_one_random_prize_async(i)
             var toy_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
             await set_loading_progress(toy_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
         return
@@ -3380,7 +3395,10 @@ func build_prizes_async() -> void:
             var variant: int = int(saved.get("variant", 0))
             var size_factor: float = clampf(float(saved.get("size_factor", 1.0)), 0.90, 1.12)
             var variant_color: Color = get_toy_variant_color(toys[source_index]["color"], variant)
-            var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor)
+            var body := make_physics_toy(source_index, toys[source_index], pos, variant_color, size_factor, false)
+            await get_tree().process_frame
+            make_toy_visual(body, source_index, String(toys[source_index]["rarity"]), variant_color)
+            await get_tree().process_frame
             body.rotation = rot
             prize_bodies.append(body)
             prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
@@ -3390,16 +3408,43 @@ func build_prizes_async() -> void:
     if prize_bodies.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
             await set_loading_status("ДОПОЛНЯЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
-            spawn_one_random_prize(i)
+            await spawn_one_random_prize_async(i)
             var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
             await set_loading_progress(fallback_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         var missing := TARGET_PRIZE_COUNT - prize_bodies.size()
         for i in range(missing):
             await set_loading_status("ДОЗАГРУЖАЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, missing])
-            spawn_one_random_prize(i)
+            await spawn_one_random_prize_async(i)
             var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
             await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])
+
+func spawn_one_random_prize_async(n: int) -> void:
+    # Поэтапная версия для стартового загрузчика: физическая оболочка -> кадр ->
+    # 3D-визуал -> кадр. Это не меняет обычный игровой путь.
+    var rng := RandomNumberGenerator.new()
+    rng.randomize()
+    var x: float = rng.randf_range(-2.65, 2.65)
+    var z: float = rng.randf_range(-1.62, 1.62)
+    var layer: int = n % 8
+    var y: float = minf(3.20 + float(layer) * 0.26 + rng.randf_range(-0.04, 0.05), MAX_PRIZE_CENTER_Y)
+    if rng.randf() < CAPSULE_CHANCE:
+        var capsule := make_coin_capsule(Vector3(x, y, z))
+        capsule.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-PI, PI), rng.randf_range(-0.25, 0.25))
+        prize_bodies.append(capsule)
+        prize_data.append({"kind":"capsule", "name":"Капсула с монетами", "rarity":"БОНУС", "collection":"МОНЕТНЫЙ БОНУС", "reward_min":3, "reward_max":12})
+        return
+    var source_index := rng.randi_range(0, toys.size() - 1)
+    var variant := rng.randi_range(0, 3)
+    var variant_color := get_toy_variant_color(toys[source_index]["color"], variant)
+    var size_factor := rng.randf_range(0.90, 1.12)
+    var body := make_physics_toy(source_index, toys[source_index], Vector3(x, y, z), variant_color, size_factor, false)
+    await get_tree().process_frame
+    make_toy_visual(body, source_index, String(toys[source_index]["rarity"]), variant_color)
+    await get_tree().process_frame
+    body.rotation = Vector3(rng.randf_range(-0.35, 0.35), rng.randf_range(-PI, PI), rng.randf_range(-0.25, 0.25))
+    prize_bodies.append(body)
+    prize_data.append({"kind":"toy", "index":source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
 
 func spawn_one_random_prize(n: int) -> void:
     var rng := RandomNumberGenerator.new()
@@ -3618,7 +3663,7 @@ func safe_prize_position(pos: Vector3) -> Vector3:
         result.y = clampf(result.y, 3.22, MAX_PRIZE_CENTER_Y)
     return result
 
-func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: Color = Color(-1, -1, -1, -1), size_factor: float = 1.0) -> RigidBody3D:
+func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: Color = Color(-1, -1, -1, -1), size_factor: float = 1.0, with_visual: bool = true) -> RigidBody3D:
     var body := RigidBody3D.new()
     body.name = "Prize_%02d" % index
     body.position = safe_prize_position(pos)
@@ -3650,7 +3695,9 @@ func make_physics_toy(index: int, data: Dictionary, pos: Vector3, visual_color: 
     body.add_child(shape)
 
     var render_color: Color = data["color"] if visual_color.a < 0.0 else visual_color
-    make_toy_visual(body, index, String(data["rarity"]), render_color)
+    if with_visual:
+        make_toy_visual(body, index, String(data["rarity"]), render_color)
+    body.set_meta("toy_render_color", render_color)
     body.set_meta("toy_source_index", index)
     body.set_meta("toy_name", String(data.get("name", "Игрушка")))
     body.set_meta("toy_collection", String(data.get("collection", "")))
