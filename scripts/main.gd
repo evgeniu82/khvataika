@@ -156,6 +156,8 @@ var _last_nav_context: String = ""
 var sfx_move: AudioStreamPlayer
 var sfx_volume_db: float = -4.0
 var music_volume_db: float = -8.0
+var music_track_index: int = 0
+var music_tracks: Array[String] = ["res://audio/background_music.ogg", "res://audio/music_arcade_01.wav", "res://audio/music_arcade_02.wav", "res://audio/music_arcade_03.wav", "res://audio/music_arcade_04.wav", "res://audio/music_arcade_05.wav", "res://audio/music_arcade_06.wav"]
 var vibration_on: bool = true
 var auto_tips_on: bool = true
 var notifications_on: bool = true
@@ -200,13 +202,13 @@ var news_unread: int = 4
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
-const SERVER_AUTHORITATIVE: bool = true
+const SERVER_AUTHORITATIVE: bool = false
 # CONTROL TEST: keep the five recently added feature groups out of startup.
 # Their code remains in the project; this switch only isolates the startup path.
 const STARTUP_CONTROL_TEST: bool = false
 # TEST 1: daily login/mission systems only. All other new startup features remain isolated.
 const DAILY_ONLY_TEST: bool = false
-var server_url: String = DEFAULT_SERVER_URL
+var server_url: String = ""
 var player_id: String = ""
 var player_token: String = ""
 var remote_action_name: String = ""
@@ -739,7 +741,7 @@ func _ready() -> void:
         for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
-    if not STARTUP_CONTROL_TEST:
+    if not STARTUP_CONTROL_TEST and SERVER_AUTHORITATIVE:
         ensure_player_id()
         remote_http = HTTPRequest.new()
         remote_http.name = "RemoteGameHTTP"
@@ -1191,7 +1193,7 @@ func _normalized_server_url() -> String:
     return server_url.strip_edges().trim_suffix("/")
 
 func _server_ready() -> bool:
-    return remote_http != null and _normalized_server_url() != ""
+    return SERVER_AUTHORITATIVE and remote_http != null and _normalized_server_url() != ""
 
 func get_server_game_state() -> Dictionary:
     return {
@@ -1563,6 +1565,9 @@ func _on_connection_http_completed(result: int, response_code: int, _headers: Pa
 
 func update_connection_status_ui() -> void:
     if not connection_status_label or not is_instance_valid(connection_status_label):
+        return
+    if not SERVER_AUTHORITATIVE:
+        connection_status_label.text = "● ОФЛАЙН: ЛОКАЛЬНОЕ СОХРАНЕНИЕ"
         return
     if server_connection_ok:
         connection_status_label.text = "● СЕТЬ: OK   •   СЕРВЕР: OK"
@@ -2344,7 +2349,7 @@ func build_rating_panel() -> PanelContainer:
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
     var v:=VBoxContainer.new(); v.name="RatingContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",9); scroll.add_child(v)
     add_panel_title(v,"🏆  РЕЙТИНГ")
-    var note:=Label.new(); note.text="🌐 ОБЩИЙ ОНЛАЙН-РЕЙТИНГ • данные игроков загружаются с сервера"; note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; note.add_theme_font_size_override("font_size",16); note.modulate=Color("#BCA996"); v.add_child(note)
+    var note:=Label.new(); note.name="RatingNote"; note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; note.add_theme_font_size_override("font_size",16); note.modulate=Color("#BCA996"); v.add_child(note)
     var list:=VBoxContainer.new(); list.name="Leaderboard"; list.add_theme_constant_override("separation",7); v.add_child(list)
     var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,74); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
     return p
@@ -2353,18 +2358,13 @@ func refresh_rating_panel() -> void:
     if not rating_panel:return
     var list:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/Leaderboard") as VBoxContainer
     if not list:return
+    var note:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/RatingNote") as Label
+    var rows: Array = get_local_leaderboard() if not SERVER_AUTHORITATIVE else remote_leaderboard
+    if note:
+        note.text = "🏠 ЛОКАЛЬНЫЙ РЕЙТИНГ • работает полностью без сервера" if not SERVER_AUTHORITATIVE else "🌐 ОБЩИЙ ОНЛАЙН-РЕЙТИНГ • данные игроков загружаются с сервера"
     for c in list.get_children():c.queue_free()
-    var rows: Array = remote_leaderboard
     if rows.is_empty():
-        var empty := Label.new()
-        empty.text = "⏳ ПОДКЛЮЧАЕМСЯ К ОНЛАЙН-РЕЙТИНГУ…" if remote_sync_status != "ОШИБКА СЕРВЕРА" else "⚠ НЕТ СВЯЗИ С СЕРВЕРОМ
-Попробуйте открыть рейтинг ещё раз."
-        empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        empty.add_theme_font_size_override("font_size", 19)
-        empty.modulate = Color("#BCA996")
-        list.add_child(empty)
-        return
+        var empty := Label.new(); empty.text="Рейтинг пока пуст."; empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; empty.add_theme_font_size_override("font_size",19); list.add_child(empty); return
     for i in range(rows.size()):
         var row:=Label.new(); row.text="%d.  %s   •   %d" % [i+1,String(rows[i]["name"]),int(rows[i]["score"])] ; row.add_theme_font_size_override("font_size",20); row.modulate=GOLD if String(rows[i]["name"])==player_name else Color("#E0D4C6"); list.add_child(row)
 
@@ -4909,18 +4909,36 @@ func toggle_event_panel() -> void:
     animate_panel_in(event_panel)
     update_android_navigation()
 func build_audio() -> void:
-    # Звук движения клешни + отдельная фоновая мелодия без авторских сэмплов.
+    # Полный локальный аудиодвижок: отдельные эффекты + плейлист фоновых мелодий.
     if not sfx_move or not is_instance_valid(sfx_move):
         sfx_move = make_sfx_player("res://audio/claw_move.wav")
     if sfx_move.stream is AudioStreamWAV:
         (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
-    music_player = make_sfx_player("res://audio/background_music.ogg")
+    music_player = make_sfx_player(music_tracks[clampi(music_track_index, 0, music_tracks.size() - 1)])
     music_player.volume_db = music_volume_db
-    music_player.finished.connect(func():
-        if music_on and music_player and is_instance_valid(music_player):
-            music_player.play()
-    )
+    music_player.finished.connect(_play_next_music_track)
     apply_music_settings()
+
+func _play_next_music_track() -> void:
+    if not music_on or not music_player or not is_instance_valid(music_player):
+        return
+    music_track_index = (music_track_index + 1) % music_tracks.size()
+    var stream := load(music_tracks[music_track_index])
+    if stream:
+        music_player.stream = stream
+        music_player.play()
+        save_game()
+
+func select_music_track(index: int) -> void:
+    if music_tracks.is_empty(): return
+    music_track_index = clampi(index, 0, music_tracks.size() - 1)
+    if music_player and is_instance_valid(music_player):
+        var stream := load(music_tracks[music_track_index])
+        if stream:
+            music_player.stream = stream
+            if music_on: music_player.play()
+    save_game()
+
 func apply_sfx_volume_settings() -> void:
     if sfx_move and is_instance_valid(sfx_move):
         sfx_move.volume_db = sfx_volume_db
@@ -7237,6 +7255,14 @@ func build_settings_panel() -> PanelContainer:
     music.toggled.connect(func(on: bool): music_on = on; apply_music_settings(); save_game()); v.add_child(music)
     var music_vol := HSlider.new(); music_vol.min_value = -30; music_vol.max_value = 3; music_vol.step = 1; music_vol.value = music_volume_db; music_vol.custom_minimum_size = Vector2(0, 42)
     music_vol.value_changed.connect(func(value: float): music_volume_db = value; apply_music_settings(); save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
+    var music_track := OptionButton.new()
+    music_track.name = "MusicTrackOption"
+    var music_names := ["Аркада • Классика", "Аркада • Неон", "Аркада • Космос", "Аркада • Осень", "Аркада • Ночь", "Аркада • Праздник", "Аркада • Финал"]
+    for name in music_names: music_track.add_item(name)
+    music_track.selected = clampi(music_track_index, 0, music_names.size() - 1)
+    music_track.custom_minimum_size = Vector2(0, 54)
+    music_track.item_selected.connect(func(idx:int): select_music_track(idx))
+    v.add_child(make_labeled_control("Фоновая мелодия", music_track))
     var sfx := CheckButton.new(); sfx.text = "Звуки игры и интерфейса"; sfx.button_pressed = sfx_on; sfx.add_theme_font_size_override("font_size", 21)
     sfx.toggled.connect(func(on: bool): sfx_on = on; apply_sfx_volume_settings(); save_game()); v.add_child(sfx)
     var volume := HSlider.new(); volume.min_value = -24; volume.max_value = 3; volume.step = 1; volume.value = sfx_volume_db; volume.custom_minimum_size = Vector2(0, 42)
@@ -7309,6 +7335,7 @@ func reset_settings_defaults() -> void:
     music_on = true
     sfx_on = true
     music_volume_db = -8.0
+    music_track_index = 0
     sfx_volume_db = -4.0
     vibration_on = true
     energy_saving_on = false
@@ -8950,12 +8977,17 @@ func build_upgrade_sound_system() -> void:
     # Отдельные короткие SFX: интерфейс, захват, успех, срыв, монеты и выдача.
     var files := {
         "button":"res://audio/ui_click.wav",
+        "hover":"res://audio/ui_hover.wav",
+        "select":"res://audio/ui_select.wav",
+        "confirm":"res://audio/ui_confirm.wav",
         "open":"res://audio/ui_open.wav",
         "close":"res://audio/ui_close.wav",
         "coin":"res://audio/coin.wav",
+        "reward":"res://audio/ui_reward.wav",
         "grab":"res://audio/grab_close.wav",
         "win":"res://audio/grab_success.wav",
         "fail":"res://audio/grab_fail.wav",
+        "error":"res://audio/ui_error.wav",
         "drop":"res://audio/prize_drop.wav"
     }
     for key in files.keys():
@@ -8965,10 +8997,11 @@ func build_upgrade_sound_system() -> void:
         player.volume_db = sfx_volume_db
         add_child(player)
         sound_players[key] = player
-    # Движение клешни остаётся отдельным циклическим моторным звуком.
-    sfx_move = make_sfx_player("res://audio/claw_move.wav")
-    if sfx_move.stream is AudioStreamWAV:
-        (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+    # Движение клешни уже создаётся в build_audio(), повторно его не создаём.
+    if not sfx_move or not is_instance_valid(sfx_move):
+        sfx_move = make_sfx_player("res://audio/claw_move.wav")
+        if sfx_move.stream is AudioStreamWAV:
+            (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
 func play_upgrade_sound(kind: String) -> void:
     if kind == "grab":
         play_ui_sound("grab")
@@ -9015,6 +9048,7 @@ func save_game() -> void:
             "sfx": sfx_on,
             "sfx_volume_db": sfx_volume_db,
             "music_volume_db": music_volume_db,
+            "music_track_index": music_track_index,
             "vibration_on": vibration_on,
             "energy_saving_on": energy_saving_on,
             "confirm_purchases_on": confirm_purchases_on,
@@ -9151,6 +9185,7 @@ func load_save() -> void:
     sfx_on = bool(data.get("sfx", true))
     sfx_volume_db = clampf(float(data.get("sfx_volume_db", -4.0)), -24.0, 3.0)
     music_volume_db = clampf(float(data.get("music_volume_db", -8.0)), -30.0, 3.0)
+    music_track_index = clampi(int(data.get("music_track_index", 0)), 0, music_tracks.size() - 1)
     vibration_on = bool(data.get("vibration_on", true))
     energy_saving_on = bool(data.get("energy_saving_on", false))
     confirm_purchases_on = bool(data.get("confirm_purchases_on", true))
