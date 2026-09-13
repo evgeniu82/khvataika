@@ -6003,10 +6003,10 @@ func award_chest_for_win(rarity: String) -> void:
 
 func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     if chest_opening: return
-    if not skip_confirmation and confirm_rare_chests_on and kind in ["rare", "epic", "legendary", "vip"]:
-        var names := {"rare":"РЕДКИЙ", "epic":"ЭПИЧЕСКИЙ", "legendary":"ЛЕГЕНДАРНЫЙ", "vip":"VIP"}
+    if not skip_confirmation and confirm_rare_chests_on:
+        var names := {"common":"ОБЫЧНЫЙ", "rare":"РЕДКИЙ", "epic":"ЭПИЧЕСКИЙ", "legendary":"ЛЕГЕНДАРНЫЙ", "vip":"VIP"}
         var need := int(chest_key_costs.get(kind, 1))
-        confirm_purchase("Открытие редкого сундука", "Открыть «%s» за %d ключей?" % [String(names.get(kind, kind.to_upper())), need], func(): open_chest(kind, true), "ОТКРЫТЬ")
+        show_chest_confirmation(kind, String(names.get(kind, kind.to_upper())), need)
         return
     if _server_ready() and player_token != "":
         if _server_action("chest_open", {"kind":kind}):
@@ -9002,6 +9002,91 @@ func rarity_reward(rarity: String) -> int:
         "ЭПИЧЕСКАЯ": return 50
         "ЛЕГЕНДАРНАЯ": return 150
     return 5
+
+func show_chest_confirmation(kind: String, chest_name: String, need: int) -> void:
+    # Единое подтверждение открытия любого сундука в фирменной коричневой гамме.
+    # Не использует стандартный серый ConfirmationDialog и создаётся только по нажатию.
+    if not menu_layer or not is_instance_valid(menu_layer):
+        return
+
+    var old := menu_layer.get_node_or_null("ChestConfirmOverlay")
+    if old:
+        old.queue_free()
+
+    var overlay := Control.new()
+    overlay.name = "ChestConfirmOverlay"
+    overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+    overlay.z_index = 1000
+    menu_layer.add_child(overlay)
+
+    # Очень лёгкое затемнение, чтобы окно визуально отделялось от игры.
+    var dim := ColorRect.new()
+    dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    dim.color = Color(0.04, 0.025, 0.018, 0.28)
+    dim.mouse_filter = Control.MOUSE_FILTER_STOP
+    overlay.add_child(dim)
+
+    var panel := PanelContainer.new()
+    panel.name = "ChestConfirmPanel"
+    panel.set_anchors_preset(Control.PRESET_CENTER)
+    panel.position = Vector2(-330, -175)
+    panel.size = Vector2(660, 350)
+    panel.mouse_filter = Control.MOUSE_FILTER_STOP
+    panel.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#8A684C"), 22, 3))
+    overlay.add_child(panel)
+
+    var box := VBoxContainer.new()
+    box.add_theme_constant_override("separation", 12)
+    panel.add_child(box)
+
+    var title := Label.new()
+    title.text = "🎁  ОТКРЫТИЕ %s СУНДУКА" % chest_name
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    title.add_theme_font_size_override("font_size", 25)
+    title.add_theme_color_override("font_color", Color("#E1C29A"))
+    title.custom_minimum_size = Vector2(0, 70)
+    box.add_child(title)
+
+    var message := Label.new()
+    message.text = "Открыть «%s» за %d ключей?" % [chest_name, need]
+    message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    message.add_theme_font_size_override("font_size", 22)
+    message.add_theme_color_override("font_color", Color("#F1E5D6"))
+    message.custom_minimum_size = Vector2(0, 105)
+    box.add_child(message)
+
+    var buttons := HBoxContainer.new()
+    buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+    buttons.add_theme_constant_override("separation", 18)
+    buttons.custom_minimum_size = Vector2(0, 78)
+    box.add_child(buttons)
+
+    var cancel := Button.new()
+    cancel.text = "ОТМЕНА"
+    cancel.custom_minimum_size = Vector2(220, 64)
+    style_button(cancel, Color("#6E4B33"))
+    buttons.add_child(cancel)
+
+    var open := Button.new()
+    open.text = "ОТКРЫТЬ"
+    open.custom_minimum_size = Vector2(220, 64)
+    style_button(open, Color("#A8754A"))
+    buttons.add_child(open)
+
+    cancel.pressed.connect(func():
+        if is_instance_valid(overlay):
+            overlay.queue_free()
+    )
+    open.pressed.connect(func():
+        if is_instance_valid(overlay):
+            overlay.queue_free()
+        open_chest(kind, true)
+    )
 
 func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ") -> void:
     var dialog := ConfirmationDialog.new()
