@@ -19,7 +19,7 @@ const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
 const CLAW_HOME := Vector3(PRIZE_HOLE.x, 8.20, PRIZE_HOLE.z)
 const CLAW_MIN := Vector3(-2.55, 2.70, -1.55)
 const CLAW_MAX := Vector3(2.55, 8.20, 1.55)
-const TOY_SCALE := 0.04968
+const TOY_SCALE := 0.30
 const TARGET_PRIZE_COUNT: int = 60
 const MAX_PRIZE_CENTER_Y: float = 5.12
 const GRAB_SLIP_CHANCE: float = 0.22
@@ -3662,11 +3662,16 @@ func plush_piece(root: Node3D, pos: Vector3, scale: Vector3, mat: Material, name
     return n
 
 func plush_face(root: Node3D, face_y: float, face_z: float, white: Material, dark: Material, pink: Material) -> void:
-    make_sphere(root, 0.075, Vector3(-0.16, face_y, face_z), dark, "EyeL")
-    make_sphere(root, 0.075, Vector3(0.16, face_y, face_z), dark, "EyeR")
-    make_sphere(root, 0.030, Vector3(-0.135, face_y + 0.025, face_z + 0.055), white, "EyeSparkL")
-    make_sphere(root, 0.030, Vector3(0.185, face_y + 0.025, face_z + 0.055), white, "EyeSparkR")
-    make_sphere(root, 0.055, Vector3(0, face_y - 0.17, face_z + 0.045), pink, "Nose")
+    # Лицо размещается вплотную к передней поверхности головы, а не
+    # "висит" перед игрушкой. Все детали имеют общий ориентир +Z.
+    var z := clampf(face_z, 0.30, 0.46)
+    make_sphere(root, 0.075, Vector3(-0.16, face_y, z), dark, "EyeL")
+    make_sphere(root, 0.075, Vector3(0.16, face_y, z), dark, "EyeR")
+    make_sphere(root, 0.028, Vector3(-0.135, face_y + 0.024, z + 0.055), white, "EyeSparkL")
+    make_sphere(root, 0.028, Vector3(0.135, face_y + 0.024, z + 0.055), white, "EyeSparkR")
+    make_sphere(root, 0.052, Vector3(0, face_y - 0.13, z + 0.035), pink, "Nose")
+    var mouth := make_sphere(root, 0.045, Vector3(0, face_y - 0.225, z + 0.025), dark, "Mouth")
+    mouth.scale = Vector3(1.25, 0.42, 0.34)
 
 func add_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     plush_piece(root, Vector3(0,0.55,0), Vector3(1.12,1.02,0.88), mat, "RoundBody")
@@ -3678,7 +3683,7 @@ func add_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink
     plush_piece(root, Vector3(-0.34,0.08,0.12), Vector3(0.42,0.28,0.50), mat, "FootL")
     plush_piece(root, Vector3(0.34,0.08,0.12), Vector3(0.42,0.28,0.50), mat, "FootR")
     plush_piece(root, Vector3(0,1.05,0.58), Vector3(0.36,0.25,0.16), white, "Muzzle")
-    plush_face(root,1.34,0.67,white,dark,pink)
+    plush_face(root,1.34,0.38,white,dark,pink)
 
 func add_fox(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     add_bear(root, mat, dark, white, pink)
@@ -3729,7 +3734,7 @@ func add_frog(root: Node3D, mat: Material, dark: Material, white: Material, pink
     for x in [-0.34,0.34]:
         plush_piece(root,Vector3(x,1.52,0.02),Vector3(0.25,0.25,0.25),mat,"EyeBump")
         make_sphere(root,0.07,Vector3(x,1.55,0.25),dark,"FrogEye")
-    plush_face(root,1.18,0.64,white,dark,pink)
+    plush_face(root,1.18,0.35,white,dark,pink)
     make_box(root,Vector3(0.70,0.08,0.05),Vector3(0,0.91,0.70),pink,"Smile")
 
 func add_turtle(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
@@ -3737,8 +3742,8 @@ func add_turtle(root: Node3D, mat: Material, dark: Material, white: Material, pi
     plush_piece(root,Vector3(0,0.82,0.42),Vector3(0.50,0.40,0.42),white,"Head")
     for pos in [Vector3(-0.72,0.35,0.35),Vector3(0.72,0.35,0.35),Vector3(-0.72,0.35,-0.35),Vector3(0.72,0.35,-0.35)]:
         plush_piece(root,pos,Vector3(0.36,0.22,0.30),mat,"Flipper")
-    make_sphere(root,0.06,Vector3(-0.16,0.93,0.76),dark,"EyeL")
-    make_sphere(root,0.06,Vector3(0.16,0.93,0.76),dark,"EyeR")
+    make_sphere(root,0.06,Vector3(-0.16,0.93,0.31),dark,"EyeL")
+    make_sphere(root,0.06,Vector3(0.16,0.93,0.31),dark,"EyeR")
 
 func add_monkey(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     add_bear(root,mat,dark,white,pink)
@@ -3760,7 +3765,7 @@ func add_shark(root: Node3D, mat: Material, dark: Material, white: Material, pin
     make_box(root,Vector3(0.30,0.45,0.10),Vector3(0,1.52,0),mat,"DorsalFin")
     make_box(root,Vector3(0.75,0.22,0.10),Vector3(0,0.75,-0.60),mat,"TailFin")
     plush_piece(root,Vector3(0,0.67,0.77),Vector3(0.68,0.22,0.16),white,"SharkBelly")
-    plush_face(root,1.03,0.86,white,dark,pink)
+    plush_face(root,1.03,0.29,white,dark,pink)
 
 func add_penguin(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     plush_piece(root,Vector3(0,0.62,0),Vector3(0.90,1.20,0.78),dark,"PenguinBody")
@@ -3775,7 +3780,7 @@ func add_whale(root: Node3D, mat: Material, dark: Material, white: Material, pin
     make_box(root,Vector3(0.35,0.30,0.18),Vector3(-0.45,1.30,0),mat,"FinL")
     make_box(root,Vector3(0.35,0.30,0.18),Vector3(0.45,1.30,0),mat,"FinR")
     make_sphere(root,0.10,Vector3(0,1.43,0.05),white,"Spout")
-    plush_face(root,1.08,0.88,white,dark,pink)
+    plush_face(root,1.08,0.29,white,dark,pink)
 
 func add_dragon(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, legendary: bool=false) -> void:
     add_bear(root,mat,dark,white,pink)
@@ -3831,9 +3836,9 @@ func add_space_cat(root: Node3D, mat: Material, dark: Material, white: Material,
 func add_duck(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     plush_piece(root,Vector3(0,0.58,0),Vector3(1.05,0.82,0.90),mat,"DuckBody")
     plush_piece(root,Vector3(0,1.20,0.10),Vector3(0.72,0.62,0.68),mat,"DuckHead")
-    plush_piece(root,Vector3(-0.18,1.36,0.60),Vector3(0.09,0.09,0.08),dark,"DuckEyeL")
-    plush_piece(root,Vector3(0.18,1.36,0.60),Vector3(0.09,0.09,0.08),dark,"DuckEyeR")
-    make_box(root,Vector3(0.38,0.18,0.20),Vector3(0,1.19,0.72),make_fur_mat(Color("#E88C2E")),"DuckBeak")
+    plush_piece(root,Vector3(-0.18,1.36,0.33),Vector3(0.09,0.09,0.08),dark,"DuckEyeL")
+    plush_piece(root,Vector3(0.18,1.36,0.33),Vector3(0.09,0.09,0.08),dark,"DuckEyeR")
+    make_box(root,Vector3(0.38,0.18,0.20),Vector3(0,1.19,0.38),make_fur_mat(Color("#E88C2E")),"DuckBeak")
     plush_piece(root,Vector3(-0.62,0.55,0.04),Vector3(0.38,0.22,0.58),mat,"DuckWingL")
     plush_piece(root,Vector3(0.62,0.55,0.04),Vector3(0.38,0.22,0.58),mat,"DuckWingR")
 
@@ -3842,7 +3847,7 @@ func add_cyber_cat(root: Node3D, mat: Material, dark: Material, white: Material,
     var metal := make_mat(Color("#71879B"),0.72,0.22)
     make_box(root,Vector3(0.52,0.14,0.18),Vector3(0,0.76,0.64),metal,"CyberChest")
     for x in [-0.26,0.26]:
-        make_sphere(root,0.055,Vector3(x,1.36,0.73),make_mat(Color("#D5B45A"),0.65,0.18),"CyberEye")
+        make_sphere(root,0.055,Vector3(x,1.36,0.38),make_mat(Color("#D5B45A"),0.65,0.18),"CyberEye")
 
 func add_mecha_bear(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     add_bear(root,mat,dark,white,pink)
@@ -3850,8 +3855,8 @@ func add_mecha_bear(root: Node3D, mat: Material, dark: Material, white: Material
     make_box(root,Vector3(0.70,0.20,0.72),Vector3(0,0.70,0.48),metal,"MechaChest")
     for x in [-0.50,0.50]:
         make_cylinder(root,0.10,0.32,Vector3(x,0.60,0.04),metal,"MechaArm")
-    make_sphere(root,0.06,Vector3(-0.17,1.34,0.66),make_mat(Color("#D5B45A"),0.7,0.18),"MechaEyeL")
-    make_sphere(root,0.06,Vector3(0.17,1.34,0.66),make_mat(Color("#D5B45A"),0.7,0.18),"MechaEyeR")
+    make_sphere(root,0.06,Vector3(-0.17,1.34,0.38),make_mat(Color("#D5B45A"),0.7,0.18),"MechaEyeL")
+    make_sphere(root,0.06,Vector3(0.17,1.34,0.38),make_mat(Color("#D5B45A"),0.7,0.18),"MechaEyeR")
 
 func add_space_shark(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material) -> void:
     add_shark(root,mat,dark,white,pink)
@@ -3889,6 +3894,80 @@ func get_toy_variant_color(base: Color, variant: int) -> Color:
             return base.lerp(Color("#FF78B7"), 0.22)
         _:
             return base
+
+func add_dinosaur(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    plush_piece(root,Vector3(0,0.62,0),Vector3(1.18,0.82,0.92),mat,"DinoBody")
+    plush_piece(root,Vector3(0,1.18,0.30),Vector3(0.62,0.62,0.58),mat,"DinoHead")
+    make_box(root,Vector3(0.50,0.22,0.45),Vector3(0,1.02,0.67),mat,"DinoSnout")
+    make_sphere(root,0.065,Vector3(-0.19,1.34,0.56),dark,"DinoEyeL")
+    make_sphere(root,0.065,Vector3(0.19,1.34,0.56),dark,"DinoEyeR")
+    make_sphere(root,0.045,Vector3(0,1.16,0.88),pink,"DinoNose")
+    for i in range(4):
+        make_box(root,Vector3(0.16,0.34,0.14),Vector3(-0.48 + float(i % 2) * 0.96,0.18,0.20 - float(i / 2) * 0.34),mat,"DinoLeg")
+    var spine_color := dark if variant % 2 == 0 else pink
+    for i in range(4):
+        make_box(root,Vector3(0.14,0.20,0.12),Vector3(-0.42 + float(i) * 0.28,1.62,0.0),spine_color,"DinoSpine")
+
+func add_superhero(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    add_bear(root,mat,dark,white,pink)
+    var cape_mat := make_fur_mat(Color("#A73D55") if variant % 2 == 0 else Color("#345FD1"))
+    make_box(root,Vector3(0.78,1.05,0.08),Vector3(0,0.95,-0.42),cape_mat,"HeroCape")
+    make_box(root,Vector3(0.48,0.38,0.08),Vector3(0,0.78,0.62),make_mat(Color("#D5B45A"),0.25,0.28),"HeroBadge")
+
+func add_candy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    plush_piece(root,Vector3(0,0.72,0),Vector3(1.05,1.05,0.82),mat,"CandyBody")
+    plush_face(root,1.30,0.38,white,dark,pink)
+    var stripe := make_mat(Color("#F7E9DC") if variant % 2 == 0 else Color("#B9E9F4"),0.05,0.34)
+    make_box(root,Vector3(0.80,0.12,0.06),Vector3(0,0.82,0.68),stripe,"CandyStripe")
+    make_cylinder(root,0.08,0.34,Vector3(0,1.78,0),make_mat(Color("#E8B93D"),0.15,0.30),"CandyStick")
+
+func add_pirate(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    add_bear(root,mat,dark,white,pink)
+    make_box(root,Vector3(0.92,0.16,0.62),Vector3(0,1.72,0.0),make_mat(Color("#202020"),0.05,0.42),"PirateHat")
+    make_box(root,Vector3(0.62,0.10,0.08),Vector3(0,1.72,0.32),make_mat(Color("#E4D4B2"),0.0,0.55),"PirateHatBand")
+    make_box(root,Vector3(0.18,0.28,0.05),Vector3(0.18,1.34,0.40),dark,"PiratePatch")
+    make_box(root,Vector3(0.34,0.12,0.08),Vector3(0,0.74,0.63),make_mat(Color("#C69B55"),0.45,0.22),"PirateBuckle")
+
+func add_robot_toy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    make_box(root,Vector3(1.10,0.88,0.78),Vector3(0,0.66,0),make_mat(Color("#6E7E8A") if variant % 2 == 0 else Color("#5567A0"),0.65,0.24),"RobotBody")
+    make_box(root,Vector3(0.82,0.68,0.70),Vector3(0,1.40,0),mat,"RobotHead")
+    var eye_mat := make_mat(Color("#42E6FF"),0.20,0.18,1.5)
+    make_sphere(root,0.075,Vector3(-0.18,1.46,0.37),eye_mat,"RobotEyeL")
+    make_sphere(root,0.075,Vector3(0.18,1.46,0.37),eye_mat,"RobotEyeR")
+    make_box(root,Vector3(0.24,0.07,0.05),Vector3(0,1.22,0.38),dark,"RobotMouth")
+    for x in [-0.70,0.70]:
+        make_cylinder(root,0.12,0.44,Vector3(x,0.62,0),mat,"RobotArm")
+        make_cylinder(root,0.13,0.34,Vector3(x,0.10,0),mat,"RobotLeg")
+    make_cylinder(root,0.08,0.38,Vector3(0,1.98,0),dark,"RobotAntenna")
+
+func add_fantasy_toy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    if variant % 2 == 0:
+        add_dragon(root,mat,dark,white,pink,variant > 1)
+    else:
+        add_unicorn(root,mat,dark,white,pink,variant > 2)
+
+func add_sport_toy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    if variant % 2 == 0:
+        plush_piece(root,Vector3(0,0.72,0),Vector3(0.95,0.95,0.95),white,"BallBody")
+        for x in [-0.32,0.0,0.32]:
+            make_box(root,Vector3(0.12,0.55,0.08),Vector3(x,0.72,0.75),dark,"BallPanel")
+        plush_face(root,1.16,0.70,white,dark,pink)
+    else:
+        add_bear(root,mat,dark,white,pink)
+        make_box(root,Vector3(0.78,0.48,0.08),Vector3(0,0.82,0.62),make_mat(Color("#E5E5E5"),0.05,0.50),"SportJersey")
+        make_box(root,Vector3(0.18,0.42,0.05),Vector3(0,0.84,0.68),make_mat(Color("#D34D4D"),0.0,0.45),"SportNumber")
+
+func add_monster_toy(root: Node3D, mat: Material, dark: Material, white: Material, pink: Material, variant: int = 0) -> void:
+    plush_piece(root,Vector3(0,0.62,0),Vector3(1.16,1.00,0.88),mat,"MonsterBody")
+    plush_piece(root,Vector3(0,1.30,0),Vector3(0.82,0.74,0.76),mat,"MonsterHead")
+    for x in [-0.22,0.22]:
+        make_sphere(root,0.085,Vector3(x,1.46,0.38),white,"MonsterEyeWhite")
+        make_sphere(root,0.042,Vector3(x,1.46,0.44),dark,"MonsterPupil")
+    make_sphere(root,0.06,Vector3(0,1.20,0.43),pink,"MonsterNose")
+    var mouth := make_sphere(root,0.07,Vector3(0,1.06,0.43),dark,"MonsterMouth")
+    mouth.scale=Vector3(1.4,0.45,0.35)
+    make_box(root,Vector3(0.18,0.35,0.16),Vector3(-0.35,1.84,0),white,"MonsterHornL")
+    make_box(root,Vector3(0.18,0.35,0.16),Vector3(0.35,1.84,0),white,"MonsterHornR")
 
 func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> void:
     # Все призы сделаны как единая линейка мягких коллекционных игрушек:
@@ -3931,7 +4010,19 @@ func make_toy_visual(root: Node3D, index: int, rarity: String, color: Color) -> 
         29: add_cyber_cat(root,body_mat,dark,white,pink)
         30: add_mecha_bear(root,body_mat,dark,white,pink)
         31: add_robot(root,body_mat,dark,white,pink,true)
-        _: add_bear(root,body_mat,dark,white,pink)
+        _: 
+            var cname := String(toys[index].get("collection", "")) if index >= 0 and index < toys.size() else ""
+            var variant := maxi(0, index - 32)
+            match cname:
+                "ДИНОЗАВРЫ": add_dinosaur(root,body_mat,dark,white,pink,variant)
+                "СУПЕРГЕРОИ": add_superhero(root,body_mat,dark,white,pink,variant)
+                "СЛАДКИЙ МИР": add_candy(root,body_mat,dark,white,pink,variant)
+                "ПИРАТЫ": add_pirate(root,body_mat,dark,white,pink,variant)
+                "РОБОТЫ": add_robot_toy(root,body_mat,dark,white,pink,variant)
+                "ФАНТАСТИКА": add_fantasy_toy(root,body_mat,dark,white,pink,variant)
+                "СПОРТ": add_sport_toy(root,body_mat,dark,white,pink,variant)
+                "МИР МОНСТРОВ": add_monster_toy(root,body_mat,dark,white,pink,variant)
+                _: add_bear(root,body_mat,dark,white,pink)
 
     # Мягкая тканевая "сигнатура" коллекции: маленькая нашивка на груди.
     if rarity == "ЛЕГЕНДАРНАЯ":
@@ -4123,7 +4214,7 @@ func build_ui() -> void:
     gameplay_modal_blocker.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     gameplay_modal_blocker.mouse_filter = Control.MOUSE_FILTER_STOP
     gameplay_modal_blocker.visible = false
-    gameplay_modal_blocker.z_index = 20
+    gameplay_modal_blocker.z_index = 10
     gameplay_modal_blocker.gui_input.connect(_on_gameplay_modal_blocker_gui_input)
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
@@ -4252,6 +4343,17 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
         # Горизонтальные категории листаются влево/вправо отдельно.
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+    # Свободная прокрутка пальцем: не нужно попадать в ползунок сбоку.
+    if not scroll.has_meta("free_touch_scroll_connected"):
+        scroll.set_meta("free_touch_scroll_connected", true)
+        scroll.gui_input.connect(func(event: InputEvent):
+            if event is InputEventScreenDrag:
+                if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+                    scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(event.relative.y)), 0, maxi(0, int(scroll.get_v_scroll_bar().max_value - scroll.get_v_scroll_bar().page)))
+                elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+                    scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(event.relative.x)), 0, maxi(0, int(scroll.get_h_scroll_bar().max_value - scroll.get_h_scroll_bar().page)))
+                get_viewport().set_input_as_handled()
+        )
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -4619,6 +4721,7 @@ func toggle_mission_detail(is_daily: bool) -> void:
     else:
         title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
         detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
+    panel.z_index = 20
     panel.visible = true
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
@@ -6431,6 +6534,11 @@ func build_collection_panel() -> PanelContainer:
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
+        var reward_line := Label.new()
+        reward_line.text = "🎁 " + collection_completion_reward_text(cname)
+        reward_line.add_theme_font_size_override("font_size", 17)
+        reward_line.modulate = Color("#D5B45A") if not done else Color("#F0D4A9")
+        card.add_child(reward_line)
         var names := Label.new()
         var parts: Array[String] = []
         for toy in toys:
@@ -7720,7 +7828,7 @@ func build_help_panel() -> PanelContainer:
 
     var vk := Button.new()
     vk.text = "◉  VK  ВКонтакте"
-    vk.custom_minimum_size = Vector2(300, 62)
+    vk.custom_minimum_size = Vector2(260, 62)
     style_button(vk, Color("#526F8E"))
     vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
@@ -7729,9 +7837,20 @@ func build_help_panel() -> PanelContainer:
     )
     social_row.add_child(vk)
 
+    var rate := Button.new()
+    rate.text = "★  ОЦЕНИТЬ ИГРУ"
+    rate.custom_minimum_size = Vector2(260, 62)
+    style_button(rate, Color("#B58A43"))
+    rate.add_theme_font_size_override("font_size", 18)
+    rate.pressed.connect(func():
+        current_result = "ОЦЕНКА ИГРЫ: СТРАНИЦА МАГАЗИНА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
+        update_ui()
+    )
+    social_row.add_child(rate)
+
     var max_btn := Button.new()
     max_btn.text = "◆  MAX"
-    max_btn.custom_minimum_size = Vector2(300, 62)
+    max_btn.custom_minimum_size = Vector2(260, 62)
     style_button(max_btn, Color("#7A5D91"))
     max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
@@ -8056,6 +8175,8 @@ func _process(delta: float) -> void:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
             result_popup.visible = false
+            if not pending_collection_completion.is_empty():
+                show_collection_completion_popup()
     if drop_state == 0 and hud_layer.visible:
         # Движение не прыгает между точками: кнопка задаёт цель, а каретка
         # плавно догоняет её с инерцией. Клавиатура также работает плавно.
@@ -8329,8 +8450,18 @@ func move_z(amount: float) -> void:
     register_game_activity()
     claw_move_target.z = clampf(claw_move_target.z + amount * joystick_sensitivity * claw_move_multiplier(), CLAW_MIN.z, CLAW_MAX.z)
 
+func is_claw_over_prize_hole() -> bool:
+    var dx := claw_pos.x - PRIZE_HOLE.x
+    var dz := claw_pos.z - PRIZE_HOLE.z
+    return sqrt(dx * dx + dz * dz) <= 0.72
+
 func drop_claw() -> void:
     if drop_state != 0 or not hud_layer.visible: return
+    if is_claw_over_prize_hole():
+        current_result = "⚠ НАД ОТВЕРСТИЕМ — ЗАХВАТ НЕДОСТУПЕН"
+        play_upgrade_sound("error")
+        update_ui()
+        return
     play_upgrade_sound("grab")
     register_game_activity()
     if _server_ready():
@@ -8559,6 +8690,8 @@ func finalize_delivered_prize() -> void:
         last_reward_rubles = maxi(0, coins - coins_before_prize)
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
+        if previous_count > 0 and sale_available:
+            show_sale_offer()
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8693,6 +8826,40 @@ func award_toy_xp(rarity: String) -> int:
         player_xp = xp_to_next
     return gained
 
+func collection_completion_reward(collection_name: String) -> Dictionary:
+    var needed := 0
+    for toy in toys:
+        if String(toy.get("collection", "")) == collection_name:
+            needed += 1
+    # Небольшая награда: чем больше коллекция, тем чуть выше ценность.
+    var rubles := 30 if needed <= 4 else (40 if needed <= 5 else 50)
+    var parts := 1 if needed >= 5 else 0
+    var keys := 1 if needed >= 5 else 0
+    return {"rubles":rubles, "parts":parts, "keys":keys}
+
+func collection_completion_reward_text(collection_name: String) -> String:
+    var r := collection_completion_reward(collection_name)
+    var items: Array[String] = []
+    if int(r.get("rubles", 0)) > 0: items.append("%d ₽" % int(r["rubles"]))
+    if int(r.get("parts", 0)) > 0: items.append("%d запчасть" % int(r["parts"]))
+    if int(r.get("keys", 0)) > 0: items.append("%d ключ" % int(r["keys"]))
+    return "Награда за полную коллекцию: " + " + ".join(items)
+
+func show_collection_completion_popup() -> void:
+    if pending_collection_completion.is_empty() or not result_popup:
+        return
+    var cname := String(pending_collection_completion.get("name", ""))
+    var reward_text := String(pending_collection_completion.get("reward_text", ""))
+    if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
+    popup_name_label.text = cname
+    popup_info_label.text = "Все игрушки коллекции собраны"
+    popup_xp_label.text = reward_text
+    if popup_rating_label: popup_rating_label.text = ""
+    popup_achievement_label.text = "Поздравляем! Коллекция полностью собрана."
+    popup_timer = 4.0
+    result_popup.visible = true
+    pending_collection_completion.clear()
+
 func check_collection_completion(collection_name: String) -> void:
     if completed_collections.has(collection_name):
         return
@@ -8705,9 +8872,13 @@ func check_collection_completion(collection_name: String) -> void:
                 got += 1
     if needed > 0 and got >= needed:
         completed_collections[collection_name] = true
-        var reward: int = 60 + needed * 10
-        coins += reward
-        current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
+        var reward := collection_completion_reward(collection_name)
+        coins += int(reward.get("rubles", 0))
+        workshop_parts += int(reward.get("parts", 0))
+        chest_keys += int(reward.get("keys", 0))
+        total_keys_earned += int(reward.get("keys", 0))
+        pending_collection_completion = {"name":collection_name, "reward_text":collection_completion_reward_text(collection_name)}
+        current_result = "🏆 КОЛЛЕКЦИЯ «%s» СОБРАНА" % collection_name
         check_achievements()
 
 func achievement_value(spec: Dictionary) -> int:
@@ -8968,10 +9139,12 @@ func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
 
 func show_sale_offer() -> void:
     if not result_popup: return
-    if popup_title_label: popup_title_label.text = "ДУБЛЬ ИГРУШКИ"
+    if popup_title_label: popup_title_label.text = "🧸 ИГРУШКА УЖЕ В КОЛЛЕКЦИИ"
+    popup_name_label.text = sale_name
+    popup_info_label.text = "%s  •  %s" % [last_prize_collection, last_prize_rarity]
     if popup_rating_label: popup_rating_label.text = ""
-    popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
-    popup_achievement_label.text = "Игрушка уже есть в коллекции. Можно оставить дубль или продать его."
+    popup_xp_label.text = "Это дубль • продать за %d ₽?" % sale_price
+    popup_achievement_label.text = "Игрушка уже есть в коллекции. Выберите: оставить дубль или продать его."
     popup_timer = 0.0
     result_popup.visible = true
     if not sale_panel:
