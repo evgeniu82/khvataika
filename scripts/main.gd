@@ -4734,10 +4734,10 @@ func update_mission_timers_light() -> void:
         var timer_label := panel.get_node_or_null("MissionDetailVBox/MissionDetailTimer") as Label
         if timer_label:
             if is_daily and daily_mission_claimed:
-                timer_label.text = "⏳ НОВАЯ МИССИЯ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_day())
+                timer_label.text = "⏳ НОВАЯ МИССИЯ ЧЕРЕЗ %s" % _format_reset_timer(_seconds_to_next_day())
                 timer_label.visible = true
             elif not is_daily and weekly_mission_claimed:
-                timer_label.text = "⏳ НОВОЕ ЗАДАНИЕ ЧЕРЕЗ: %s" % _format_reset_timer(_seconds_to_next_week())
+                timer_label.text = "⏳ НОВОЕ ЗАДАНИЕ ЧЕРЕЗ %s" % _format_reset_timer(_seconds_to_next_week())
                 timer_label.visible = true
             else:
                 timer_label.visible = false
@@ -4748,13 +4748,14 @@ func update_mission_timers_light() -> void:
         if daily_timer:
             daily_timer.visible = false
             if not daily_claim_available and daily_series_claimed_at > 0:
-                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ: %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
                 daily_timer.visible = true
         if hint:
             if daily_claim_available:
                 hint.text = "Нажми на доступный день"
             else:
-                hint.text = "День уже получен — жди новый"
+                hint.text = "День уже получен —
+жди новый"
 
 func toggle_daily_mission() -> void:
     toggle_mission_detail(true)
@@ -4837,7 +4838,7 @@ func build_daily_login_panel() -> void:
 
     var v := VBoxContainer.new()
     v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 8)
+    v.add_theme_constant_override("separation", 2)
     daily_login_panel.add_child(v)
 
     var title := Label.new()
@@ -4858,7 +4859,7 @@ func build_daily_login_panel() -> void:
     daily_days_container.columns = 3
     daily_days_container.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
     daily_days_container.add_theme_constant_override("h_separation", 4)
-    daily_days_container.add_theme_constant_override("v_separation", 4)
+    daily_days_container.add_theme_constant_override("v_separation", 2)
     v.add_child(daily_days_container)
 
     var daily_timer := Label.new()
@@ -4867,7 +4868,7 @@ func build_daily_login_panel() -> void:
     daily_timer.add_theme_font_size_override("font_size", 13)
     daily_timer.modulate = Color("#D6A14A")
     daily_timer.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-    daily_timer.custom_minimum_size = Vector2(0, 18)
+    daily_timer.custom_minimum_size = Vector2(0, 14)
     daily_timer.visible = false
     v.add_child(daily_timer)
 
@@ -4875,7 +4876,7 @@ func build_daily_login_panel() -> void:
     for day in range(1, 8):
         var day_button := Button.new()
         day_button.name = "DailyDay%d" % day
-        day_button.custom_minimum_size = Vector2(92, 32)
+        day_button.custom_minimum_size = Vector2(92, 27)
         day_button.add_theme_font_size_override("font_size", 9)
         day_button.mouse_filter = Control.MOUSE_FILTER_STOP
         day_button.focus_mode = Control.FOCUS_ALL
@@ -4911,10 +4912,11 @@ func update_daily_login_ui() -> void:
         if daily_timer:
             daily_timer.visible = false
             if not daily_claim_available and daily_series_claimed_at > 0:
-                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ: %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.text = "⏳ СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
                 daily_timer.visible = true
         if daily_hint:
-            daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен — жди новый"
+            daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен —\nжди новый"
+            daily_hint.visible = daily_timer == null or not daily_timer.visible
 
         for i in range(daily_day_buttons.size()):
             var day := i + 1
@@ -4926,7 +4928,7 @@ func update_daily_login_ui() -> void:
             # Обработчик сам проверяет, можно ли забрать этот день.
             btn.disabled = false
             if claimed:
-                btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ ПОЛУЧЕН" % day
+                btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ\nПОЛУЧЕН" % day
                 btn.tooltip_text = "Приз за этот день уже получен"
                 style_button(btn, Color("#5FBF72"))
             elif available:
@@ -5163,7 +5165,7 @@ func build_event_panel() -> void:
     var v := VBoxContainer.new()
     v.name = "EventVBox"
     v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 8)
+    v.add_theme_constant_override("separation", 2)
     event_panel.add_child(v)
     var title := Label.new()
     title.name = "EventTitle"
@@ -6700,7 +6702,7 @@ func build_achievements_panel() -> PanelContainer:
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 8)
+    v.add_theme_constant_override("separation", 2)
     v.custom_minimum_size = Vector2(940, 0)
     scroll.add_child(v)
     var h := Label.new()
