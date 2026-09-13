@@ -778,9 +778,12 @@ func _ready() -> void:
     create_loading_screen()
     await get_tree().process_frame
 
+    # Старый диагностический этап больше не блокирует запуск.
+    # Если прошлый запуск аварийно оборвался, показываем этап только в журнале
+    # и продолжаем нормальную инициализацию, чтобы user://startup_diagnostic.txt
+    # не мог навсегда "заморозить" приложение после обновления APK.
     if startup_diagnostic_previous != "" and startup_diagnostic_previous != "DONE":
-        _startup_diag_halt(startup_diagnostic_previous)
-        return
+        _startup_write_phase("RECOVERED_FROM_" + startup_diagnostic_previous)
 
     if not STARTUP_CONTROL_TEST:
         # Extended toy collections are disabled for this build to keep the startup/catalog light.
