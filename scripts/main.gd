@@ -78,12 +78,6 @@ var login_streak: int = 0
 var last_login_claim_date: String = ""
 var daily_claim_available: bool = false
 var daily_claim_button: Button
-var daily_mission_button: Button
-var weekly_mission_button: Button
-var daily_mission_timer_label: Label
-var weekly_mission_timer_label: Label
-var daily_streak_timer_label: Label
-var hud_countdown_timer: float = 0.0
 var daily_login_panel: PanelContainer
 var daily_days_container: GridContainer
 var daily_day_buttons: Array[Button] = []
@@ -4226,7 +4220,38 @@ func build_ui() -> void:
     setup_android_ui_navigation()
     await get_tree().process_frame
     await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
-    # Прокрутка оставлена в стандартном режиме проекта.
+    await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
+    setup_android_scrolls()
+    await get_tree().process_frame
+    await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
+
+func setup_android_scrolls() -> void:
+    # Единая настройка прокрутки для всех длинных окон под Android.
+    # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
+    # остаётся достаточно широкой для точного захвата.
+    var stack: Array[Node] = [self]
+    while not stack.is_empty():
+        var current: Node = stack.pop_back()
+        if current is ScrollContainer:
+            configure_android_scroll(current)
+        for child in current.get_children():
+            stack.append(child)
+
+func configure_android_scroll(scroll: ScrollContainer) -> void:
+    if scroll.has_meta("android_scroll_configured"):
+        return
+    scroll.set_meta("android_scroll_configured", true)
+    scroll.follow_focus = true
+    scroll.scroll_deadzone = 1
+    scroll.add_theme_constant_override("scroll_bar_width", 20)
+    scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
+    if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+        scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    else:
+        # Горизонтальные категории листаются влево/вправо отдельно.
+        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -4446,7 +4471,6 @@ func build_extra_hud() -> void:
     hud_layer.add_child(workshop_btn)
 
     var daily_btn := Button.new()
-    daily_mission_button = daily_btn
     daily_btn.text = "🎯"
     daily_btn.position = Vector2(948, 185)
     daily_btn.size = Vector2(82, 82)
@@ -4458,10 +4482,8 @@ func build_extra_hud() -> void:
     daily_btn.tooltip_text = "Миссия дня"
     daily_btn.pressed.connect(toggle_daily_mission)
     hud_layer.add_child(daily_btn)
-    daily_mission_timer_label = null
 
     var weekly_btn := Button.new()
-    weekly_mission_button = weekly_btn
     weekly_btn.text = "🏆"
     weekly_btn.position = Vector2(948, 280)
     weekly_btn.size = Vector2(82, 82)
@@ -4473,7 +4495,6 @@ func build_extra_hud() -> void:
     weekly_btn.tooltip_text = "Недельная миссия"
     weekly_btn.pressed.connect(toggle_weekly_mission)
     hud_layer.add_child(weekly_btn)
-    weekly_mission_timer_label = null
 
     daily_claim_button = Button.new()
     daily_claim_button.text = "🎁"
@@ -4485,7 +4506,6 @@ func build_extra_hud() -> void:
     daily_claim_button.tooltip_text = "Ежедневная серия"
     daily_claim_button.pressed.connect(toggle_daily_login)
     hud_layer.add_child(daily_claim_button)
-    daily_streak_timer_label = null
 
     # Правый нижний круг — именно НЕДЕЛЬНЫЕ СОБЫТИЯ, отдельно от сезонов и праздников.
     event_button = Button.new()
@@ -4507,7 +4527,7 @@ func build_extra_hud() -> void:
     var mission_panel := PanelContainer.new()
     mission_panel.name = "MissionDetailPanel"
     mission_panel.position = Vector2(500, 170)
-    mission_panel.size = Vector2(430, 225)
+    mission_panel.size = Vector2(430, 205)
     mission_panel.visible = false
     style_panel(mission_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     mission_panel.z_index = 30
@@ -4529,63 +4549,13 @@ func build_extra_hud() -> void:
     md.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     md.add_theme_font_size_override("font_size", 18)
     mv.add_child(md)
-    var mtimer := Label.new()
-    mtimer.name = "MissionDetailTimer"
-    mtimer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    mtimer.add_theme_font_size_override("font_size", 12)
-    mtimer.modulate = Color("#E1C29A")
-    mv.add_child(mtimer)
 
-func make_hud_countdown_label(parent: Button) -> Label:
-    var label := Label.new()
-    label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    label.add_theme_font_size_override("font_size", 10)
-    label.add_theme_color_override("font_color", Color("#E8D6C0"))
-    label.add_theme_color_override("font_shadow_color", Color("#000000", 0.85))
-    label.add_theme_constant_override("shadow_offset_x", 1)
-    label.add_theme_constant_override("shadow_offset_y", 1)
-    label.position = Vector2(4, 61)
-    label.size = Vector2(74, 16)
-    label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-    parent.add_child(label)
-    return label
-
-func _seconds_until_next_midnight() -> int:
-    var now_unix := int(Time.get_unix_time_from_system())
-    var dt := Time.get_datetime_dict_from_system()
-    var midnight := Time.get_unix_time_from_datetime_dict({
-        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + 1,
-        "hour":0, "minute":0, "second":0
-    })
-    return maxi(0, int(midnight) - now_unix)
-
-func _seconds_until_next_week_reset() -> int:
-    var now_unix := int(Time.get_unix_time_from_system())
-    var dt := Time.get_datetime_dict_from_system()
-    var weekday := int(dt.get("weekday", 0)) # 0=воскресенье, 1=понедельник
-    var days_until_monday := 7 if weekday == 1 else ((8 - weekday) % 7)
-    var reset_unix := Time.get_unix_time_from_datetime_dict({
-        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + days_until_monday,
-        "hour":0, "minute":0, "second":0
-    })
-    return maxi(0, int(reset_unix) - now_unix)
-
-func _format_hud_countdown(seconds_left: int, weekly: bool = false) -> String:
-    var total := maxi(0, seconds_left)
-    var days := int(total / 86400)
-    var hours := int((total % 86400) / 3600)
-    var minutes := int((total % 3600) / 60)
-    var seconds := int(total % 60)
-    if weekly:
-        return "%dд %02d:%02d" % [days, hours, minutes]
-    return "%02d:%02d:%02d" % [hours, minutes, seconds]
-
-func update_hud_countdown_timers() -> void:
-    # Таймеры больше не занимают место на круглых кнопках. Они показываются
-    # внутри соответствующих открытых окон.
-    update_missions()
-    update_daily_login_ui()
+    var mission_timer := Label.new()
+    mission_timer.name = "MissionDetailTimer"
+    mission_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    mission_timer.add_theme_font_size_override("font_size", 12)
+    mission_timer.modulate = Color("#E1C29A")
+    mv.add_child(mission_timer)
 
 func animate_panel_in(panel: Control, from_scale: float = 0.94) -> void:
     if not panel or not is_instance_valid(panel): return
@@ -4704,7 +4674,7 @@ func build_daily_login_panel() -> void:
     # Большая карточка привязана к правому кругу. Полностью помещается в экран
     # и раскрывается влево от кнопки.
     daily_login_panel.position = Vector2(310, 285)
-    daily_login_panel.size = Vector2(300, 185)
+    daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.visible = false
     style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
     daily_login_panel.z_index = 30
@@ -4727,12 +4697,13 @@ func build_daily_login_panel() -> void:
     detail.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     detail.add_theme_font_size_override("font_size", 9)
     v.add_child(detail)
-    var timer := Label.new()
-    timer.name = "DailyLoginTimer"
-    timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    timer.add_theme_font_size_override("font_size", 9)
-    timer.modulate = Color("#E1C29A")
-    v.add_child(timer)
+
+    var daily_timer := Label.new()
+    daily_timer.name = "DailyLoginTimer"
+    daily_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    daily_timer.add_theme_font_size_override("font_size", 9)
+    daily_timer.modulate = Color("#E1C29A")
+    v.add_child(daily_timer)
 
     daily_days_container = GridContainer.new()
     daily_days_container.name = "DailyDaysGrid"
@@ -4766,6 +4737,16 @@ func build_daily_login_panel() -> void:
 
 func update_daily_login_ui() -> void:
     if not daily_claim_button: return
+    # Этот метод уже вызывается игровым циклом в стабильной версии 1.16.2,
+    # поэтому отдельный новый _process для таймеров не нужен.
+    var mission_panel: PanelContainer = null
+    if hud_layer:
+        mission_panel = hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
+    if mission_panel and mission_panel.visible:
+        var mission_timer := mission_panel.get_node_or_null("MissionDetailVBox/MissionDetailTimer") as Label
+        if mission_timer:
+            var is_daily := String(mission_panel.get_meta("mission_type", "daily")) == "daily"
+            mission_timer.text = "⏱ Обновление через %s" % (_format_hud_countdown(_seconds_until_next_midnight()) if is_daily else _format_hud_countdown(_seconds_until_next_week_reset(), true))
     if daily_claim_available:
         daily_claim_button.modulate.a = 0.65 + 0.35 * (0.5 + 0.5 * sin(time_alive * 5.0))
     else:
@@ -4777,9 +4758,9 @@ func update_daily_login_ui() -> void:
         var reward := 20 + current_day * 5
         if detail:
             detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
-        var timer_label := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
-        if timer_label:
-            timer_label.text = "⏱ Новый день через %s" % _format_hud_countdown(_seconds_until_next_midnight())
+        var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
+        if daily_timer:
+            daily_timer.text = "⏱ Новый день через %s" % _format_hud_countdown(_seconds_until_next_midnight())
 
         for i in range(daily_day_buttons.size()):
             var day := i + 1
@@ -8020,10 +8001,6 @@ func update_ui() -> void:
 
 func _process(delta: float) -> void:
     time_alive += delta
-    hud_countdown_timer -= delta
-    if hud_countdown_timer <= 0.0:
-        hud_countdown_timer = 1.0
-        update_hud_countdown_timers()
     if notification_permission_waiting and OS.has_feature("android") and fmod(time_alive, 1.0) < delta:
         if _android_notification_permission_granted():
             notification_permission_waiting = false
@@ -8958,7 +8935,8 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
         popup_achievement_label.text = ""
     else:
         popup_achievement_label.text = "\n".join(pending_achievement_rewards_text)
-    # Дубль требует выбора игрока, поэтому окно не исчезает само.
+    # Если это дубль, окно выбора не должно исчезать само: игрок должен
+    # явно выбрать «ПРОДАТЬ» или «ОСТАВИТЬ».
     popup_timer = 0.0 if sale_available and sale_name == toy_name else 3.2
     if sale_available and sale_name == toy_name:
         if popup_title_label: popup_title_label.text = "ДУБЛЬ ИГРУШКИ"
@@ -8990,8 +8968,8 @@ func rarity_reward(rarity: String) -> int:
     return 5
 
 func show_chest_confirmation(chest_name: String, need: int, action: Callable) -> void:
-    # Собственное окно вместо ConfirmationDialog: стандартная серая рамка
-    # Android больше не появляется вокруг коричневого интерфейса.
+    # Собственное окно в стиле игры вместо стандартного ConfirmationDialog.
+    # Это исключает серую системную рамку на Android.
     var dialog := PanelContainer.new()
     dialog.name = "ChestConfirmationPanel"
     dialog.size = Vector2(620, 300)
@@ -9338,6 +9316,36 @@ func register_game_activity() -> void:
     if waiting_overlay:
         waiting_overlay.visible = false
 
+func _seconds_until_next_midnight() -> int:
+    var now_unix := int(Time.get_unix_time_from_system())
+    var dt := Time.get_datetime_dict_from_system()
+    var midnight := Time.get_unix_time_from_datetime_dict({
+        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + 1,
+        "hour":0, "minute":0, "second":0
+    })
+    return maxi(0, int(midnight) - now_unix)
+
+func _seconds_until_next_week_reset() -> int:
+    var now_unix := int(Time.get_unix_time_from_system())
+    var dt := Time.get_datetime_dict_from_system()
+    var weekday := int(dt.get("weekday", 0))
+    var days_until_monday := 7 if weekday == 1 else ((8 - weekday) % 7)
+    var reset_unix := Time.get_unix_time_from_datetime_dict({
+        "year":int(dt.get("year", 2026)), "month":int(dt.get("month", 1)), "day":int(dt.get("day", 1)) + days_until_monday,
+        "hour":0, "minute":0, "second":0
+    })
+    return maxi(0, int(reset_unix) - now_unix)
+
+func _format_hud_countdown(seconds_left: int, weekly: bool = false) -> String:
+    var total := maxi(0, seconds_left)
+    var days := int(total / 86400)
+    var hours := int((total % 86400) / 3600)
+    var minutes := int((total % 3600) / 60)
+    var seconds := int(total % 60)
+    if weekly:
+        return "%dд %02d:%02d" % [days, hours, minutes]
+    return "%02d:%02d:%02d" % [hours, minutes, seconds]
+
 func update_missions() -> void:
     if not hud_layer or not is_instance_valid(hud_layer):
         return
@@ -9346,15 +9354,12 @@ func update_missions() -> void:
         var is_daily := String(panel.get_meta("mission_type", "daily")) == "daily"
         var title := panel.get_node("MissionDetailVBox/MissionDetailTitle") as Label
         var detail := panel.get_node("MissionDetailVBox/MissionDetailText") as Label
-        var timer_label := panel.get_node("MissionDetailVBox/MissionDetailTimer") as Label
         if is_daily:
             title.text = "🎯 МИССИЯ ДНЯ"
             detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +50 ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target]
-            timer_label.text = "⏱ Обновление через %s" % _format_hud_countdown(_seconds_until_next_midnight())
         else:
             title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
             detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
-            timer_label.text = "⏱ Обновление через %s" % _format_hud_countdown(_seconds_until_next_week_reset(), true)
 
 func show_waiting_screen() -> void:
     if not auto_tips_on:
