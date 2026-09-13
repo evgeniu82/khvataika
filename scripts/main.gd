@@ -4226,39 +4226,7 @@ func build_ui() -> void:
     setup_android_ui_navigation()
     await get_tree().process_frame
     await set_loading_progress(95.0, "НАВИГАЦИЯ ANDROID НАСТРОЕНА")
-    await set_loading_status("ПРОКРУТКА НАСТРОЕНА...")
-    setup_android_scrolls()
-    await get_tree().process_frame
-    await set_loading_progress(96.0, "ПРОКРУТКА НАСТРОЕНА")
-
-func setup_android_scrolls() -> void:
-    # Единая настройка прокрутки для всех длинных окон под Android.
-    # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
-    # остаётся достаточно широкой для точного захвата.
-    var stack: Array[Node] = [self]
-    while not stack.is_empty():
-        var current: Node = stack.pop_back()
-        if current is ScrollContainer:
-            configure_android_scroll(current)
-        for child in current.get_children():
-            stack.append(child)
-
-func configure_android_scroll(scroll: ScrollContainer) -> void:
-    if scroll.has_meta("android_scroll_configured"):
-        return
-    scroll.set_meta("android_scroll_configured", true)
-    scroll.follow_focus = false
-    scroll.scroll_deadzone = 0
-    # Полоса прокрутки скрыта: содержимое листается свободным свайпом пальца.
-    scroll.add_theme_constant_override("scroll_bar_width", 0)
-    scroll.add_theme_constant_override("scroll_bar_h_separation", 0)
-    if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-        scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    else:
-        # Горизонтальные категории листаются влево/вправо отдельно.
-        scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+    # Прокрутка оставлена в стандартном режиме проекта.
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
