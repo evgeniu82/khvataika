@@ -1,36 +1,32 @@
-# Хватайка 1.14.0 — Offline Complete Edition
+# ХВАТАЙКА 1.14.1 — LOCAL / OFFLINE COMPLETE
 
-Игра переведена в полноценный локальный режим без обязательного сервера.
+This build is the local-first milestone. The server code is retained for the later online phase, but gameplay is explicitly offline and does not use server authority.
 
-## Локально работают
-- профиль и сохранение прогресса;
-- игровой экран, управление клешнёй и физика игрушек;
-- шанс захвата с учётом веса, скользкости, наведения, улучшений, мастерской, счастливой игрушки и событий;
-- коллекции и дубликаты;
-- достижения и награды;
-- магазин: клешни, улучшения, скины клешни, игрушек и аппарата, VIP;
-- сундуки и ключи;
-- мастерская, модули, чертежи, калибровка, оверклок и работа по таймеру;
-- ежедневные/еженедельные задания;
-- сезонный пропуск;
-- сезоны, праздники и события;
-- ежедневный вход и бонус за возвращение;
-- промокоды;
-- реферальная система на одном устройстве;
-- локальный рейтинг;
-- новости;
-- помощь;
-- настройки, язык, графика, FPS, управление и уведомления;
-- расширенная локальная звуковая система с плейлистом фоновых мелодий и дополнительными UI-звуками.
+## Local systems
+- Profile and local save/load
+- Main arcade machine and claw movement
+- Prize physics, capture chances and rarity
+- Toys, duplicates, collections and collection rewards
+- Shop: claws, claw skins, toy skins, machine skins, upgrades and VIP
+- Workshop: modules, blueprints, calibration, overclock and timed jobs
+- Daily/weekly missions and login rewards
+- Achievements and progression/XP
+- Chests and keys
+- Seasonal pass, seasons, holidays and events
+- Promo codes
+- Local referral flow
+- Local leaderboard/rating presentation
+- News and in-game live systems panels
+- Return bonus
+- Settings, music playlist and UI/game SFX
+- Android background notification integration where supported
 
-## Сервер
-Серверная архитектура сохранена в проекте, но клиентская сборка 1.14.0 не блокирует игру из-за отсутствия сети. Это позволяет полностью тестировать игровой цикл до подключения Selectel.
+## Offline safety
+- `OFFLINE_MODE = true`
+- `SERVER_AUTHORITATIVE = false`
+- server URL is forced empty when loading an old save
+- old player token is cleared on load
+- all local rewards/purchases use local save state
 
-## Админ-панель
-Сохранена прежняя тёплая коричневая визуальная тема. Добавлены:
-- расширенный обзор с конкретными показателями контента, заданий, сезона, событий, коммуникаций, промокодов, аудита и игроков;
-- просмотр всех игроков без ограничения 300 записей;
-- кнопка открытия конкретного игрока;
-- сводка игрока;
-- полная JSON-конфигурация игрока и сохранение полного состояния;
-- улучшенная адаптация навигации и форм под Android и ПК.
+## Important
+The web admin panel is retained for the future Selectel/server phase. It is not required to launch or play the local game.
