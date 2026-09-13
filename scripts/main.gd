@@ -4410,40 +4410,71 @@ func _on_gameplay_modal_blocker_gui_input(event: InputEvent) -> void:
         _dismiss_gameplay_side_panels_on_tap(event.position)
         get_viewport().set_input_as_handled()
 
+# Активное окно прокрутки для текущего пальца. Важно: мы выбираем его
+# в момент НАЧАЛА касания и больше не ищем заново во время движения.
+# Поэтому палец может пройти поверх кнопок, текста, картинок и других пунктов
+# внутри окна — прокрутка не потеряется.
+var _free_scroll_touch_id: int = -1
+var _free_scroll_target: ScrollContainer = null
+
 func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
-    # Ищем только в момент свайпа — ничего не перебираем во время запуска игры.
-    for child in node.get_children():
-        if child is Control and child.visible:
-            var control := child as Control
-            if control.get_global_rect().has_point(point):
-                var nested := _find_scroll_container_at(child, point)
-                if nested:
-                    return nested
-                if child is ScrollContainer:
-                    var scroll := child as ScrollContainer
-                    if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
-                        return scroll
-        elif child.get_child_count() > 0:
-            var nested := _find_scroll_container_at(child, point)
-            if nested:
-                return nested
-    return null
+    # Ищем среди ВСЕХ видимых ScrollContainer, под которыми находится точка.
+    # Не зависим от того, какой дочерний Label/Button оказался сверху.
+    var best: ScrollContainer = null
+    var best_area: float = INF
+    var stack: Array[Node] = [node]
+    while not stack.is_empty():
+        var current: Node = stack.pop_back()
+        if current is ScrollContainer:
+            var scroll := current as ScrollContainer
+            if scroll.visible and scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+                if scroll.get_global_rect().has_point(point):
+                    var size := scroll.size
+                    var area := maxf(size.x * size.y, 1.0)
+                    # Из нескольких вложенных окон выбираем самое маленькое
+                    # подходящее — обычно это конкретное открытое окно.
+                    if area < best_area:
+                        best = scroll
+                        best_area = area
+        for child in current.get_children():
+            if child is Control and not (child as Control).visible:
+                continue
+            stack.append(child)
+    return best
 
 func _handle_free_screen_scroll(event: InputEventScreenDrag) -> bool:
-    var scroll := _find_scroll_container_at(self, event.position)
-    if scroll == null:
+    # Цель уже захвачена при первом касании. Неважно, куда палец
+    # переместился внутри окна и над каким Control он сейчас находится.
+    if _free_scroll_target == null or not is_instance_valid(_free_scroll_target):
         return false
-    var content_height := scroll.get_v_scroll_bar().max_value
-    if content_height <= 0.0:
+    var scroll := _free_scroll_target
+    var bar := scroll.get_v_scroll_bar()
+    var max_scroll := maxf(bar.max_value, 0.0)
+    if max_scroll <= 0.0:
         return false
-    scroll.scroll_vertical = clampf(scroll.scroll_vertical - event.relative.y, 0.0, content_height)
+    # 1:1 со скоростью пальца, с защитой от выхода за границы.
+    scroll.scroll_vertical = clampf(scroll.scroll_vertical - event.relative.y, 0.0, max_scroll)
     return true
 
 func _input(event: InputEvent) -> void:
-    # Свободный свайп по любому видимому вертикальному окну.
-    # Обрабатывается только движение пальца, поэтому обычные кнопки не затрагиваются.
+    # Свободный скроллинг работает как настоящий свайп: сначала захватываем
+    # окно, затем листаем его до отпускания пальца. Кнопки и пункты внутри
+    # окна не мешают прокрутке.
+    if event is InputEventScreenTouch:
+        var touch := event as InputEventScreenTouch
+        if touch.pressed:
+            _free_scroll_touch_id = touch.index
+            _free_scroll_target = _find_scroll_container_at(self, touch.position)
+        elif touch.index == _free_scroll_touch_id:
+            _free_scroll_touch_id = -1
+            _free_scroll_target = null
+        return
+
     if event is InputEventScreenDrag:
-        if _handle_free_screen_scroll(event):
+        var drag := event as InputEventScreenDrag
+        if drag.index != _free_scroll_touch_id:
+            return
+        if _handle_free_screen_scroll(drag):
             get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
