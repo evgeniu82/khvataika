@@ -5569,12 +5569,50 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
     update_ui()
     return selected
 func buy_claw_skin(index: int) -> void:
+    # Жёсткая привязка магазина: СКИН 01 = стартовая коричневая клешня,
+    # СКИН 02 = бирюзовая клешня, СКИН 03+ = следующие позиции по порядку.
+    # Не допускаем сдвига индексов между кнопкой магазина и реальным скином.
+    if index < 0 or index >= claw_skin_specs.size(): return
+    if index == 0:
+        owned_claw_skins[0] = true
+        selected_claw_skin = 0
+        apply_shop_visuals()
+        save_game()
+        return
     selected_claw_skin = buy_cosmetic(index, claw_skin_specs, owned_claw_skins, selected_claw_skin)
+    # После покупки/выбора ещё раз фиксируем именно нажатый индекс.
+    if index < owned_claw_skins.size() and owned_claw_skins[index]:
+        selected_claw_skin = index
+        apply_shop_visuals()
+        save_game()
 func buy_toy_skin(index: int) -> void:
+    if index < 0 or index >= toy_skin_specs.size(): return
+    if index == 0:
+        owned_toy_skins[0] = true
+        selected_toy_skin = 0
+        apply_shop_visuals()
+        build_prizes()
+        save_game()
+        return
     selected_toy_skin = buy_cosmetic(index, toy_skin_specs, owned_toy_skins, selected_toy_skin)
-    build_prizes()
+    if index < owned_toy_skins.size() and owned_toy_skins[index]:
+        selected_toy_skin = index
+        apply_shop_visuals()
+        build_prizes()
+        save_game()
 func buy_machine_skin(index: int) -> void:
+    if index < 0 or index >= machine_skin_specs.size(): return
+    if index == 0:
+        owned_machine_skins[0] = true
+        selected_machine_skin = 0
+        apply_shop_visuals()
+        save_game()
+        return
     selected_machine_skin = buy_cosmetic(index, machine_skin_specs, owned_machine_skins, selected_machine_skin)
+    if index < owned_machine_skins.size() and owned_machine_skins[index]:
+        selected_machine_skin = index
+        apply_shop_visuals()
+        save_game()
 
 func apply_shop_visuals() -> void:
     var current_machine: Node3D = get_node_or_null("PremiumClawMachine") as Node3D
