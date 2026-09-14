@@ -504,7 +504,6 @@ var collection_completion_popup_toys: String = ""
 var collection_completion_popup: PanelContainer
 var collection_completion_popup_timer: float = 0.0
 var collection_completion_popup_pending: bool = false
-var achievement_check_timer: float = 0.0
 var popup_achievement_label: Label
 var achievement_strip: PanelContainer
 var achievement_strip_label: Label
@@ -554,7 +553,7 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"toys_250","name":"ПРОФЕССИОНАЛ","desc":"Достаньте 250 игрушек.","kind":"toys","value":250},
     {"id":"toys_500","name":"ЛЕГЕНДА АППАРАТА","desc":"Достаньте 500 игрушек.","kind":"toys","value":500},
     {"id":"games_10","name":"ПЕРВЫЕ 10 ИГР","desc":"Сыграйте 10 раз.","kind":"games","value":10},
-    {"id":"games_50","name":"50 ИГР БЕЗ ОСТАНОВКИ","desc":"Сыграйте 50 раз.","kind":"games","value":50},
+    {"id":"games_50","name":"НЕ ОСТАНОВИТЬ","desc":"Сыграйте 50 раз.","kind":"games","value":50},
     {"id":"games_100","name":"СТО ПОПЫТОК","desc":"Сыграйте 100 раз.","kind":"games","value":100},
     {"id":"games_500","name":"МАРАФОН","desc":"Сыграйте 500 раз.","kind":"games","value":500},
     {"id":"common_25","name":"ПРОСТЫЕ ПРИЗЫ","desc":"Получите 25 обычных игрушек.","kind":"rarity","rarity":"ОБЫЧНАЯ","value":25},
@@ -565,7 +564,7 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"collections_1","name":"СОБРАНО!","desc":"Завершите 1 коллекцию.","kind":"collections","value":1},
     {"id":"collections_2","name":"ДВА НАБОРА","desc":"Завершите 2 коллекции.","kind":"collections","value":2},
     {"id":"collections_4","name":"ПОЛОВИНА ПУТИ","desc":"Завершите 4 коллекции.","kind":"collections","value":4},
-    {"id":"collections_16","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":16},
+    {"id":"collections_8","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":8},
     {"id":"level_5","name":"НОВИЧОК","desc":"Достигните 5 уровня.","kind":"level","value":5},
     {"id":"level_10","name":"УВЕРЕННЫЙ ИГРОК","desc":"Достигните 10 уровня.","kind":"level","value":10},
     {"id":"level_25","name":"ПРОДВИНУТЫЙ","desc":"Достигните 25 уровня.","kind":"level","value":25},
@@ -739,7 +738,7 @@ func add_diverse_achievements() -> void:
     # косметика, задания, ключи, XP и особые захваты. Все цели независимы.
     var extra := [
         {"id":"streak_3","name":"ПЕРВАЯ СЕРИЯ","desc":"Выиграйте 3 игры подряд.","kind":"best_streak","value":3},
-        {"id":"streak_7","name":"СЕРИЯ 7 ПОБЕД","desc":"Выиграйте 7 игр подряд.","kind":"best_streak","value":7},
+        {"id":"streak_7","name":"НЕ ОСТАНОВИТЬ","desc":"Выиграйте 7 игр подряд.","kind":"best_streak","value":7},
         {"id":"streak_15","name":"ЖЕЛЕЗНАЯ СЕРИЯ","desc":"Выиграйте 15 игр подряд.","kind":"best_streak","value":15},
         {"id":"streak_30","name":"МАШИНА ПОБЕД","desc":"Выиграйте 30 игр подряд.","kind":"best_streak","value":30},
         {"id":"streak_50","name":"НЕПОБЕДИМЫЙ","desc":"Выиграйте 50 игр подряд.","kind":"best_streak","value":50},
@@ -5508,19 +5507,19 @@ func show_achievement_strip() -> void:
     if pending_achievement_rewards_text.is_empty() and pending_new_achievements.is_empty():
         return
     var lines: Array[String] = []
-    for i in range(pending_new_achievements.size()):
-        var name := String(pending_new_achievements[i])
-        var reward_text := pending_achievement_rewards_text[i] if i < pending_achievement_rewards_text.size() else "Награда: без дополнительной награды"
-        reward_text = String(reward_text).replace("🏆 ", "").replace("\n   ", " ")
-        lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: %s • %s" % [name, reward_text])
+    for i in range(pending_achievement_rewards_text.size()):
+        var text := String(pending_achievement_rewards_text[i]).replace("\n", " • ")
+        lines.append(text)
     if lines.is_empty():
-        for reward_text in pending_achievement_rewards_text:
-            lines.append("🏆 " + String(reward_text).replace("\n", " • "))
+        for name in pending_new_achievements:
+            lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % String(name))
+    else:
+        var cleaned: Array[String] = []
+        for line in lines:
+            cleaned.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: " + line.trim_prefix("🏆 "))
+        lines = cleaned
     achievement_strip_label.text = "\n".join(lines)
-    var line_count := maxi(1, lines.size())
-    achievement_strip.size = Vector2(630, 58.0 + float(line_count - 1) * 42.0)
-    achievement_strip.position = Vector2(225, 145)
-    achievement_strip_timer = 5.0 + float(line_count - 1) * 1.5
+    achievement_strip_timer = 5.0
     achievement_strip.visible = true
 
 func hide_achievement_strip() -> void:
@@ -7747,7 +7746,6 @@ func build_settings_panel() -> PanelContainer:
     for name in music_names: music_track.add_item(name)
     music_track.selected = clampi(music_track_index, 0, music_names.size() - 1)
     music_track.custom_minimum_size = Vector2(0, 54)
-    style_option_button(music_track)
     music_track.item_selected.connect(func(idx:int): select_music_track(idx))
     v.add_child(make_labeled_control("Фоновая мелодия", music_track))
     var sfx := CheckButton.new(); sfx.text = "Звуки игры и интерфейса"; sfx.button_pressed = sfx_on; sfx.add_theme_font_size_override("font_size", 21)
@@ -7757,10 +7755,10 @@ func build_settings_panel() -> PanelContainer:
 
     var sep2 := Label.new(); sep2.text = "ГРАФИКА"; sep2.add_theme_font_size_override("font_size", 22); sep2.modulate = GOLD; v.add_child(sep2)
     quality_option = OptionButton.new(); ["ПЛОХО","НИЗКО","СРЕДНЕ","ВЫСОКО","УЛЬТРА"].map(func(x): quality_option.add_item(x))
-    quality_option.selected = clampi(quality_level,0,4); quality_option.custom_minimum_size = Vector2(0, 54); style_option_button(quality_option)
+    quality_option.selected = clampi(quality_level,0,4); quality_option.custom_minimum_size = Vector2(0, 54)
     quality_option.item_selected.connect(func(idx: int): quality_level = clampi(idx,0,4); apply_quality_settings(); save_game(); update_quality_info()); v.add_child(make_labeled_control("Качество", quality_option))
     var fps := OptionButton.new(); [30,60,90,120].map(func(x): fps.add_item("%d FPS" % x))
-    fps.selected = 1 if fps_limit == 60 else (0 if fps_limit == 30 else (2 if fps_limit == 90 else 3)); fps.custom_minimum_size = Vector2(0,54); style_option_button(fps)
+    fps.selected = 1 if fps_limit == 60 else (0 if fps_limit == 30 else (2 if fps_limit == 90 else 3)); fps.custom_minimum_size = Vector2(0,54)
     fps.item_selected.connect(func(idx:int): fps_limit = [30,60,90,120][idx]; Engine.max_fps = fps_limit; save_game()); v.add_child(make_labeled_control("Ограничение кадров", fps))
     var energy := CheckButton.new(); energy.text = "Энергосбережение"; energy.button_pressed = energy_saving_on; energy.add_theme_font_size_override("font_size",21)
     energy.toggled.connect(func(on:bool): energy_saving_on = on; Engine.max_fps = 30 if on else fps_limit; save_game()); v.add_child(energy)
@@ -7796,7 +7794,7 @@ func build_settings_panel() -> PanelContainer:
 
 
     var sep5 := Label.new(); sep5.text="ЯЗЫК"; sep5.add_theme_font_size_override("font_size",22); sep5.modulate=GOLD; v.add_child(sep5)
-    language_option=OptionButton.new(); language_option.add_item("Русский"); language_option.add_item("English"); language_option.selected=0 if language=="ru" else 1; language_option.custom_minimum_size=Vector2(0,54); style_option_button(language_option)
+    language_option=OptionButton.new(); language_option.add_item("Русский"); language_option.add_item("English"); language_option.selected=0 if language=="ru" else 1; language_option.custom_minimum_size=Vector2(0,54)
     language_option.item_selected.connect(func(idx:int): language="ru" if idx==0 else "en"; apply_language(); save_game()); v.add_child(language_option)
 
     var info := Label.new(); info.name="SettingsInfo"; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
@@ -7807,23 +7805,6 @@ func build_settings_panel() -> PanelContainer:
     var reset := Button.new(); reset.text="СБРОСИТЬ ПРОГРЕСС"; reset.custom_minimum_size=Vector2(0,78); style_button(reset,Color("#76583F")); reset.pressed.connect(confirm_reset_progress); v.add_child(reset)
     var close := Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,78); style_button(close,Color("#9A7653")); close.pressed.connect(func(): show_main_menu()); v.add_child(close)
     return p
-
-func style_option_button(option: OptionButton) -> void:
-    if not option:
-        return
-    option.add_theme_color_override("font_color", Color("#F1E5D6"))
-    option.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
-    option.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
-    option.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 12, 2))
-    option.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 12, 2))
-    option.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 12, 2))
-    var popup := option.get_popup()
-    if popup:
-        popup.add_theme_color_override("font_color", Color("#F1E5D6"))
-        popup.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
-        popup.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
-        popup.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#A3754D"), 12, 2))
-        popup.add_theme_stylebox_override("hover", make_style(Color("#4A3022"), Color("#B98B5C"), 8, 1))
 
 func make_labeled_control(title_text: String, control: Control) -> VBoxContainer:
     var box := VBoxContainer.new(); box.add_theme_constant_override("separation",3)
@@ -7874,7 +7855,6 @@ func confirm_reset_settings() -> void:
     dialog.dialog_text = "Вернуть звук, графику и управление к исходным значениям? Прогресс игры не будет затронут."
     dialog.ok_button_text = "ВОССТАНОВИТЬ"
     dialog.cancel_button_text = "ОТМЕНА"
-    style_confirmation_dialog(dialog)
     menu_layer.add_child(dialog)
     dialog.confirmed.connect(func(): reset_settings_defaults(); dialog.queue_free())
     dialog.canceled.connect(func(): dialog.queue_free())
@@ -7886,7 +7866,6 @@ func confirm_reset_progress() -> void:
     dialog.dialog_text = "Весь прогресс, покупки и коллекция будут удалены. Продолжить?"
     dialog.ok_button_text = "СБРОСИТЬ"
     dialog.cancel_button_text = "ОТМЕНА"
-    style_confirmation_dialog(dialog)
     menu_layer.add_child(dialog)
     dialog.confirmed.connect(func(): reset_progress(); dialog.queue_free())
     dialog.canceled.connect(func(): dialog.queue_free())
@@ -8363,10 +8342,6 @@ func _process(delta: float) -> void:
                 loading_tip_index = next_tip
                 loading_tip.text = tips[loading_tip_index]
         return
-    achievement_check_timer -= delta
-    if achievement_check_timer <= 0.0:
-        achievement_check_timer = 0.50
-        check_achievements()
     if aim_marker and is_instance_valid(aim_marker):
         aim_marker.position.x = claw_pos.x
         aim_marker.position.z = claw_pos.z
@@ -9146,56 +9121,55 @@ func build_collection_completion_popup() -> void:
     collection_completion_popup = PanelContainer.new()
     collection_completion_popup.name = "CollectionCompletionPopup"
     collection_completion_popup.position = Vector2(145, 290)
-    collection_completion_popup.size = Vector2(760, 470)
+    collection_completion_popup.size = Vector2(790, 730)
     collection_completion_popup.visible = false
     collection_completion_popup.z_index = 700
     style_panel(collection_completion_popup, Color("#241B16"), Color("#76583F"), 26, 3)
     hud_layer.add_child(collection_completion_popup)
     var v := VBoxContainer.new()
-    v.name = "VBoxContainer"
     v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 8)
+    v.add_theme_constant_override("separation", 12)
     collection_completion_popup.add_child(v)
     var title := Label.new()
     title.name = "Title"
-    title.text = "🏆  КОЛЛЕКЦИЯ СОБРАНА!"
+    title.text = "🏆  НОВАЯ КОЛЛЕКЦИЯ ОТКРЫТА!"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 24)
+    title.add_theme_font_size_override("font_size", 30)
     title.modulate = Color("#DDB47A")
     v.add_child(title)
     var name := Label.new()
     name.name = "CollectionName"
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    name.add_theme_font_size_override("font_size", 30)
+    name.add_theme_font_size_override("font_size", 38)
     name.modulate = Color("#F39C32")
     v.add_child(name)
     var info := Label.new()
     info.name = "Info"
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    info.add_theme_font_size_override("font_size", 17)
+    info.add_theme_font_size_override("font_size", 20)
     info.modulate = Color("#C7B4A0")
     v.add_child(info)
     var toys_label := Label.new()
     toys_label.name = "Toys"
     toys_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     toys_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    toys_label.add_theme_font_size_override("font_size", 16)
+    toys_label.add_theme_font_size_override("font_size", 18)
     toys_label.modulate = Color("#D8C3AA")
     v.add_child(toys_label)
     var reward := Label.new()
     reward.name = "Reward"
     reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    reward.add_theme_font_size_override("font_size", 22)
+    reward.add_theme_font_size_override("font_size", 28)
     reward.modulate = Color("#DDB47A")
     v.add_child(reward)
     var cont := Button.new()
     cont.name = "ContinueButton"
     cont.text = "▶  ПРОДОЛЖИТЬ СБОР КОЛЛЕКЦИЙ"
-    cont.custom_minimum_size = Vector2(0, 58)
+    cont.custom_minimum_size = Vector2(0, 74)
     cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     style_button(cont, Color("#76583F"))
-    cont.add_theme_font_size_override("font_size", 17)
+    cont.add_theme_font_size_override("font_size", 20)
     cont.pressed.connect(hide_collection_completion_popup)
     v.add_child(cont)
 
@@ -9364,10 +9338,842 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
         popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
         popup_achievement_label.text = "Игрушка уже есть в коллекции. Выберите: продать дубль или оставить его."
     result_popup.visible = true
-    popup_achievement_label.text = ""
     pending_new_achievements.clear()
     pending_achievement_rewards_text.clear()
 
 func show_achievement_popup() -> void:
+    # Старое отдельное окно достижений больше не используется:
+    # уведомление показывается компактной полоской в верхней части HUD.
     show_achievement_strip()
 
+func rarity_reward(rarity: String) -> int:
+    match rarity:
+        "ОБЫЧНАЯ": return 8
+        "РЕДКАЯ": return 20
+        "ЭПИЧЕСКАЯ": return 50
+        "ЛЕГЕНДАРНАЯ": return 150
+    return 5
+
+func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ", chest_style: bool = false) -> void:
+    var dialog := ConfirmationDialog.new()
+    dialog.title = title_text
+    dialog.dialog_text = message_text
+    dialog.ok_button_text = ok_text
+    dialog.cancel_button_text = "ОТМЕНА"
+
+    # Для сундуков оставляем штатный надёжный ConfirmationDialog,
+    # но убираем серую системную рамку/заголовок и оформляем содержимое
+    # полностью в фирменной коричневой гамме игры.
+    if chest_style:
+        dialog.borderless = true
+        dialog.transparent_bg = true
+        var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
+        panel_style.content_margin_left = 28.0
+        panel_style.content_margin_right = 28.0
+        panel_style.content_margin_top = 22.0
+        panel_style.content_margin_bottom = 22.0
+        dialog.add_theme_stylebox_override("panel", panel_style)
+        dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
+        dialog.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
+        dialog.add_theme_font_size_override("font_size", 27)
+
+        var chest_label := dialog.get_label()
+        if chest_label:
+            chest_label.add_theme_color_override("font_color", Color("#F1E5D6"))
+            chest_label.add_theme_font_size_override("font_size", 27)
+            chest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            chest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            chest_label.custom_minimum_size = Vector2(620, 210)
+
+        var ok := dialog.get_ok_button()
+        var cancel := dialog.get_cancel_button()
+        style_button(ok, Color("#A8754A"))
+        style_button(cancel, Color("#6E4B33"))
+        ok.custom_minimum_size = Vector2(220, 62)
+        cancel.custom_minimum_size = Vector2(220, 62)
+        ok.add_theme_font_size_override("font_size", 20)
+        cancel.add_theme_font_size_override("font_size", 20)
+
+    menu_layer.add_child(dialog)
+    dialog.confirmed.connect(action)
+    dialog.confirmed.connect(func(): dialog.queue_free())
+    dialog.canceled.connect(func(): dialog.queue_free())
+    dialog.close_requested.connect(func(): dialog.queue_free())
+    if chest_style:
+        dialog.popup_centered(Vector2(700, 390))
+    else:
+        dialog.popup_centered(Vector2(700, 320))
+
+func buy_claw(index: int, skip_confirmation: bool = false) -> void:
+    if index < 0 or index >= claw_specs.size(): return
+    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on and not (index < owned_claws.size() and owned_claws[index]):
+        confirm_purchase("Покупка клешни", "Купить «%s» за %d ₽?" % [String(claw_specs[index]["name"]), int(claw_specs[index]["price"])], func(): buy_claw(index, true))
+        return
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
+            update_ui()
+            return
+        var action_name := "shop_select" if index < owned_claws.size() and owned_claws[index] else "shop_buy"
+        if _server_action(action_name, {"item_id":"claw_%d" % (index + 1)}):
+            current_result = "КЛЕШНЯ ВЫБИРАЕТСЯ СЕРВЕРОМ…" if action_name == "shop_select" else "ПОКУПКА КЛЕШНИ ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
+            show_shop_feedback(current_result, 3.0)
+        else:
+            show_shop_feedback("⏳ ОДНА ОПЕРАЦИЯ УЖЕ ВЫПОЛНЯЕТСЯ")
+        update_ui()
+        return
+    if owned_claws[index]:
+        selected_claw = index
+        current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
+    elif coins >= int(claw_specs[index]["price"]):
+        coins -= int(claw_specs[index]["price"])
+        owned_claws[index] = true
+        selected_claw = index
+        current_result = "КУПЛЕНА: %s" % String(claw_specs[index]["name"])
+        check_achievements()
+        save_game()
+    else:
+        current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
+        show_shop_insufficient_popup()
+        show_shop_feedback("💰 НЕДОСТАТОЧНО СРЕДСТВ")
+    update_ui()
+
+func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
+    if index < 0 or index >= upgrade_specs.size(): return
+    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on:
+        var level := int(upgrade_levels[index])
+        var price := int(upgrade_specs[index]["base_price"]) * (level + 1)
+        if level < 5:
+            confirm_purchase("Покупка улучшения", "Улучшить «%s» до уровня %d за %d ₽?" % [String(upgrade_specs[index]["name"]), level + 1, price], func(): buy_upgrade(index, true))
+            return
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "":
+            current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
+            show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
+            update_ui()
+            return
+        if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
+            current_result = "Улучшение проверяется сервером…"
+            show_shop_feedback(current_result, 3.0)
+            update_ui()
+            return
+        show_shop_feedback("⏳ ОДНА ОПЕРАЦИЯ УЖЕ ВЫПОЛНЯЕТСЯ")
+        return
+    if _server_ready() and player_token != "":
+        if _server_action("shop_buy", {"item_id":"upgrade_%d" % (index + 1)}):
+            current_result = "Улучшение проверяется сервером…"
+            update_ui()
+            return
+    if index < 0 or index >= upgrade_specs.size():
+        return
+    var level: int = upgrade_levels[index]
+    if level >= 5:
+        current_result = "МАКСИМАЛЬНЫЙ УРОВЕНЬ"
+        update_ui()
+        return
+    var price: int = int(upgrade_specs[index]["base_price"]) * (level + 1)
+    if coins >= price:
+        coins -= price
+        upgrade_levels[index] = level + 1
+        current_result = "УЛУЧШЕНИЕ: %s • УРОВЕНЬ %d" % [String(upgrade_specs[index]["name"]), level + 1]
+        check_achievements()
+        save_game()
+    else:
+        current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
+        show_shop_insufficient_popup()
+    update_ui()
+
+func show_sale_offer() -> void:
+    if not result_popup: return
+    if popup_title_label: popup_title_label.text = "ДУБЛЬ ИГРУШКИ"
+    if popup_rating_label: popup_rating_label.text = ""
+    popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
+    popup_achievement_label.text = "Игрушка уже есть в коллекции. Можно оставить дубль или продать его."
+    popup_timer = 0.0
+    result_popup.visible = true
+    if not sale_panel:
+        sale_panel = PanelContainer.new()
+        sale_panel.position = Vector2(90, 900)
+        sale_panel.size = Vector2(900, 130)
+        style_panel(sale_panel, Color("#241B16"), Color("#76583F"), 18, 2)
+        hud_layer.add_child(sale_panel)
+        var h := HBoxContainer.new()
+        h.alignment = BoxContainer.ALIGNMENT_CENTER
+        h.add_theme_constant_override("separation", 14)
+        sale_panel.add_child(h)
+        var sell := Button.new()
+        sell.text = "💰 ПРОДАТЬ"
+        sell.custom_minimum_size = Vector2(280, 75)
+        style_button(sell, Color("#C09A70"))
+        sell.add_theme_font_size_override("font_size", 22)
+        sell.pressed.connect(sell_duplicate)
+        h.add_child(sell)
+        var keep := Button.new()
+        keep.text = "ОСТАВИТЬ"
+        keep.custom_minimum_size = Vector2(280, 75)
+        style_button(keep, Color("#76583F"))
+        keep.add_theme_font_size_override("font_size", 22)
+        keep.pressed.connect(keep_duplicate)
+        h.add_child(keep)
+    sale_panel.visible = true
+
+func sell_duplicate() -> void:
+    if not sale_available: return
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        if _server_action("sell_duplicate", {"toy_name":sale_name,"amount":sale_price}):
+            sale_available = false
+            if sale_panel: sale_panel.visible = false
+            result_popup.visible = false
+        return
+    coins += sale_price
+    current_result = "💰 ДУБЛЬ ПРОДАН • +%d ₽" % sale_price
+    sale_available = false
+    sale_panel.visible = false
+    result_popup.visible = false
+    save_game()
+    update_ui()
+
+func keep_duplicate() -> void:
+    sale_available = false
+    if sale_panel: sale_panel.visible = false
+    result_popup.visible = false
+    current_result = "🧸 ДУБЛЬ ОСТАВЛЕН В КОЛЛЕКЦИИ"
+    save_game()
+    update_ui()
+
+func reset_progress() -> void:
+    coins = 120
+    selected_claw = 0
+    owned_claws = [true, false, false, false, false, false, false, false, false, false]
+    collection.clear()
+    toy_inventory_counts.clear()
+    completed_collections.clear()
+    player_level = 1
+    player_xp = 0
+    xp_to_next = xp_needed_for_level(1)
+    total_games = 0
+    total_prizes_won = 0
+    total_chests_opened = 0
+    total_keys_earned = 0
+    total_daily_claims = 0
+    total_weekly_claims = 0
+    current_win_streak = 0
+    best_win_streak = 0
+    total_xp_earned = 0
+    highest_reward_rubles = 0
+    perfect_grabs = 0
+    heavy_toy_wins = 0
+    lucky_toy_wins = 0
+    login_streak = 0
+    last_login_claim_date = ""
+    active_event_id = ""
+    active_event_name = ""
+    active_event_end_unix = 0
+    active_event_bonus = 0.0
+    active_event_reward_mult = 1.0
+    batch_type = "ОБЫЧНАЯ ПАРТИЯ"
+    batch_index = 0
+    language = "ru"
+    sfx_volume_db = -4.0
+    vibration_on = true
+    auto_tips_on = true
+    daily_mission_progress = 0
+    daily_mission_date = Time.get_date_string_from_system()
+    daily_mission_claimed = false
+    daily_mission_completed_at = 0
+    weekly_mission_progress = 0
+    weekly_mission_key = ""
+    weekly_mission_claimed = false
+    weekly_mission_completed_at = 0
+    daily_series_claimed_at = 0
+    lucky_toy_date = ""
+    lucky_toy_index = 0
+    rarity_wins.clear()
+    unlocked_achievements.clear()
+    upgrade_levels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    vip_owned.resize(vip_specs.size())
+    for i in range(vip_owned.size()): vip_owned[i] = false
+    vip_selected = 0
+    active_season_id = ""
+    chest_inventory = {"common": 0, "rare": 0, "epic": 0, "legendary": 0, "vip": 0}
+    chest_keys = 0
+    chest_opening = false
+    chest_last_reward = ""
+    chest_exclusive_toys = {}
+    chest_exclusive_skins = {}
+    chest_exclusive_reward_count = 0
+    workshop_parts = 0
+    workshop_level = 1
+    workshop_claw_power = 0
+    workshop_speed = 0
+    workshop_precision = 0
+    workshop_luck = 0
+    workshop_motor = 0
+    workshop_servo = 0
+    workshop_cable = 0
+    workshop_damper = 0
+    workshop_cooling = 0
+    workshop_controller = 0
+    workshop_blueprints = {"grip":"none", "speed":"none", "precision":"none", "luck":"none"}
+    workshop_calibration = 0
+    workshop_overclock = false
+    workshop_overclock_games = 0
+    return_bonus_days = 0
+    return_bonus_available = false
+    return_bonus_claimed = false
+    last_active_unix = int(Time.get_unix_time_from_system())
+    workshop_job_end_unix = 0
+    workshop_job_active = false
+    workshop_job_name = ""
+    workshop_job_reward = 0
+    season_pass_xp = 0
+    season_pass_level = 1
+    promo_codes_used.clear()
+    promo_status = ""
+    notify_rewards_on = true
+    notify_streak_on = true
+    notify_events_on = true
+    notify_workshop_on = true
+    notify_chests_on = true
+    saved_prizes.clear()
+    build_prizes()
+    current_result = "ПРОГРЕСС СБРОШЕН"
+    save_game()
+    update_ui()
+
+func serialize_prizes() -> Array:
+    var result: Array = []
+    for i in range(prize_bodies.size()):
+        var body := prize_bodies[i]
+        if not body or not is_instance_valid(body):
+            continue
+        var source_index: int = int(prize_data[i].get("index", 0)) if i < prize_data.size() else 0
+        var d: Dictionary = prize_data[i] if i < prize_data.size() else {}
+        result.append({
+            "kind": String(d.get("kind", "toy")),
+            "source_index": source_index,
+            "variant": int(d.get("variant", 0)),
+            "size_factor": float(d.get("size_factor", 1.0)),
+            "position": [body.position.x, body.position.y, body.position.z],
+            "rotation": [body.rotation.x, body.rotation.y, body.rotation.z]
+        })
+    return result
+
+func setup_daily_systems() -> void:
+    var today := Time.get_date_string_from_system()
+    if daily_mission_date != today:
+        daily_mission_date = today
+        daily_mission_progress = 0
+        daily_mission_claimed = false
+        daily_mission_completed_at = 0
+    var day_number := int(floor(Time.get_unix_time_from_system() / 86400.0))
+    var week_key := str(int(floor(float(day_number) / 7.0)))
+    if weekly_mission_key != week_key:
+        weekly_mission_key = week_key
+        weekly_mission_progress = 0
+        weekly_mission_claimed = false
+        weekly_mission_completed_at = 0
+    if lucky_toy_date != today:
+        lucky_toy_date = today
+        lucky_toy_index = abs(today.hash()) % toys.size()
+    save_game()
+
+func register_game_activity() -> void:
+    last_game_activity = time_alive
+    if _server_ready():
+        sync_player_to_server()
+    waiting_idle_time = 0.0
+    if waiting_overlay:
+        waiting_overlay.visible = false
+
+func update_missions() -> void:
+    if not hud_layer or not is_instance_valid(hud_layer):
+        return
+    var panel := hud_layer.get_node_or_null("MissionDetailPanel") as PanelContainer
+    if panel and panel.visible:
+        var is_daily := String(panel.get_meta("mission_type", "daily")) == "daily"
+        var title := panel.get_node("MissionDetailVBox/MissionDetailTitle") as Label
+        var detail := panel.get_node("MissionDetailVBox/MissionDetailText") as Label
+        if is_daily:
+            title.text = "🎯 МИССИЯ ДНЯ"
+            detail.text = "Поймай %d игрушки\nПрогресс: %d / %d\nНаграда: +50 ₽" % [daily_mission_target, daily_mission_progress, daily_mission_target]
+        else:
+            title.text = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ"
+            detail.text = "Поймай %d игрушек\nПрогресс: %d / %d\nНаграда: +180 ₽" % [weekly_mission_target, weekly_mission_progress, weekly_mission_target]
+
+func show_waiting_screen() -> void:
+    if not auto_tips_on:
+        return
+    if not waiting_overlay or not hud_layer.visible or drop_state != 0:
+        return
+    waiting_overlay.visible = true
+    var tips := [
+        "ПОДСКАЗКА: ЦЕЛЬСЯ В ЦЕНТР ИГРУШКИ",
+        "ПОДСКАЗКА: ТЯЖЁЛЫЕ ИГРУШКИ СЛОЖНЕЕ УДЕРЖАТЬ",
+        "ПОДСКАЗКА: СЧАСТЛИВАЯ ИГРУШКА ДАЁТ x3",
+        "ПОДСКАЗКА: ВЫПОЛНЯЙ МИССИИ ДЛЯ БОНУСОВ",
+        "ПОДСКАЗКА: НЕ СПЕШИ — СНАЧАЛА ВЫБЕРИ УДОБНУЮ ЦЕЛЬ",
+        "ПОДСКАЗКА: ИГРУШКИ МОГУТ СТАЛКИВАТЬСЯ ДРУГ С ДРУГОМ",
+        "ПОДСКАЗКА: СКОЛЬЗКИЕ ИГРУШКИ ЛЕГЧЕ ПОТЕРЯТЬ ПРИ ПОДЪЁМЕ",
+        "ПОДСКАЗКА: РЕДКИЕ ИГРУШКИ МОГУТ ПРИНЕСТИ БОЛЬШУЮ НАГРАДУ",
+        "ПОДСКАЗКА: СЛЕДИ ЗА ЕЖЕДНЕВНОЙ И НЕДЕЛЬНОЙ МИССИЯМИ",
+        "ПОДСКАЗКА: СОБИРАЙ ИГРУШКИ, ЧТОБЫ РАЗВИВАТЬ ПРОФИЛЬ",
+        "ПОДСКАЗКА: ПОСЛЕ НЕУДАЧНОГО ЗАХВАТА ИГРУШКА МОЖЕТ РАСКАЧАТЬСЯ",
+        "ПОДСКАЗКА: ПРОВЕРЯЙ ПРОФИЛЬ, ЧТОБЫ СЛЕДИТЬ ЗА ПРОГРЕССОМ"
+    ]
+    # Меняем подсказку медленнее: одна новая подсказка примерно раз в 12 секунд.
+    waiting_tip_label.text = tips[int(time_alive / 12.0) % tips.size()]
+
+func complete_daily_mission_if_ready() -> void:
+    if _server_ready() and player_token != "" and daily_mission_progress >= daily_mission_target and not daily_mission_claimed:
+        if _server_action("claim_daily_mission"):
+            return
+    if daily_mission_progress >= daily_mission_target and not daily_mission_claimed:
+        coins += server_reward_amount(daily_mission_reward)
+        daily_mission_progress = daily_mission_target
+        daily_mission_claimed = true
+        daily_mission_completed_at = int(Time.get_unix_time_from_system())
+        total_daily_claims += 1
+        current_result = "🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(daily_mission_reward)
+        notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +50 ₽ уже получена!")
+
+func complete_weekly_mission_if_ready() -> void:
+    if _server_ready() and player_token != "" and weekly_mission_progress >= weekly_mission_target and not weekly_mission_claimed:
+        if _server_action("claim_weekly_mission"):
+            return
+    if weekly_mission_progress >= weekly_mission_target and not weekly_mission_claimed:
+        coins += server_reward_amount(weekly_mission_reward)
+        weekly_mission_progress = weekly_mission_target
+        weekly_mission_claimed = true
+        weekly_mission_completed_at = int(Time.get_unix_time_from_system())
+        total_weekly_claims += 1
+        current_result = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(weekly_mission_reward)
+        notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
+
+func claim_daily_bonus() -> void:
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        if _server_action("claim_daily"):
+            return
+        return
+    # Награда выдаётся только один раз в календарный день.
+    var today: String = Time.get_date_string_from_system()
+    if last_daily_bonus_date == today:
+        return
+
+    coins += server_reward_amount(daily_bonus_amount)
+    last_daily_bonus_date = today
+    save_game()
+
+    if toast_label:
+        toast_label.text = "ЕЖЕДНЕВНЫЙ БОНУС  +%d ₽" % daily_bonus_amount
+        toast_label.visible = true
+        await get_tree().create_timer(3.0).timeout
+        if is_instance_valid(toast_label):
+            toast_label.visible = false
+
+func rarity_color(rarity: String) -> Color:
+    match rarity:
+        "ОБЫЧНАЯ": return Color("#D6D0C8")
+        "НЕОБЫЧНАЯ": return Color("#76B77B")
+        "РЕДКАЯ": return Color("#6E9FD8")
+        "ЭПИЧЕСКАЯ": return Color("#9C78D8")
+        "ЛЕГЕНДАРНАЯ": return Color("#D6A14A")
+        "МИФИЧЕСКАЯ": return Color("#D36C55")
+        _: return Color.WHITE
+
+func build_upgrade_sound_system() -> void:
+    # Отдельные короткие SFX: интерфейс, захват, успех, срыв, монеты и выдача.
+    var files := {
+        "button":"res://audio/ui_click.wav",
+        "hover":"res://audio/ui_hover.wav",
+        "select":"res://audio/ui_select.wav",
+        "confirm":"res://audio/ui_confirm.wav",
+        "open":"res://audio/ui_open.wav",
+        "close":"res://audio/ui_close.wav",
+        "coin":"res://audio/coin.wav",
+        "reward":"res://audio/ui_reward.wav",
+        "grab":"res://audio/grab_close.wav",
+        "win":"res://audio/grab_success.wav",
+        "fail":"res://audio/grab_fail.wav",
+        "error":"res://audio/ui_error.wav",
+        "drop":"res://audio/prize_drop.wav"
+    }
+    for key in files.keys():
+        var player := AudioStreamPlayer.new()
+        player.name = "SFX_" + String(key)
+        player.stream = load(String(files[key]))
+        player.volume_db = sfx_volume_db
+        add_child(player)
+        sound_players[key] = player
+    # Движение клешни уже создаётся в build_audio(), повторно его не создаём.
+    if not sfx_move or not is_instance_valid(sfx_move):
+        sfx_move = make_sfx_player("res://audio/claw_move.wav")
+        if sfx_move.stream is AudioStreamWAV:
+            (sfx_move.stream as AudioStreamWAV).loop_mode = AudioStreamWAV.LOOP_FORWARD
+func play_upgrade_sound(kind: String) -> void:
+    if kind == "grab":
+        play_ui_sound("grab")
+    elif kind == "win":
+        play_ui_sound("win")
+    elif kind == "fail":
+        play_ui_sound("fail")
+    elif kind == "coin":
+        play_ui_sound("coin")
+    elif kind == "drop":
+        play_ui_sound("drop")
+    elif kind == "level" or kind == "chest" or kind == "button":
+        play_ui_sound("button")
+func play_ui_sound(kind: String) -> void:
+    if not sfx_on: return
+    var player: AudioStreamPlayer = sound_players.get(kind, null)
+    if player and is_instance_valid(player) and player.stream:
+        player.volume_db = sfx_volume_db
+        player.play()
+
+func get_profile_summary() -> String:
+    var collections_done := completed_collections.size()
+    var unique := collection.size()
+    return "Игрок: %s\nУровень %d  •  XP %d/%d\nИгр: %d  •  Игрушек: %d  •  Уникальных: %d\nЛучшая серия: %d  •  Идеальных захватов: %d\nКоллекции: %d/%d\nКлючи: %d  •  Детали: %d" % [player_name, player_level, player_xp, xp_to_next, total_games, total_prizes_won, unique, best_win_streak, perfect_grabs, collections_done, get_collection_names().size(), chest_keys, workshop_parts]
+
+func get_daily_weekly_summary() -> String:
+    return "ЕЖЕДНЕВНОЕ: %d/%d   •   Награда %d ₽\nЕЖЕНЕДЕЛЬНОЕ: %d/%d   •   Награда %d ₽" % [daily_mission_progress,daily_mission_target,int(round(float(daily_mission_reward) * online_reward_multiplier)),weekly_mission_progress,weekly_mission_target,int(round(float(weekly_mission_reward) * online_reward_multiplier))]
+
+func refresh_upgrade_dashboard() -> void:
+    update_ui()
+    if menu_layer and menu_layer.visible:
+        menu_notice_count = int((daily_mission_target - daily_mission_progress) > 0) + int((weekly_mission_target - weekly_mission_progress) > 0) + int(chest_keys > 0)
+
+func save_game() -> void:
+    # SERVER_AUTHORITATIVE: this file is a UI/cache snapshot only. Economy/progress authority lives on server.
+    server_settings_dirty = true
+    var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+    if f:
+        f.store_string(JSON.stringify({
+            "coins": coins,
+            "player_name": player_name,
+            "player_avatar_index": player_avatar_index,
+            "music": music_on,
+            "sfx": sfx_on,
+            "sfx_volume_db": sfx_volume_db,
+            "music_volume_db": music_volume_db,
+            "music_track_index": music_track_index,
+            "vibration_on": vibration_on,
+            "energy_saving_on": energy_saving_on,
+            "confirm_purchases_on": confirm_purchases_on,
+            "confirm_rare_chests_on": confirm_rare_chests_on,
+            "fps_limit": fps_limit,
+            "joystick_sensitivity": joystick_sensitivity,
+            "grab_button_scale": grab_button_scale,
+            "auto_tips_on": auto_tips_on,
+            "notifications_on": notifications_on,
+            "notify_rewards_on": notify_rewards_on,
+            "notify_streak_on": notify_streak_on,
+            "notify_events_on": notify_events_on,
+            "notify_workshop_on": notify_workshop_on,
+            "notify_chests_on": notify_chests_on,
+            "return_bonus_days": return_bonus_days,
+            "return_bonus_available": return_bonus_available,
+            "return_bonus_claimed": return_bonus_claimed,
+            "last_active_unix": last_active_unix,
+            "workshop_job_end_unix": workshop_job_end_unix,
+            "workshop_job_active": workshop_job_active,
+            "workshop_job_name": workshop_job_name,
+            "workshop_job_reward": workshop_job_reward,
+            "season_pass_xp": season_pass_xp,
+            "season_pass_level": season_pass_level,
+            "promo_codes_used": promo_codes_used,
+            "quality_level": quality_level,
+            "language": language,
+            "server_url": server_url,
+            "player_id": player_id,
+            "player_token": player_token,
+            "bonus_keys": bonus_keys,
+            "engineering_parts": engineering_parts,
+            "claw": selected_claw,
+            "owned_claws": owned_claws,
+            "owned_claw_skins": owned_claw_skins,
+            "owned_toy_skins": owned_toy_skins,
+            "owned_machine_skins": owned_machine_skins,
+            "selected_claw_skin": selected_claw_skin,
+            "selected_toy_skin": selected_toy_skin,
+            "selected_machine_skin": selected_machine_skin,
+            "vip_owned": vip_owned,
+            "vip_selected": vip_selected,
+            "active_season_id": active_season_id,
+            "chest_inventory": chest_inventory,
+            "chest_keys": chest_keys,
+            "chest_exclusive_toys": chest_exclusive_toys,
+            "chest_exclusive_skins": chest_exclusive_skins,
+            "chest_exclusive_reward_count": chest_exclusive_reward_count,
+            "total_chests_opened": total_chests_opened,
+            "total_keys_earned": total_keys_earned,
+            "total_daily_claims": total_daily_claims,
+            "total_weekly_claims": total_weekly_claims,
+            "workshop_parts": workshop_parts,
+            "workshop_level": workshop_level,
+            "workshop_claw_power": workshop_claw_power,
+            "workshop_speed": workshop_speed,
+            "workshop_precision": workshop_precision,
+            "workshop_luck": workshop_luck,
+            "workshop_motor": workshop_motor,
+            "workshop_servo": workshop_servo,
+            "workshop_cable": workshop_cable,
+            "workshop_damper": workshop_damper,
+            "workshop_cooling": workshop_cooling,
+            "workshop_controller": workshop_controller,
+            "workshop_blueprints": workshop_blueprints,
+            "workshop_calibration": workshop_calibration,
+            "workshop_overclock": workshop_overclock,
+            "workshop_overclock_games": workshop_overclock_games,
+            "collection": collection,
+            "toy_inventory_counts": toy_inventory_counts,
+            "completed_collections": completed_collections,
+            "upgrades": upgrade_levels,
+            "level": player_level,
+            "xp": player_xp,
+            "xp_to_next": xp_to_next,
+            "games": total_games,
+            "total_prizes_won": total_prizes_won,
+            "rarity_wins": rarity_wins,
+            "achievements": unlocked_achievements,
+            "last_daily_bonus_date": last_daily_bonus_date,
+            "login_streak": login_streak,
+            "last_login_claim_date": last_login_claim_date,
+            "active_event_id": active_event_id,
+            "active_event_name": active_event_name,
+            "active_event_end_unix": active_event_end_unix,
+            "active_event_bonus": active_event_bonus,
+            "active_event_reward_mult": active_event_reward_mult,
+            "batch_type": batch_type,
+            "batch_index": batch_index,
+            "referral_code": referral_code,
+            "referral_invites": referral_invites,
+            "referral_used": referral_used,
+            "best_result": best_result,
+            "best_result_xp": best_result_xp,
+            "current_win_streak": current_win_streak,
+            "best_win_streak": best_win_streak,
+            "total_xp_earned": total_xp_earned,
+            "highest_reward_rubles": highest_reward_rubles,
+            "perfect_grabs": perfect_grabs,
+            "heavy_toy_wins": heavy_toy_wins,
+            "lucky_toy_wins": lucky_toy_wins,
+            "daily_mission_progress": daily_mission_progress,
+            "daily_mission_date": daily_mission_date,
+            "daily_mission_claimed": daily_mission_claimed,
+            "weekly_mission_progress": weekly_mission_progress,
+            "weekly_mission_key": weekly_mission_key,
+            "weekly_mission_claimed": weekly_mission_claimed,
+            "lucky_toy_index": lucky_toy_index,
+            "lucky_toy_date": lucky_toy_date,
+            "prizes": serialize_prizes(),
+            "claw_position": [claw_pos.x, claw_pos.y, claw_pos.z]
+        }))
+        f.close()
+
+func load_save() -> void:
+    if not FileAccess.file_exists(SAVE_PATH): return
+    var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+    if not f: return
+    var parsed: Variant = JSON.parse_string(f.get_as_text())
+    f.close()
+    if typeof(parsed) != TYPE_DICTIONARY: return
+    var data: Dictionary = parsed
+    player_token = String(data.get("player_token", player_token))
+    player_name = String(data.get("player_name", "ИГРОК")).strip_edges()
+    if player_name == "":
+        player_name = "ИГРОК"
+    player_name = player_name.substr(0, 20)
+    player_avatar_index = clampi(int(data.get("player_avatar_index", 0)), 0, AVATAR_OPTIONS.size() - 1)
+    bonus_keys = int(data.get("bonus_keys", 0))
+    engineering_parts = int(data.get("engineering_parts", 0))
+    coins = maxi(0, int(data.get("coins", 120)))
+    selected_claw = clampi(int(data.get("claw", 0)), 0, claw_specs.size() - 1)
+    music_on = bool(data.get("music", true))
+    sfx_on = bool(data.get("sfx", true))
+    sfx_volume_db = clampf(float(data.get("sfx_volume_db", -4.0)), -24.0, 3.0)
+    music_volume_db = clampf(float(data.get("music_volume_db", -8.0)), -30.0, 3.0)
+    music_track_index = clampi(int(data.get("music_track_index", 0)), 0, music_tracks.size() - 1)
+    vibration_on = bool(data.get("vibration_on", true))
+    energy_saving_on = bool(data.get("energy_saving_on", false))
+    confirm_purchases_on = bool(data.get("confirm_purchases_on", true))
+    confirm_rare_chests_on = bool(data.get("confirm_rare_chests_on", true))
+    fps_limit = int(data.get("fps_limit", 60))
+    if fps_limit not in [30,60,90,120]: fps_limit = 60
+    Engine.max_fps = 30 if energy_saving_on else fps_limit
+    joystick_sensitivity = clampf(float(data.get("joystick_sensitivity", 1.0)), 0.5, 1.5)
+    grab_button_scale = clampf(float(data.get("grab_button_scale", 1.0)), 0.8, 1.3)
+    auto_tips_on = bool(data.get("auto_tips_on", true))
+    notifications_on = bool(data.get("notifications_on", true))
+    notify_rewards_on = bool(data.get("notify_rewards_on", true))
+    notify_streak_on = bool(data.get("notify_streak_on", true))
+    notify_events_on = bool(data.get("notify_events_on", true))
+    notify_workshop_on = bool(data.get("notify_workshop_on", true))
+    notify_chests_on = bool(data.get("notify_chests_on", true))
+    return_bonus_days = maxi(0, int(data.get("return_bonus_days", 0)))
+    return_bonus_available = bool(data.get("return_bonus_available", false))
+    return_bonus_claimed = bool(data.get("return_bonus_claimed", false))
+    last_active_unix = int(data.get("last_active_unix", 0))
+    workshop_job_end_unix = int(data.get("workshop_job_end_unix", 0))
+    workshop_job_active = bool(data.get("workshop_job_active", false))
+    workshop_job_name = String(data.get("workshop_job_name", ""))
+    workshop_job_reward = maxi(0, int(data.get("workshop_job_reward", 0)))
+    season_pass_xp = maxi(0, int(data.get("season_pass_xp", 0)))
+    season_pass_level = clampi(int(data.get("season_pass_level", 1)), 1, SEASON_PASS_MAX_LEVEL)
+    var saved_codes: Variant = data.get("promo_codes_used", {})
+    if saved_codes is Dictionary: promo_codes_used = saved_codes
+    # Offline build: never restore a previous online endpoint from an old save.
+    # This prevents an old 1.12/1.13 save from silently changing the local mode.
+    server_url = ""
+    player_token = ""
+    player_id = String(data.get("player_id", ""))
+    quality_level = clampi(int(data.get("quality_level", 2)), 0, 4)
+    var saved_upgrades: Variant = data.get("upgrades", upgrade_levels)
+    if saved_upgrades is Array:
+        upgrade_levels = []
+        for i in range(upgrade_specs.size()):
+            var value: Variant = saved_upgrades[i] if i < saved_upgrades.size() else 0
+            upgrade_levels.append(clampi(int(value), 0, 5))
+    var saved_owned: Variant = data.get("owned_claws", owned_claws)
+    if saved_owned is Array and saved_owned.size() == claw_specs.size():
+        owned_claws = []
+        for value in saved_owned:
+            owned_claws.append(bool(value))
+    owned_claws[0] = true
+    var saved_claw_skins: Variant = data.get("owned_claw_skins", owned_claw_skins)
+    if saved_claw_skins is Array and saved_claw_skins.size() == claw_skin_specs.size():
+        owned_claw_skins = []
+        for value in saved_claw_skins: owned_claw_skins.append(bool(value))
+    var saved_toy_skins: Variant = data.get("owned_toy_skins", owned_toy_skins)
+    if saved_toy_skins is Array and saved_toy_skins.size() == toy_skin_specs.size():
+        owned_toy_skins = []
+        for value in saved_toy_skins: owned_toy_skins.append(bool(value))
+    var saved_machine_skins: Variant = data.get("owned_machine_skins", owned_machine_skins)
+    if saved_machine_skins is Array and saved_machine_skins.size() == machine_skin_specs.size():
+        owned_machine_skins = []
+        for value in saved_machine_skins: owned_machine_skins.append(bool(value))
+    # Индекс 0 всегда означает стартовый скин. Индексы 1+ — магазинные скины
+    # (уровни 2+). Это сохраняет совместимость со старыми сохранениями и серверными ID.
+    if not owned_claw_skins.is_empty(): owned_claw_skins[0] = true
+    if not owned_toy_skins.is_empty(): owned_toy_skins[0] = true
+    if not owned_machine_skins.is_empty(): owned_machine_skins[0] = true
+    selected_claw_skin = clampi(selected_claw_skin, 0, maxi(0, claw_skin_specs.size() - 1))
+    selected_toy_skin = clampi(selected_toy_skin, 0, maxi(0, toy_skin_specs.size() - 1))
+    selected_machine_skin = clampi(selected_machine_skin, 0, maxi(0, machine_skin_specs.size() - 1))
+    selected_claw_skin = clampi(int(data.get("selected_claw_skin", 0)), 0, claw_skin_specs.size() - 1)
+    selected_toy_skin = clampi(int(data.get("selected_toy_skin", 0)), 0, toy_skin_specs.size() - 1)
+    selected_machine_skin = clampi(int(data.get("selected_machine_skin", 0)), 0, machine_skin_specs.size() - 1)
+    var saved_vip: Variant = data.get("vip_owned", [])
+    vip_owned.resize(vip_specs.size())
+    for i in range(vip_owned.size()): vip_owned[i] = false
+    if saved_vip is Array:
+        for i in range(mini(saved_vip.size(), vip_owned.size())): vip_owned[i] = bool(saved_vip[i])
+    vip_selected = clampi(int(data.get("vip_selected", 0)), 0, maxi(0, vip_specs.size() - 1))
+    active_season_id = String(data.get("active_season_id", ""))
+    var saved_chests: Variant = data.get("chest_inventory", chest_inventory)
+    if saved_chests is Dictionary:
+        for key in chest_inventory.keys(): chest_inventory[key] = maxi(0, int(saved_chests.get(key, 0)))
+    chest_keys = maxi(0, int(data.get("chest_keys", 0)))
+    var saved_ex_toys: Variant = data.get("chest_exclusive_toys", {})
+    if saved_ex_toys is Dictionary: chest_exclusive_toys = saved_ex_toys
+    var saved_ex_skins: Variant = data.get("chest_exclusive_skins", {})
+    if saved_ex_skins is Dictionary: chest_exclusive_skins = saved_ex_skins
+    chest_exclusive_reward_count = maxi(0, int(data.get("chest_exclusive_reward_count", 0)))
+    var saved_counts: Variant = data.get("toy_inventory_counts", {})
+    if saved_counts is Dictionary: toy_inventory_counts = saved_counts
+    workshop_parts = maxi(0, int(data.get("workshop_parts", 0)))
+    workshop_level = maxi(1, int(data.get("workshop_level", 1)))
+    workshop_claw_power = clampi(int(data.get("workshop_claw_power", 0)), 0, 10)
+    workshop_speed = clampi(int(data.get("workshop_speed", 0)), 0, 10)
+    workshop_precision = clampi(int(data.get("workshop_precision", 0)), 0, 10)
+    workshop_luck = clampi(int(data.get("workshop_luck", 0)), 0, 10)
+    workshop_motor = clampi(int(data.get("workshop_motor", 0)), 0, 15)
+    workshop_servo = clampi(int(data.get("workshop_servo", 0)), 0, 15)
+    workshop_cable = clampi(int(data.get("workshop_cable", 0)), 0, 15)
+    workshop_damper = clampi(int(data.get("workshop_damper", 0)), 0, 15)
+    workshop_cooling = clampi(int(data.get("workshop_cooling", 0)), 0, 15)
+    workshop_controller = clampi(int(data.get("workshop_controller", 0)), 0, 15)
+    var saved_blueprints: Variant = data.get("workshop_blueprints", {})
+    if saved_blueprints is Dictionary: workshop_blueprints = saved_blueprints
+    workshop_calibration = clampi(int(data.get("workshop_calibration", 0)), 0, 5)
+    workshop_overclock = bool(data.get("workshop_overclock", false))
+    workshop_overclock_games = maxi(0, int(data.get("workshop_overclock_games", 0)))
+    player_level = maxi(1, int(data.get("level", 1)))
+    player_xp = maxi(0, int(data.get("xp", 0)))
+    xp_to_next = maxi(xp_needed_for_level(player_level), int(data.get("xp_to_next", xp_needed_for_level(player_level))))
+    total_games = maxi(0, int(data.get("games", 0)))
+    total_prizes_won = maxi(0, int(data.get("total_prizes_won", 0)))
+    total_chests_opened = maxi(0, int(data.get("total_chests_opened", 0)))
+    total_keys_earned = maxi(0, int(data.get("total_keys_earned", 0)))
+    total_daily_claims = maxi(0, int(data.get("total_daily_claims", 0)))
+    total_weekly_claims = maxi(0, int(data.get("total_weekly_claims", 0)))
+    var saved_rarity: Variant = data.get("rarity_wins", {})
+    if saved_rarity is Dictionary: rarity_wins = saved_rarity
+    var saved_ach: Variant = data.get("achievements", {})
+    if saved_ach is Dictionary: unlocked_achievements = saved_ach
+    last_daily_bonus_date = String(data.get("last_daily_bonus_date", ""))
+    login_streak = maxi(0, int(data.get("login_streak", 0)))
+    last_login_claim_date = String(data.get("last_login_claim_date", ""))
+    active_event_id = String(data.get("active_event_id", ""))
+    active_event_name = String(data.get("active_event_name", ""))
+    active_event_end_unix = int(data.get("active_event_end_unix", 0))
+    active_event_bonus = float(data.get("active_event_bonus", 0.0))
+    active_event_reward_mult = float(data.get("active_event_reward_mult", 1.0))
+    batch_type = String(data.get("batch_type", "ОБЫЧНАЯ ПАРТИЯ"))
+    batch_index = int(data.get("batch_index", 0))
+    language = String(data.get("language", "ru"))
+    if language != "en": language = "ru"
+    referral_code = String(data.get("referral_code", ""))
+    referral_invites = maxi(0, int(data.get("referral_invites", 0)))
+    referral_used = bool(data.get("referral_used", false))
+    best_result = String(data.get("best_result", "—"))
+    best_result_xp = maxi(0, int(data.get("best_result_xp", 0)))
+    current_win_streak = maxi(0, int(data.get("current_win_streak", 0)))
+    best_win_streak = maxi(0, int(data.get("best_win_streak", 0)))
+    total_xp_earned = maxi(0, int(data.get("total_xp_earned", 0)))
+    highest_reward_rubles = maxi(0, int(data.get("highest_reward_rubles", 0)))
+    perfect_grabs = maxi(0, int(data.get("perfect_grabs", 0)))
+    heavy_toy_wins = maxi(0, int(data.get("heavy_toy_wins", 0)))
+    lucky_toy_wins = maxi(0, int(data.get("lucky_toy_wins", 0)))
+    daily_mission_progress = maxi(0, int(data.get("daily_mission_progress", 0)))
+    daily_mission_date = String(data.get("daily_mission_date", ""))
+    daily_mission_claimed = bool(data.get("daily_mission_claimed", false))
+    weekly_mission_progress = maxi(0, int(data.get("weekly_mission_progress", 0)))
+    weekly_mission_key = String(data.get("weekly_mission_key", ""))
+    weekly_mission_claimed = bool(data.get("weekly_mission_claimed", false))
+    lucky_toy_index = clampi(int(data.get("lucky_toy_index", 0)), 0, toys.size() - 1)
+    lucky_toy_date = String(data.get("lucky_toy_date", ""))
+    var saved_completed: Variant = data.get("completed_collections", {})
+    if saved_completed is Dictionary:
+        completed_collections = saved_completed
+    var saved_collection: Variant = data.get("collection", {})
+    if saved_collection is Dictionary:
+        collection = saved_collection
+    var loaded_prizes: Variant = data.get("prizes", [])
+    if loaded_prizes is Array:
+        saved_prizes = loaded_prizes
+        var toy_counts: Dictionary = {}
+        var unique_toys := {}
+        for saved in saved_prizes:
+            if saved is Dictionary and String(saved.get("kind", "toy")) == "toy":
+                var idx := int(saved.get("source_index", 0))
+                toy_counts[idx] = int(toy_counts.get(idx, 0)) + 1
+                unique_toys[idx] = true
+        var too_many_duplicates := false
+        for key in toy_counts.keys():
+            if int(toy_counts[key]) > 3:
+                too_many_duplicates = true
+                break
+        if unique_toys.size() < 24 or too_many_duplicates:
+            saved_prizes.clear()
+    var saved_claw_pos: Variant = data.get("claw_position", [])
+    if saved_claw_pos is Array and saved_claw_pos.size() >= 3:
+        claw_pos = Vector3(
+            clampf(float(saved_claw_pos[0]), CLAW_MIN.x, CLAW_MAX.x),
+            clampf(float(saved_claw_pos[1]), CLAW_MIN.y, CLAW_MAX.y),
+            clampf(float(saved_claw_pos[2]), CLAW_MIN.z, CLAW_MAX.z)
+        )
+        claw_target = claw_pos
