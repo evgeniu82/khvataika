@@ -524,6 +524,8 @@ var popup_achievement_label: Label
 var achievement_strip: PanelContainer
 var achievement_strip_label: Label
 var achievement_strip_timer: float = 0.0
+var achievement_strip_batch_index: int = 0
+var achievement_strip_batches: Array[Array[String]] = []
 var achievement_check_timer: float = 0.0
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
@@ -2605,23 +2607,30 @@ func create_loading_screen() -> void:
     var top := ColorRect.new()
     top.color = Color("#3B2618")
     top.position = Vector2(0, 0)
-    top.size = Vector2(1080, 300)
+    top.size = Vector2(1080, 250)
     loading_screen.add_child(top)
 
     var bottom := ColorRect.new()
     bottom.color = Color("#21140D")
-    bottom.position = Vector2(0, 1620)
-    bottom.size = Vector2(1080, 300)
+    bottom.position = Vector2(0, 1650)
+    bottom.size = Vector2(1080, 270)
     loading_screen.add_child(bottom)
 
     # Декоративные горизонтальные полосы заполняют пространство и
     # визуально связывают верхнюю и нижнюю части экрана.
-    for y in [350, 1540]:
+    for y in [330, 1585]:
         var line := ColorRect.new()
         line.color = Color("#76583F")
         line.position = Vector2(70, y)
         line.size = Vector2(940, 2)
         loading_screen.add_child(line)
+    # Три небольших цветовых акцента — в духе HUD игры, без тяжёлой графики.
+    for item in [[Color("#C19A70"), 270], [Color("#6F8C78"), 380], [Color("#A66A55"), 490]]:
+        var accent := ColorRect.new()
+        accent.color = item[0]
+        accent.position = Vector2(item[1], 612)
+        accent.size = Vector2(90, 4)
+        loading_screen.add_child(accent)
 
     var card := Panel.new()
     card.position = Vector2(45, 70)
@@ -2662,12 +2671,12 @@ func create_loading_screen() -> void:
     subtitle.size = Vector2(920, 55)
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     subtitle.add_theme_font_size_override("font_size", 17)
-    subtitle.modulate = Color("#BCA996")
+    subtitle.add_theme_color_override("font_color", Color("#BCA996"))
     loading_screen.add_child(subtitle)
 
     var divider := ColorRect.new()
-    divider.color = Color("#9A7653")
-    divider.position = Vector2(270, 620)
+    divider.color = Color("#C19A70")
+    divider.position = Vector2(270, 625)
     divider.size = Vector2(540, 3)
     loading_screen.add_child(divider)
 
@@ -2677,7 +2686,7 @@ func create_loading_screen() -> void:
     loading_status.size = Vector2(920, 52)
     loading_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     loading_status.add_theme_font_size_override("font_size", 22)
-    loading_status.modulate = Color("#E0C6A2")
+    loading_status.add_theme_color_override("font_color", Color("#E0C6A2"))
     loading_screen.add_child(loading_status)
 
     loading_progress = ProgressBar.new()
@@ -2711,7 +2720,7 @@ func create_loading_screen() -> void:
     loading_percent.size = Vector2(920, 48)
     loading_percent.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     loading_percent.add_theme_font_size_override("font_size", 24)
-    loading_percent.modulate = Color("#DDB47A")
+    loading_percent.add_theme_color_override("font_color", Color("#DDB47A"))
     loading_screen.add_child(loading_percent)
 
     # Небольшой блок состояния вместо изображения: он заполняет центральную
@@ -2724,7 +2733,7 @@ func create_loading_screen() -> void:
     info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     info.add_theme_font_size_override("font_size", 18)
-    info.modulate = Color("#A98E76")
+    info.add_theme_color_override("font_color", Color("#B7A18A"))
     loading_screen.add_child(info)
 
     var tips_title := Label.new()
@@ -2733,7 +2742,7 @@ func create_loading_screen() -> void:
     tips_title.size = Vector2(920, 45)
     tips_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     tips_title.add_theme_font_size_override("font_size", 18)
-    tips_title.modulate = Color("#C9A982")
+    tips_title.add_theme_color_override("font_color", Color("#C9A982"))
     loading_screen.add_child(tips_title)
 
     loading_stage = Label.new()
@@ -2753,7 +2762,7 @@ func create_loading_screen() -> void:
     loading_tip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     loading_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     loading_tip.add_theme_font_size_override("font_size", 17)
-    loading_tip.modulate = Color("#D8C3AA")
+    loading_tip.add_theme_color_override("font_color", Color("#D8C3AA"))
     loading_screen.add_child(loading_tip)
 
     var hint := Label.new()
@@ -2762,7 +2771,7 @@ func create_loading_screen() -> void:
     hint.size = Vector2(940, 55)
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     hint.add_theme_font_size_override("font_size", 20)
-    hint.modulate = Color("#9A7653")
+    hint.add_theme_color_override("font_color", Color("#9A7653"))
     loading_screen.add_child(hint)
 
     var ready := Label.new()
@@ -2771,7 +2780,7 @@ func create_loading_screen() -> void:
     ready.size = Vector2(940, 60)
     ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     ready.add_theme_font_size_override("font_size", 22)
-    ready.modulate = Color("#C9A982")
+    ready.add_theme_color_override("font_color", Color("#C19A70"))
     loading_screen.add_child(ready)
 
     var footer := Label.new()
@@ -2780,16 +2789,16 @@ func create_loading_screen() -> void:
     footer.size = Vector2(940, 55)
     footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     footer.add_theme_font_size_override("font_size", 17)
-    footer.modulate = Color("#9E8975")
+    footer.add_theme_color_override("font_color", Color("#A98E76"))
     loading_screen.add_child(footer)
 
     var version := Label.new()
-    version.text = "MOBILE EDITION  •  v1.14.2"
-    version.position = Vector2(70, 1795)
+    version.text = "ВЕРСИЯ ИГРЫ 2.0.0"
+    version.position = Vector2(70, 1810)
     version.size = Vector2(940, 38)
     version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    version.add_theme_font_size_override("font_size", 13)
-    version.modulate = Color("#5D493A")
+    version.add_theme_font_size_override("font_size", 15)
+    version.add_theme_color_override("font_color", Color("#C19A70"))
     loading_screen.add_child(version)
 
 func set_loading_status(text: String) -> void:
@@ -5847,20 +5856,20 @@ func build_hud() -> void:
 func build_achievement_strip() -> void:
     achievement_strip = PanelContainer.new()
     achievement_strip.name = "AchievementStrip"
-    # Центр между вторыми боковыми кружками: примерно напротив
-    # сундуков слева и недельной миссии справа.
+    # Компактная уведомительная полоска. Она никогда не разрастается в большое окно.
     achievement_strip.position = Vector2(225, 280)
-    achievement_strip.size = Vector2(630, 68)
+    achievement_strip.size = Vector2(630, 64)
     achievement_strip.visible = false
     achievement_strip.z_index = 650
-    style_panel(achievement_strip, Color("#241B16"), Color("#8A684C"), 18, 2)
+    style_panel(achievement_strip, Color("#241B16"), Color("#9A7653"), 16, 2)
     hud_layer.add_child(achievement_strip)
     achievement_strip_label = Label.new()
     achievement_strip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     achievement_strip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    achievement_strip_label.add_theme_font_size_override("font_size", 17)
-    achievement_strip_label.modulate = Color("#E1C29A")
+    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+    achievement_strip_label.clip_text = true
+    achievement_strip_label.add_theme_font_size_override("font_size", 15)
+    achievement_strip_label.add_theme_color_override("font_color", Color("#E8D2B5"))
     achievement_strip.add_child(achievement_strip_label)
 
 func show_achievement_strip() -> void:
@@ -5868,25 +5877,62 @@ func show_achievement_strip() -> void:
         return
     if pending_achievement_rewards_text.is_empty() and pending_new_achievements.is_empty():
         return
-    var lines: Array[String] = []
-    for i in range(pending_achievement_rewards_text.size()):
-        var text := String(pending_achievement_rewards_text[i]).replace("\n", " • ")
-        lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: " + text.trim_prefix("🏆 "))
-    if lines.is_empty():
+
+    # Собираем только названия. Максимум 3 достижения помещаются в одну
+    # компактную полоску; если их больше — следующая полоска покажется сама.
+    var names: Array[String] = []
+    for reward_text in pending_achievement_rewards_text:
+        var raw := String(reward_text).replace("\n", " • ")
+        raw = raw.trim_prefix("🏆 ")
+        var cut := raw.find(" • Награда:")
+        if cut >= 0:
+            raw = raw.substr(0, cut)
+        if not raw.is_empty() and not names.has(raw):
+            names.append(raw)
+    if names.is_empty():
         for name in pending_new_achievements:
-            lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % String(name))
-    achievement_strip_label.text = "\n".join(lines)
-    # Полоска остаётся между боковыми кругами и расширяется только вниз,
-    # если одновременно открыто несколько достижений.
-    var line_count := maxi(1, lines.size())
-    achievement_strip.size = Vector2(630, 68 + float(line_count - 1) * 42.0)
-    achievement_strip_timer = 5.0
+            var clean := String(name).strip_edges()
+            if not clean.is_empty() and not names.has(clean):
+                names.append(clean)
+
+    achievement_strip_batches.clear()
+    for start in range(0, names.size(), 3):
+        var batch: Array[String] = []
+        var finish := mini(start + 3, names.size())
+        for i in range(start, finish):
+            batch.append(names[i])
+        achievement_strip_batches.append(batch)
+    if achievement_strip_batches.is_empty():
+        return
+
+    achievement_strip_batch_index = 0
+    achievement_strip_timer = 3.5
     achievement_strip.visible = true
+    _show_current_achievement_batch()
+
+func _show_current_achievement_batch() -> void:
+    if not achievement_strip or not achievement_strip_label:
+        return
+    if achievement_strip_batch_index < 0 or achievement_strip_batch_index >= achievement_strip_batches.size():
+        return
+    var batch := achievement_strip_batches[achievement_strip_batch_index]
+    achievement_strip_label.text = "🏆 " + "  •  ".join(batch)
+    achievement_strip.size = Vector2(630, 64)
 
 func hide_achievement_strip() -> void:
     achievement_strip_timer = 0.0
     if achievement_strip and is_instance_valid(achievement_strip):
+        if achievement_strip_batch_index + 1 < achievement_strip_batches.size():
+            achievement_strip_batch_index += 1
+            achievement_strip_timer = 3.5
+            _show_current_achievement_batch()
+            achievement_strip.visible = true
+            return
         achievement_strip.visible = false
+    achievement_strip_batches.clear()
+    achievement_strip_batch_index = 0
+    pending_new_achievements.clear()
+    pending_achievement_rewards_text.clear()
 
 func make_control_button(text_value: String, pos: Vector2) -> Button:
     var b := Button.new()
@@ -6366,6 +6412,8 @@ func build_seasons_panel() -> PanelContainer:
     scroll.name = "SeasonsScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.follow_focus = false
+    scroll.clip_contents = true
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
