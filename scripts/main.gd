@@ -840,7 +840,9 @@ func _ready() -> void:
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
     sanitize_unlocked_achievements()
+    synchronize_achievement_ownership()
     audit_achievement_source_state()
+    check_achievements()
     # ID игрока нужен и в полностью офлайн-режиме, чтобы профиль не зависал
     # на «ПОЛУЧАЕМ…». Генерируем его сразу после загрузки сохранения.
     ensure_player_id()
@@ -9287,6 +9289,51 @@ func recover_claw_ownership_from_saved_sources(data: Dictionary) -> bool:
         changed = true
     return changed
 
+func synchronize_achievement_ownership() -> bool:
+    # Единый слой владения для всех покупаемых предметов. Он намеренно не
+    # уменьшает уже подтверждённое владение и синхронизирует массивы магазина
+    # с ID-журналами достижений.
+    var changed := false
+
+    # Клешни: owned_claws <-> owned_claw_ids.
+    var ids: Array[String] = []
+    for raw_id in owned_claw_ids:
+        var cid := _canonical_claw_id(raw_id)
+        if cid != "" and not ids.has(cid):
+            ids.append(cid)
+    for i in range(mini(owned_claws.size(), claw_specs.size())):
+        if owned_claws[i]:
+            var cid := "claw_%d" % (i + 1)
+            if not ids.has(cid):
+                ids.append(cid)
+    if not ids.has("claw_1"):
+        ids.push_front("claw_1")
+    var normalized: Array[bool] = []
+    normalized.resize(claw_specs.size())
+    for i in range(normalized.size()): normalized[i] = false
+    for cid in ids:
+        var idx := int(cid.trim_prefix("claw_")) - 1
+        if idx >= 0 and idx < normalized.size(): normalized[idx] = true
+    if owned_claws != normalized:
+        owned_claws = normalized
+        changed = true
+    if owned_claw_ids != ids:
+        owned_claw_ids = ids
+        changed = true
+
+    # Косметика: факт выбранного скина подтверждает, что он был приобретён.
+    if selected_claw_skin >= 0 and selected_claw_skin < owned_claw_skins.size() and not owned_claw_skins[selected_claw_skin]:
+        owned_claw_skins[selected_claw_skin] = true
+        changed = true
+    if selected_toy_skin >= 0 and selected_toy_skin < owned_toy_skins.size() and not owned_toy_skins[selected_toy_skin]:
+        owned_toy_skins[selected_toy_skin] = true
+        changed = true
+    if selected_machine_skin >= 0 and selected_machine_skin < owned_machine_skins.size() and not owned_machine_skins[selected_machine_skin]:
+        owned_machine_skins[selected_machine_skin] = true
+        changed = true
+
+    return changed
+
 func update_achievement_historical_values() -> bool:
     # Только показатели, которые по смыслу являются накопительными или
     # историческими. Ежедневные/недельные текущие задания сюда не входят.
@@ -9309,6 +9356,8 @@ func audit_achievement_source_state() -> void:
     # сохранения: старые версии могли сохранить инвентарь, но не заполнить
     # completed_collections/некоторые счётчики достижений.
     sync_collection_from_inventory()
+
+    synchronize_achievement_ownership()
 
     # Восстанавливаем факт завершённых коллекций из реального инвентаря.
     # Это делает достижения за коллекции ретроактивными.
@@ -9512,6 +9561,7 @@ func grant_achievement_reward(spec: Dictionary) -> void:
     total_keys_earned += int(r.get("keys", 0))
 
 func check_achievements() -> void:
+    var before_unlock_count := unlocked_achievements.size()
     audit_achievement_source_state()
     var unlocked_now: Array[String] = []
     for spec in achievement_specs:
@@ -9531,6 +9581,11 @@ func check_achievements() -> void:
         refresh_achievements_panel()
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         show_achievement_strip()
+    elif before_unlock_count != unlocked_achievements.size():
+        save_game()
+        refresh_achievements_panel()
+    elif achievements_panel and achievements_panel.visible:
+        refresh_achievements_panel()
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
@@ -10116,6 +10171,7 @@ func save_game() -> void:
             "engineering_parts": engineering_parts,
             "claw": selected_claw,
             "owned_claws": owned_claws,
+            "owned_claw_ids": owned_claw_ids,
             "owned_claw_skins": owned_claw_skins,
             "owned_toy_skins": owned_toy_skins,
             "owned_machine_skins": owned_machine_skins,
