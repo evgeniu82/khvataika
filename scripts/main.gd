@@ -793,6 +793,17 @@ func _achievement_exists(id: String) -> bool:
             return true
     return false
 
+func sanitize_unlocked_achievements() -> void:
+    # В сохранениях от старых версий могут остаться ID достижений,
+    # которых больше нет в актуальном списке. Не считаем их открытыми
+    # и не позволяем им искажать общий счётчик.
+    var valid_ids: Dictionary = {}
+    for spec in achievement_specs:
+        valid_ids[String(spec.get("id", ""))] = true
+    for id in unlocked_achievements.keys():
+        if not valid_ids.has(String(id)):
+            unlocked_achievements.erase(id)
+
 func _ready() -> void:
     startup_diagnostic_previous = _startup_read_phase()
     _startup_write_phase("READY")
@@ -823,6 +834,7 @@ func _ready() -> void:
         for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
+    sanitize_unlocked_achievements()
     sync_collection_from_inventory()
     # ID игрока нужен и в полностью офлайн-режиме, чтобы профиль не зависал
     # на «ПОЛУЧАЕМ…». Генерируем его сразу после загрузки сохранения.
@@ -4574,16 +4586,6 @@ func build_extra_hud() -> void:
     seasons_btn.pressed.connect(func(): open_panel("seasons"))
     hud_layer.add_child(seasons_btn)
 
-    var season_caption := Label.new()
-    season_caption.name = "SeasonCircleCaption"
-    season_caption.position = Vector2(8, 263)
-    season_caption.size = Vector2(102, 28)
-    season_caption.text = get_current_season_short_name()
-    season_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    season_caption.add_theme_font_size_override("font_size", 11)
-    season_caption.modulate = Color("#E1C29A")
-    hud_layer.add_child(season_caption)
-
     # Возвращаем сундуки и мастерскую на главный экран: это НЕ пункты меню.
     var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), Color("#7A5A42"))
     chests_btn.name = "ChestsCircleButton"
@@ -5834,6 +5836,7 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
         update_ui()
         return selected
     save_game()
+    check_achievements()
     apply_shop_visuals()
     update_ui()
     return selected
@@ -5847,6 +5850,7 @@ func buy_claw_skin(index: int) -> void:
         selected_claw_skin = 0
         apply_shop_visuals()
         save_game()
+        check_achievements()
         return
     selected_claw_skin = buy_cosmetic(index, claw_skin_specs, owned_claw_skins, selected_claw_skin)
     # После покупки/выбора ещё раз фиксируем именно нажатый индекс.
@@ -5862,6 +5866,7 @@ func buy_toy_skin(index: int) -> void:
         apply_shop_visuals()
         build_prizes()
         save_game()
+        check_achievements()
         return
     selected_toy_skin = buy_cosmetic(index, toy_skin_specs, owned_toy_skins, selected_toy_skin)
     if index < owned_toy_skins.size() and owned_toy_skins[index]:
@@ -5876,6 +5881,7 @@ func buy_machine_skin(index: int) -> void:
         selected_machine_skin = 0
         apply_shop_visuals()
         save_game()
+        check_achievements()
         return
     selected_machine_skin = buy_cosmetic(index, machine_skin_specs, owned_machine_skins, selected_machine_skin)
     if index < owned_machine_skins.size() and owned_machine_skins[index]:
@@ -5963,7 +5969,7 @@ func buy_vip(index: int) -> void:
         if item.has("toy"): selected_toy_skin = clampi(int(item["toy"]), 0, toy_skin_specs.size()-1); owned_toy_skins[selected_toy_skin] = true
         apply_shop_visuals(); build_prizes(); current_result = "💎 VIP ПРЕДМЕТ ПОЛУЧЕН"
     else: current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
-    save_game(); update_ui(); refresh_vip_panel()
+    save_game(); check_achievements(); update_ui(); refresh_vip_panel()
 
 func get_current_season() -> Dictionary:
     var month := int(Time.get_datetime_dict_from_system().get("month", 1))
@@ -5979,15 +5985,6 @@ func get_current_season_icon() -> String:
         "summer": return "☀️"
         "autumn": return "🍂"
     return "🌎"
-
-func get_current_season_short_name() -> String:
-    var season := get_current_season()
-    match String(season.get("id", "autumn")):
-        "winter": return "ЗИМА"
-        "spring": return "ВЕСНА"
-        "summer": return "ЛЕТО"
-        "autumn": return "ОСЕНЬ"
-    return "СЕЗОН"
 
 func build_seasons_panel() -> PanelContainer:
     var p := PanelContainer.new()
@@ -6294,6 +6291,7 @@ func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     current_result = "🎁 %s: %s" % [kind.to_upper(), reward_text]
     chest_opening = false
     save_game()
+    check_achievements()
     update_ui()
     refresh_chests_panel()
 
@@ -6448,7 +6446,7 @@ func workshop_upgrade(stat: String) -> void:
     set("workshop_" + stat, level + 1)
     workshop_level = maxi(workshop_level, 1 + int(total_workshop_levels() / 3))
     current_result = "🛠 МОДУЛЬ УЛУЧШЕН: %s %d/%d" % [stat.to_upper(), level + 1, max_level]
-    save_game(); update_ui(); refresh_workshop_panel()
+    save_game(); check_achievements(); update_ui(); refresh_workshop_panel()
 
 func workshop_blueprint_bonus(stat: String) -> float:
     var tier := String(workshop_blueprints.get(stat, "none"))
@@ -6483,7 +6481,7 @@ func workshop_buy_blueprint(stat: String, tier: String) -> void:
     workshop_blueprints[stat] = tier
     workshop_level = maxi(workshop_level, 5 + int(total_workshop_levels() / 4))
     current_result = "📐 ЧЕРТЁЖ УСТАНОВЛЕН: %s — %s" % [stat.to_upper(), tier.to_upper()]
-    save_game(); update_ui(); refresh_workshop_panel()
+    save_game(); check_achievements(); update_ui(); refresh_workshop_panel()
 
 func workshop_calibrate() -> void:
     if SERVER_AUTHORITATIVE:
@@ -6502,6 +6500,7 @@ func workshop_calibrate() -> void:
         workshop_calibration += 1
         current_result = "🎯 КАЛИБРОВКА УРОВЕНЬ %d/5" % workshop_calibration
         save_game()
+        check_achievements()
     refresh_workshop_panel()
 
 func workshop_toggle_overclock() -> void:
@@ -6521,6 +6520,7 @@ func workshop_toggle_overclock() -> void:
         workshop_overclock_games = 5
         current_result = "⚡ ОВЕРКЛОК АКТИВИРОВАН НА 5 ИГР"
         save_game()
+        check_achievements()
     else:
         current_result = "НУЖЕН 10 УРОВЕНЬ МАСТЕРСКОЙ И 100 ДЕТАЛЕЙ"
     refresh_workshop_panel()
@@ -9286,7 +9286,33 @@ func achievement_reward(spec: Dictionary) -> Dictionary:
         "best_streak":
             rubles = 30 if value <= 5 else 60
         "perfect":
-            rubles = 35 if value <= 5 else 70
+            rubles = 35 if value <= 5 else (70 if value <= 25 else 120)
+        "heavy":
+            rubles = 30 if value <= 10 else (60 if value <= 50 else 100)
+        "lucky":
+            rubles = 35 if value <= 5 else (70 if value <= 25 else 120)
+        "xp":
+            rubles = 25 if value <= 1000 else (50 if value <= 10000 else 100)
+        "max_reward":
+            rubles = 30 if value <= 100 else (60 if value <= 500 else 100)
+        "chests_opened":
+            rubles = 25 if value <= 1 else (50 if value <= 10 else (90 if value <= 50 else 150))
+        "keys_earned":
+            keys = 1 if value <= 25 else 2
+        "exclusive":
+            rubles = 50 if value <= 1 else 100
+        "workshop_level":
+            rubles = 30 if value <= 5 else (60 if value <= 10 else 100)
+        "parts":
+            rubles = 25 if value <= 100 else (50 if value <= 500 else 100)
+        "calibration":
+            parts = 25 if value < 5 else 50
+        "overclock":
+            rubles = 50
+        "claw_skins", "toy_skins", "machine_skins":
+            rubles = 40 if value <= 3 else 80
+        "login_streak":
+            rubles = 30 if value <= 3 else 60
         "daily_claims", "weekly_claims":
             keys = 1 if value >= 7 else 0
             rubles = 25 if keys == 0 else 0
@@ -9322,6 +9348,10 @@ func check_achievements() -> void:
             grant_achievement_reward(spec)
             pending_achievement_rewards_text.append("🏆 %s\n   %s" % [String(spec["name"]), achievement_reward_text(spec)])
     if not unlocked_now.is_empty():
+        # Сохраняем сразу после фактического открытия достижения: его награда
+        # и статус не должны потеряться при закрытии игры до следующего autosave.
+        save_game()
+        refresh_achievements_panel()
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         show_achievement_strip()
 
@@ -9740,6 +9770,7 @@ func complete_daily_mission_if_ready() -> void:
         daily_mission_claimed = true
         daily_mission_completed_at = int(Time.get_unix_time_from_system())
         total_daily_claims += 1
+        check_achievements()
         current_result = "🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(daily_mission_reward)
         notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +50 ₽ уже получена!")
 
@@ -9753,6 +9784,7 @@ func complete_weekly_mission_if_ready() -> void:
         weekly_mission_claimed = true
         weekly_mission_completed_at = int(Time.get_unix_time_from_system())
         total_weekly_claims += 1
+        check_achievements()
         current_result = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(weekly_mission_reward)
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
 
