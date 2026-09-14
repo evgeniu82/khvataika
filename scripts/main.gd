@@ -624,60 +624,6 @@ func get_collection_names() -> Array[String]:
         "РОБОТЫ", "ФАНТАСТИКА", "СПОРТ", "МИР МОНСТРОВ"
     ]
 
-func add_extended_collections() -> void:
-    var extra_toys: Array[Dictionary] = [
-        # ДИНОЗАВРЫ
-        {"name":"Рекс Рокки","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#6FA45A")},
-        {"name":"Трицератопс Три","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#8C6A4A")},
-        {"name":"Раптор Рэй","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":15.0,"color":Color("#E27A42")},
-        {"name":"Бронто Бум","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":11.0,"color":Color("#4D9A87")},
-        {"name":"Мега-Тиран","collection":"ДИНОЗАВРЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.2,"color":Color("#B53D58")},
-        # СУПЕРГЕРОИ
-        {"name":"Капитан Плюш","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":29.0,"color":Color("#356DDB")},
-        {"name":"Молния Макс","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#F2C23E")},
-        {"name":"Ночной Ниндзя","collection":"СУПЕРГЕРОИ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#4B4D70")},
-        {"name":"Робо-Герой","collection":"СУПЕРГЕРОИ","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#45B7C8")},
-        {"name":"Золотой Герой","collection":"СУПЕРГЕРОИ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.22,"color":Color("#F5B93D")},
-        # СЛАДКИЙ МИР
-        {"name":"Пончик Пинки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":32.0,"color":Color("#F38DB4")},
-        {"name":"Маршмеллоу Мими","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#F2E5D5")},
-        {"name":"Кекс Куки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#B97852")},
-        {"name":"Леденец Лаки","collection":"СЛАДКИЙ МИР","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#68C9E8")},
-        {"name":"Шоколадный Король","collection":"СЛАДКИЙ МИР","rarity":"ЭПИЧЕСКАЯ","weight":2.0,"color":Color("#6E3F32")},
-        # ПИРАТЫ
-        {"name":"Капитан Бакс","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#8B6548")},
-        {"name":"Попугай Пират","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#E44C55")},
-        {"name":"Кракен Крош","collection":"ПИРАТЫ","rarity":"РЕДКАЯ","weight":14.0,"color":Color("#7557B5")},
-        {"name":"Призрак Палубы","collection":"ПИРАТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.5,"color":Color("#B9D9D1")},
-        {"name":"Золотой Капитан","collection":"ПИРАТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.18,"color":Color("#E8B93D")},
-        # РОБОТЫ
-        {"name":"Бот Биби","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#6D8299")},
-        {"name":"Дроид Дэн","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#4FA5B7")},
-        {"name":"Меха-Лис","collection":"РОБОТЫ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#D46D45")},
-        {"name":"Кибер-Гигант","collection":"РОБОТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.7,"color":Color("#4C5DE7")},
-        {"name":"Омега-9000","collection":"РОБОТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.14,"color":Color("#B7C8D8")},
-        # ФАНТАСТИКА
-        {"name":"Дракончик Эмбер","collection":"ФАНТАСТИКА","rarity":"ОБЫЧНАЯ","weight":25.0,"color":Color("#E36A43")},
-        {"name":"Грифон Грей","collection":"ФАНТАСТИКА","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#8B78C9")},
-        {"name":"Феникс Файр","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#EF6B38")},
-        {"name":"Лунный Дух","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":1.8,"color":Color("#8AB5F2")},
-        {"name":"Древний Дракон","collection":"ФАНТАСТИКА","rarity":"ЛЕГЕНДАРНАЯ","weight":0.08,"color":Color("#D7A93D")},
-        # СПОРТ
-        {"name":"Футбольный Боб","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":33.0,"color":Color("#F4F4F0")},
-        {"name":"Баскет-Би","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#E98537")},
-        {"name":"Хоккейный Хаски","collection":"СПОРТ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#6A89C8")},
-        {"name":"Чемпион","collection":"СПОРТ","rarity":"ЭПИЧЕСКАЯ","weight":2.4,"color":Color("#D3A33C")},
-        {"name":"Олимпийский Легендар","collection":"СПОРТ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.10,"color":Color("#7BC6A8")},
-        # МИР МОНСТРОВ
-        {"name":"Монстрик Мио","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#63B76D")},
-        {"name":"Пухлый Буба","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#7D63B8")},
-        {"name":"Зубастик Зик","collection":"МИР МОНСТРОВ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#B84F62")},
-        {"name":"Теневой Монстр","collection":"МИР МОНСТРОВ","rarity":"ЭПИЧЕСКАЯ","weight":2.3,"color":Color("#4B4A67")},
-        {"name":"Король Монстров","collection":"МИР МОНСТРОВ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.07,"color":Color("#B7A143")}
-    ]
-    for toy in extra_toys:
-        toys.append(toy)
-
 func add_progressive_achievements() -> void:
     # Многоуровневые достижения: каждый следующий уровень требует больше предыдущего.
     var tiers := [
@@ -779,11 +725,8 @@ func _ready() -> void:
     await get_tree().process_frame
 
     if startup_diagnostic_previous != "" and startup_diagnostic_previous != "DONE":
-        # Старый диагностический маркер после зависшего запуска не должен
-        # блокировать следующий запуск игры. Записываем восстановление и
-        # продолжаем обычную инициализацию.
-        print("Startup recovery: previous phase was ", startup_diagnostic_previous)
-        _startup_write_phase("RECOVERED")
+        _startup_diag_halt(startup_diagnostic_previous)
+        return
 
     if not STARTUP_CONTROL_TEST:
         add_progressive_achievements()
@@ -4161,9 +4104,9 @@ func build_ui() -> void:
     await get_tree().process_frame
     await set_loading_progress(84.0, "МАГАЗИН ГОТОВ")
 
-    # Коллекция строится лениво — только при первом открытии.
-    # Это не нагружает старт Android и не задерживает загрузочный экран.
-    collection_panel = null
+    await set_loading_status("КОЛЛЕКЦИЯ ГОТОВА...")
+    collection_panel = build_collection_panel()
+    await get_tree().process_frame
     await set_loading_progress(85.0, "КОЛЛЕКЦИЯ ГОТОВА")
 
     await set_loading_status("НАСТРОЙКИ ГОТОВЫ...")
@@ -6645,7 +6588,6 @@ func collection_total_weight(collection_name: String) -> float:
 
 func collection_difficulty(collection_name: String) -> String:
     var total := collection_total_weight(collection_name)
-    # Чем меньше суммарный вес игрушек коллекции, тем реже она собирается.
     if total >= 100.0:
         return "ЛЁГКАЯ"
     if total >= 70.0:
@@ -6715,19 +6657,16 @@ func build_collection_panel() -> PanelContainer:
         card.add_theme_constant_override("separation", 3)
         var title := Label.new()
         var done: bool = completed_collections.has(cname)
-        var difficulty := collection_difficulty(cname)
         title.text = ("🏆 " if done else "▣ ") + cname + "   •   %d / %d" % [got, needed]
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
-
         var reward_line := Label.new()
-        reward_line.text = "Сложность: %s   •   Приз за полную коллекцию: %s" % [difficulty, collection_reward_text(cname)]
+        reward_line.text = "Сложность: %s   •   Приз за полную коллекцию: %s" % [collection_difficulty(cname), collection_reward_text(cname)]
         reward_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         reward_line.add_theme_font_size_override("font_size", 15)
         reward_line.modulate = GOLD
         card.add_child(reward_line)
-
         var names := Label.new()
         var parts: Array[String] = []
         for toy in toys:
@@ -8135,11 +8074,7 @@ func open_panel(which: String) -> void:
     set_main_menu_controls(false)
     menu_layer.visible = true
     if which == "shop": shop_panel.visible = true
-    elif which == "collection":
-        # Собираем тяжёлый список коллекций только по запросу игрока.
-        if collection_panel == null or not is_instance_valid(collection_panel):
-            collection_panel = build_collection_panel()
-        collection_panel.visible = true
+    elif which == "collection": collection_panel.visible = true
     elif which == "settings": settings_panel.visible = true
     elif which == "achievements":
         achievements_panel.visible = true
@@ -9033,7 +8968,6 @@ func check_collection_completion(collection_name: String) -> bool:
                 got += 1
     if needed <= 0 or got < needed:
         return false
-
     completed_collections[collection_name] = true
     var reward := collection_reward(collection_name)
     var rubles := int(reward.get("rubles", 0))
@@ -9176,7 +9110,6 @@ func show_collection_completion_popup(collection_name: String) -> void:
     if not result_popup: return
     if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
     popup_name_label.text = collection_name
-
     var toy_lines: Array[String] = []
     for toy in toys:
         if String(toy.get("collection", "")) == collection_name:
