@@ -35,6 +35,7 @@ const NAVY := Color("#081630")
 const STEEL := Color("#34435B")
 
 var coins: int = 120
+var highest_balance_rubles: int = 120
 var selected_claw: int = 0
 var music_player: AudioStreamPlayer
 var owned_claws: Array[bool] = [true, false, false, false, false, false, false, false, false, false]
@@ -835,7 +836,7 @@ func _ready() -> void:
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
     sanitize_unlocked_achievements()
-    sync_collection_from_inventory()
+    audit_achievement_source_state()
     # ID игрока нужен и в полностью офлайн-режиме, чтобы профиль не зависал
     # на «ПОЛУЧАЕМ…». Генерируем его сразу после загрузки сохранения.
     ensure_player_id()
@@ -2873,6 +2874,8 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
+    audit_achievement_source_state()
+    check_achievements()
     _startup_write_phase("DONE")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
@@ -5056,6 +5059,7 @@ func claim_login_reward_for_day(day: int) -> void:
     daily_series_claimed_at = int(Time.get_unix_time_from_system())
     current_result = "🎁 ЕЖЕДНЕВНАЯ НАГРАДА • ДЕНЬ %d • +%d ₽" % [login_streak, reward]
     save_game()
+    check_achievements()
     update_ui()
     update_daily_login_ui()
     if toast_label:
@@ -7714,6 +7718,7 @@ func claim_referral_code(code: String) -> void:
     referral_status_label.text = "Подарок получен: +%d ₽" % referral_welcome_reward
     current_result = "🎁 ПОДАРОК ЗА ПРИГЛАШЕНИЕ • +%d ₽" % referral_welcome_reward
     save_game()
+    check_achievements()
     update_ui()
 
 func build_settings_panel() -> PanelContainer:
@@ -9201,6 +9206,52 @@ func hide_collection_completion_popup() -> void:
     if collection_completion_popup and is_instance_valid(collection_completion_popup):
         collection_completion_popup.visible = false
 
+func audit_achievement_source_state() -> void:
+    # Единая проверка источников достижений. Важно запускать её после загрузки
+    # сохранения: старые версии могли сохранить инвентарь, но не заполнить
+    # completed_collections/некоторые счётчики достижений.
+    sync_collection_from_inventory()
+
+    # Восстанавливаем факт завершённых коллекций из реального инвентаря.
+    # Это делает достижения за коллекции ретроактивными.
+    for collection_name in get_collection_names():
+        var needed := 0
+        var got := 0
+        for toy in toys:
+            if String(toy.get("collection", "")) != collection_name:
+                continue
+            needed += 1
+            var toy_name := String(toy.get("name", ""))
+            if int(toy_inventory_counts.get(toy_name, 0)) > 0 or collection.has(toy_name):
+                got += 1
+        if needed > 0 and got >= needed:
+            completed_collections[collection_name] = true
+
+    # Старые сохранения могли иметь инвентарь, но устаревший total_prizes_won.
+    var inventory_total := 0
+    var derived_rarity: Dictionary = {}
+    for toy in toys:
+        var toy_name := String(toy.get("name", ""))
+        var count := maxi(0, int(toy_inventory_counts.get(toy_name, 0)))
+        inventory_total += count
+        if count > 0:
+            var rarity := String(toy.get("rarity", "ОБЫЧНАЯ"))
+            derived_rarity[rarity] = int(derived_rarity.get(rarity, 0)) + count
+            if float(toy.get("weight", 0.0)) >= 80.0:
+                heavy_toy_wins = maxi(heavy_toy_wins, count)
+    total_prizes_won = maxi(total_prizes_won, inventory_total)
+    # Ретроактивно восстанавливаем минимально подтверждённое число призов
+    # каждой редкости из фактического инвентаря. Уже сохранённые исторические
+    # счётчики никогда не уменьшаем.
+    for rarity in derived_rarity.keys():
+        rarity_wins[rarity] = maxi(int(rarity_wins.get(rarity, 0)), int(derived_rarity[rarity]))
+    # Одна успешная выдача игрушки не может произойти без игры.
+    total_games = maxi(total_games, total_prizes_won)
+
+    # «Накопите X ₽» означает когда-либо достигнутый баланс, а не деньги,
+    # которые игрок обязан держать после последующей покупки.
+    highest_balance_rubles = maxi(highest_balance_rubles, coins)
+
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
         "toys": return total_prizes_won
@@ -9208,7 +9259,7 @@ func achievement_value(spec: Dictionary) -> int:
         "rarity": return int(rarity_wins.get(String(spec.get("rarity", "")), 0))
         "collections": return completed_collections.size()
         "level": return player_level
-        "rubles": return coins
+        "rubles": return maxi(coins, highest_balance_rubles)
         "claws":
             var count := 0
             for owned in owned_claws:
@@ -9336,6 +9387,7 @@ func grant_achievement_reward(spec: Dictionary) -> void:
     total_keys_earned += int(r.get("keys", 0))
 
 func check_achievements() -> void:
+    audit_achievement_source_state()
     var unlocked_now: Array[String] = []
     for spec in achievement_specs:
         var id := String(spec["id"])
@@ -9801,6 +9853,7 @@ func claim_daily_bonus() -> void:
 
     coins += server_reward_amount(daily_bonus_amount)
     last_daily_bonus_date = today
+    check_achievements()
     save_game()
 
     if toast_label:
@@ -9889,6 +9942,7 @@ func save_game() -> void:
     if f:
         f.store_string(JSON.stringify({
             "coins": coins,
+            "highest_balance_rubles": highest_balance_rubles,
             "player_name": player_name,
             "player_avatar_index": player_avatar_index,
             "music": music_on,
@@ -10027,6 +10081,7 @@ func load_save() -> void:
     bonus_keys = int(data.get("bonus_keys", 0))
     engineering_parts = int(data.get("engineering_parts", 0))
     coins = maxi(0, int(data.get("coins", 120)))
+    highest_balance_rubles = maxi(coins, int(data.get("highest_balance_rubles", coins)))
     selected_claw = clampi(int(data.get("claw", 0)), 0, claw_specs.size() - 1)
     music_on = bool(data.get("music", true))
     sfx_on = bool(data.get("sfx", true))
