@@ -8065,18 +8065,27 @@ func process_incoming_referral() -> void:
 
 func build_referral_panel() -> PanelContainer:
     var p := PanelContainer.new()
-    p.position = Vector2(55, 150)
-    p.size = Vector2(970, 1500)
+    p.position = Vector2(55, 100)
+    p.size = Vector2(970, 1700)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
 
+    # Верхний растягивающийся блок: весь контент прокручивается внутри окна,
+    # а кнопка «Назад» всегда остаётся внизу самого окна.
+    var root := VBoxContainer.new()
+    root.add_theme_constant_override("separation", 8)
+    p.add_child(root)
+
     var scroll := ScrollContainer.new()
+    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     style_scroll_container_brown(scroll)
-    p.add_child(scroll)
+    root.add_child(scroll)
+
     var v := VBoxContainer.new()
     v.custom_minimum_size = Vector2(880, 0)
-    v.add_theme_constant_override("separation", 12)
+    v.add_theme_constant_override("separation", 14)
     scroll.add_child(v)
 
     var title := Label.new()
@@ -8087,8 +8096,7 @@ func build_referral_panel() -> PanelContainer:
     v.add_child(title)
 
     var info := Label.new()
-    info.text = "Приглашай друзей в «Хватайку» и получай награды.
-Друг получает подарок, а ты — награду после выполнения им условия."
+    info.text = "Приглашай друзей в «Хватайку» и получай награды.\nДруг получает подарок, а ты — награду после выполнения им условия."
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     info.add_theme_font_size_override("font_size", 18)
@@ -8100,8 +8108,7 @@ func build_referral_panel() -> PanelContainer:
     reward_card.custom_minimum_size = Vector2(0, 92)
     v.add_child(reward_card)
     var reward_text := Label.new()
-    reward_text.text = "🎁 НОВОМУ ИГРОКУ  +50 ₽    •    🏆 ТЕБЕ ЗА ДРУГА  +100 ₽
-Условие награды: приглашённый должен сыграть 3 игры."
+    reward_text.text = "🎁 НОВОМУ ИГРОКУ  +50 ₽    •    🏆 ТЕБЕ ЗА ДРУГА  +100 ₽\nУсловие награды: приглашённый должен сыграть 3 игры."
     reward_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     reward_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     reward_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -8112,7 +8119,7 @@ func build_referral_panel() -> PanelContainer:
     style_panel(code_card, Color("#1A130F"), Color("#76583F"), 16, 2)
     v.add_child(code_card)
     var cv := VBoxContainer.new()
-    cv.add_theme_constant_override("separation", 6)
+    cv.add_theme_constant_override("separation", 7)
     code_card.add_child(cv)
     var code_caption := Label.new()
     code_caption.text = "ТВОЙ РЕФЕРАЛЬНЫЙ КОД"
@@ -8149,6 +8156,7 @@ func build_referral_panel() -> PanelContainer:
     referral_link_label.add_theme_font_size_override("font_size", 17)
     referral_link_label.modulate = Color("#E1C29A")
     v.add_child(referral_link_label)
+
     var copy := Button.new()
     copy.text = "🔗  СКОПИРОВАТЬ ССЫЛКУ"
     copy.custom_minimum_size = Vector2(0, 58)
@@ -8158,6 +8166,7 @@ func build_referral_panel() -> PanelContainer:
         referral_status_label.text = "Ссылка скопирована. Отправь её другу."
     )
     v.add_child(copy)
+
     var share := Button.new()
     share.text = "📤  ПРИГЛАСИТЬ ДРУГА"
     share.custom_minimum_size = Vector2(0, 62)
@@ -8168,28 +8177,8 @@ func build_referral_panel() -> PanelContainer:
     )
     v.add_child(share)
 
-    var stats_card := PanelContainer.new()
-    style_panel(stats_card, Color("#1A130F"), Color("#76583F"), 16, 2)
-    v.add_child(stats_card)
-    var stats := GridContainer.new()
-    stats.columns = 2
-    stats.add_theme_constant_override("h_separation", 18)
-    stats.add_theme_constant_override("v_separation", 4)
-    stats_card.add_child(stats)
-    for pair in [["ПРИГЛАШЕНО", "ReferralInvited"], ["ВЫПОЛНИЛИ УСЛОВИЕ", "ReferralCompleted"], ["АКТИВНЫХ", "ReferralActive"], ["ПОЛУЧЕНО", "ReferralReward"]]:
-        var l := Label.new()
-        l.name = String(pair[1])
-        l.text = String(pair[0])
-        l.add_theme_font_size_override("font_size", 15)
-        l.modulate = Color("#C09A70")
-        stats.add_child(l)
-        var val := Label.new()
-        val.name = String(pair[1]) + "Value"
-        val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-        val.add_theme_font_size_override("font_size", 18)
-        val.modulate = Color("#F0D4A9")
-        stats.add_child(val)
-
+    # Статистический блок по просьбе пользователя убран.
+    # Количество приглашённых и их состояние будут видны непосредственно в списке.
     referral_list_toggle = Button.new()
     referral_list_toggle.text = "👥  МОИ ПРИГЛАШЕНИЯ  ▼"
     referral_list_toggle.custom_minimum_size = Vector2(0, 60)
@@ -8199,7 +8188,7 @@ func build_referral_panel() -> PanelContainer:
 
     referral_list_container = VBoxContainer.new()
     referral_list_container.name = "ReferralListContainer"
-    referral_list_container.add_theme_constant_override("separation", 5)
+    referral_list_container.add_theme_constant_override("separation", 7)
     referral_list_container.visible = false
     v.add_child(referral_list_container)
 
@@ -8207,13 +8196,16 @@ func build_referral_panel() -> PanelContainer:
     enter_title.text = "🎁  ЕСТЬ КОД ДРУГА?"
     enter_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     enter_title.add_theme_font_size_override("font_size", 20)
+    enter_title.modulate = Color("#E1D2C1")
     v.add_child(enter_title)
+
     referral_code_input = LineEdit.new()
     referral_code_input.placeholder_text = "KHVA-XXXXXXXX"
     referral_code_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
     referral_code_input.custom_minimum_size = Vector2(0, 58)
     referral_code_input.add_theme_font_size_override("font_size", 19)
     v.add_child(referral_code_input)
+
     var claim := Button.new()
     claim.text = "🎁  ПРИМЕНИТЬ КОД"
     claim.custom_minimum_size = Vector2(0, 62)
@@ -8236,12 +8228,14 @@ func build_referral_panel() -> PanelContainer:
     note.modulate = Color("#9E8A76")
     v.add_child(note)
 
+    # Кнопка «Назад» находится вне ScrollContainer и всегда закреплена внизу окна.
     var close := Button.new()
     close.text = "←  НАЗАД"
-    close.custom_minimum_size = Vector2(0, 62)
+    close.custom_minimum_size = Vector2(0, 68)
     style_button(close, Color("#76583F"))
     close.pressed.connect(func(): show_main_menu())
-    v.add_child(close)
+    root.add_child(close)
+
     return p
 
 func refresh_referral_panel() -> void:
@@ -8253,32 +8247,9 @@ func refresh_referral_panel() -> void:
     refresh_referral_stats()
 
 func refresh_referral_stats() -> void:
-    var total := referral_invited_players.size()
-    referral_completed_count = 0
-    referral_active_count = 0
-    referral_total_reward = 0
-    for item in referral_invited_players:
-        var status := String(item.get("status", "pending")) if item is Dictionary else "pending"
-        if status == "completed":
-            referral_completed_count += 1
-            referral_total_reward += referral_reward_per_friend
-        elif status == "active":
-            referral_active_count += 1
-    referral_invites = total
-    if not referral_invites_label:
-        return
-    var stats_card := referral_panel.find_child("ReferralInvited", true, false) if referral_panel else null
-    if stats_card:
-        var v := stats_card.get_parent().get_node_or_null("ReferralInvitedValue")
-        if v: v.text = str(total)
-    for key in ["ReferralCompleted", "ReferralActive", "ReferralReward"]:
-        var n := referral_panel.find_child(key, true, false) if referral_panel else null
-        if n:
-            var value := n.get_parent().get_node_or_null(key + "Value")
-            if value:
-                if key == "ReferralCompleted": value.text = str(referral_completed_count)
-                elif key == "ReferralActive": value.text = str(referral_active_count)
-                else: value.text = "%d ₽" % referral_total_reward
+    # Статистика больше не занимает отдельный блок.
+    # Список приглашённых показывает актуальное состояние каждого игрока.
+    referral_invites = referral_invited_players.size()
     if referral_list_container and referral_list_container.visible:
         render_referral_page()
 
