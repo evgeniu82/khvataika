@@ -8,7 +8,7 @@ extends Node3D
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
 const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
-# 1.14.1 is intentionally a self-contained offline build. The online code remains
+# 2.0.0 is intentionally a self-contained offline build. The online code remains
 # in the project for the later server phase, but it can never become authoritative
 # while this build is running.
 const OFFLINE_MODE: bool = true
