@@ -663,14 +663,21 @@ func sync_collection_from_inventory() -> void:
 
 
 func refresh_collection_panel() -> void:
-    # Окно коллекций создаётся заново при открытии, чтобы сразу показать
-    # актуальные отметки после получения новой игрушки.
     sync_collection_from_inventory()
-    if collection_panel and is_instance_valid(collection_panel):
-        menu_layer.remove_child(collection_panel)
-        collection_panel.queue_free()
-    collection_panel = build_collection_panel()
+    if not collection_panel or not is_instance_valid(collection_panel):
+        return
+    var collection_key := "%d|%d" % [collection.size(), completed_collections.size()]
+    if collection_key == _collection_ui_last_key and collection_panel.has_meta("collection_ui_built"):
+        return
+    _collection_ui_last_key = collection_key
 
+    # Перестраиваем окно только когда действительно изменился состав коллекции.
+    # При обычном повторном открытии не создаём/удаляем сотни Control-узлов.
+    if collection_panel.has_meta("collection_ui_built"):
+        collection_panel.queue_free()
+        collection_panel = build_collection_panel()
+    refresh_collection_panel()
+    collection_panel.set_meta("collection_ui_built", true)
 
 func add_extended_collections() -> void:
     var extra_toys: Array[Dictionary] = [
@@ -2287,7 +2294,7 @@ func build_season_pass_panel() -> PanelContainer:
     style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 10)
+    scroll.add_theme_constant_override("scroll_bar_width", 5)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -2468,6 +2475,8 @@ func build_news_panel() -> PanelContainer:
 func refresh_news_panel(panel: PanelContainer = null) -> void:
     var target := panel if panel != null else news_panel
     if target == null: return
+    if target == news_panel and _news_ui_built:
+        return
     var list := target.get_node_or_null("ScrollContainer/NewsContent/NewsList") as VBoxContainer
     if list == null: return
     for child in list.get_children(): child.queue_free()
@@ -2480,6 +2489,8 @@ func refresh_news_panel(panel: PanelContainer = null) -> void:
     empty.modulate = Color("#BCA996")
     list.add_child(empty)
     news_unread = 0
+    if target == news_panel:
+        _news_ui_built = true
 
 func build_rating_panel() -> PanelContainer:
     var p:=build_info_menu_panel("RatingPanel",Vector2(970,900))
@@ -2494,6 +2505,10 @@ func build_rating_panel() -> PanelContainer:
 
 func refresh_rating_panel() -> void:
     if not rating_panel:return
+    var rating_key := "%d|%s|%d" % [remote_leaderboard.size(), player_name, int(Time.get_unix_time_from_system() / 60)]
+    if rating_key == _rating_ui_last_key and rating_panel.has_meta("rating_ui_built"):
+        return
+    _rating_ui_last_key = rating_key
     var list:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/Leaderboard") as VBoxContainer
     if not list:return
     var note:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/RatingNote") as Label
@@ -2505,6 +2520,7 @@ func refresh_rating_panel() -> void:
         var empty := Label.new(); empty.text="Рейтинг пока пуст."; empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; empty.add_theme_font_size_override("font_size",19); list.add_child(empty); return
     for i in range(rows.size()):
         var row:=Label.new(); row.text="%d.  %s   •   %d" % [i+1,String(rows[i]["name"]),int(rows[i]["score"])] ; row.add_theme_font_size_override("font_size",20); row.modulate=GOLD if String(rows[i]["name"])==player_name else Color("#E0D4C6"); list.add_child(row)
+    rating_panel.set_meta("rating_ui_built", true)
 
 func build_return_bonus_panel() -> PanelContainer:
     var p:=build_info_menu_panel("ReturnBonusPanel",Vector2(970,620))
@@ -4087,6 +4103,10 @@ func apply_global_brown_ui_theme() -> void:
     theme.set_stylebox("scroll", "HScrollBar", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
     theme.set_stylebox("grabber", "HScrollBar", make_style(Color("#765238"), Color("#A96F43"), 6, 1))
     theme.set_stylebox("grabber_highlighted", "HScrollBar", make_style(Color("#A96F43"), Color("#D1A35A"), 6, 1))
+    theme.set_constant("scroll_bar_width", "VScrollBar", 5)
+    theme.set_constant("scroll_bar_width", "HScrollBar", 5)
+    theme.set_constant("scroll_bar_h_separation", "VScrollBar", 1)
+    theme.set_constant("scroll_bar_v_separation", "HScrollBar", 1)
     theme.set_icon("unchecked", "CheckButton", load("res://assets/ui_toggle_off.svg"))
     theme.set_icon("unchecked_disabled", "CheckButton", load("res://assets/ui_toggle_off.svg"))
     theme.set_icon("checked", "CheckButton", load("res://assets/ui_toggle_on.svg"))
@@ -4150,22 +4170,20 @@ func style_slider_brown(slider: HSlider) -> void:
     slider.add_theme_icon_override("grabber_highlighted", load("res://assets/ui_slider_grabber_highlighted.svg"))
 
 func style_scroll_container_brown(scroll: ScrollContainer) -> void:
-    # Один и тот же аккуратный коричневый стиль для вертикальных и
-    # горизонтальных полос прокрутки.
-    scroll.add_theme_constant_override("scroll_bar_width", 10)
-    scroll.add_theme_constant_override("scroll_bar_h_separation", 2)
+    # Единая тонкая полоса для всех окон: 5px — в 2 раза уже прежних 10px.
+    # Один и тот же стиль применяется и к вертикальной, и к горизонтальной прокрутке.
+    scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.add_theme_constant_override("scroll_bar_h_separation", 1)
     var vs := scroll.get_v_scroll_bar()
     var hs := scroll.get_h_scroll_bar()
     if vs:
-        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 5, 1))
-        vs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 5, 1))
-        vs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 5, 1))
-        vs.mouse_filter = Control.MOUSE_FILTER_PASS
+        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+        vs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
+        vs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
     if hs:
-        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 5, 1))
-        hs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 5, 1))
-        hs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 5, 1))
-        hs.mouse_filter = Control.MOUSE_FILTER_PASS
+        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+        hs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
+        hs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
 
 func show_brown_modal(title_text: String, message_text: String, action: Callable, ok_text: String = "OK", cancel_text: String = "ОТМЕНА", large: bool = false) -> void:
     # Не используем ConfirmationDialog/AcceptDialog: на Android их Window
@@ -4477,11 +4495,13 @@ func build_ui() -> void:
 
     await set_loading_status("МАГАЗИН ГОТОВ...")
     shop_panel = build_shop_panel()
+    refresh_shop()
     await get_tree().process_frame
     await set_loading_progress(84.0, "МАГАЗИН ГОТОВ")
 
     await set_loading_status("КОЛЛЕКЦИЯ ГОТОВА...")
     collection_panel = build_collection_panel()
+    refresh_collection_panel()
     await get_tree().process_frame
     await set_loading_progress(85.0, "КОЛЛЕКЦИЯ ГОТОВА")
 
@@ -4489,11 +4509,13 @@ func build_ui() -> void:
     settings_panel = build_settings_panel()
     await get_tree().process_frame
     achievements_panel = build_achievements_panel()
+    refresh_achievements_panel()
     await get_tree().process_frame
     await set_loading_progress(86.0, "НАСТРОЙКИ И ДОСТИЖЕНИЯ ГОТОВЫ")
 
     await set_loading_status("ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ...")
     profile_panel = build_profile_panel()
+    refresh_profile_panel()
     await get_tree().process_frame
     help_panel = build_help_panel()
     await get_tree().process_frame
@@ -4501,36 +4523,46 @@ func build_ui() -> void:
 
     await set_loading_status("РЕФЕРАЛЫ И VIP ГОТОВЫ...")
     referral_panel = build_referral_panel()
+    refresh_referral_panel()
     await get_tree().process_frame
     vip_panel = build_vip_panel()
+    refresh_vip_panel()
     await get_tree().process_frame
     await set_loading_progress(88.0, "РЕФЕРАЛЫ И VIP ГОТОВЫ")
 
     await set_loading_status("СЕЗОНЫ И СУНДУКИ ГОТОВЫ...")
     seasons_panel = build_seasons_panel()
+    refresh_seasons_panel()
     await get_tree().process_frame
     chests_panel = build_chests_panel()
+    refresh_chests_panel()
     await get_tree().process_frame
     await set_loading_progress(89.0, "СЕЗОНЫ И СУНДУКИ ГОТОВЫ")
 
     await set_loading_status("МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ...")
     workshop_panel = build_workshop_panel()
+    refresh_workshop_panel()
     await get_tree().process_frame
     season_pass_panel = build_season_pass_panel()
+    refresh_season_pass_panel()
     await get_tree().process_frame
     await set_loading_progress(90.0, "МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ")
 
     await set_loading_status("ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ...")
     promo_panel = build_promo_panel()
+    refresh_promo_panel()
     await get_tree().process_frame
     news_panel = build_news_panel()
+    refresh_news_panel()
     await get_tree().process_frame
     await set_loading_progress(91.0, "ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ")
 
     await set_loading_status("РЕЙТИНГ И БОНУС ГОТОВЫ...")
     rating_panel = build_rating_panel()
+    refresh_rating_panel()
     await get_tree().process_frame
     return_bonus_panel = build_return_bonus_panel()
+    refresh_return_bonus_panel()
     await get_tree().process_frame
     await set_loading_progress(92.0, "РЕЙТИНГ И БОНУС ГОТОВЫ")
     # Старый объединённый центр больше не показывается: его функции разобраны по разделам.
@@ -4574,7 +4606,7 @@ func build_ui() -> void:
 func setup_android_scrolls() -> void:
     # Единая настройка прокрутки для всех длинных окон под Android.
     # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
-    # остаётся достаточно широкой для точного захвата.
+    # остаётся узкой, но удобной для захвата пальцем.
     var stack: Array[Node] = [self]
     while not stack.is_empty():
         var current: Node = stack.pop_back()
@@ -4587,30 +4619,17 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
     if scroll.has_meta("android_scroll_configured"):
         return
     scroll.set_meta("android_scroll_configured", true)
-    # Более узкая полоса освобождает место контенту, но сам бегунок остаётся
-    # достаточно заметным и удобным для пальца.
-    scroll.add_theme_constant_override("scroll_bar_width", 10)
-    scroll.add_theme_constant_override("scroll_bar_h_separation", 2)
     scroll.follow_focus = true
-    # Минимальная мёртвая зона делает начало свайпа более отзывчивым.
-    scroll.scroll_deadzone = 0
-    scroll.process_mode = Node.PROCESS_MODE_ALWAYS
-    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+    scroll.scroll_deadzone = 1
+    scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
     if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
         scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-        var vs := scroll.get_v_scroll_bar()
-        if vs:
-            vs.mouse_filter = Control.MOUSE_FILTER_PASS
-            vs.process_mode = Node.PROCESS_MODE_ALWAYS
     else:
-        # Горизонтальные категории листаются влево/вправо тем же самым
-        # коричневым бегунком, что и вертикальные окна.
+        # Горизонтальные категории листаются влево/вправо отдельно.
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-        var hs := scroll.get_h_scroll_bar()
-        if hs:
-            hs.mouse_filter = Control.MOUSE_FILTER_PASS
-            hs.process_mode = Node.PROCESS_MODE_ALWAYS
+    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -4773,12 +4792,25 @@ func _on_gameplay_modal_blocker_gui_input(event: InputEvent) -> void:
 # в момент НАЧАЛА касания и больше не ищем заново во время движения.
 # Поэтому палец может пройти поверх кнопок, текста, картинок и других пунктов
 # внутри окна — прокрутка не потеряется.
+var _ui_refresh_accum: float = 0.0
 var _free_scroll_touch_id: int = -1
 var _free_scroll_target: ScrollContainer = null
+var _free_scroll_axis: int = 0 # 1 = vertical, 2 = horizontal
+var _daily_ui_last_key: String = ""
+var _daily_ui_last_second: int = -1
+var _collection_ui_last_key: String = ""
+var _workshop_ui_last_key: String = ""
+var _seasons_ui_last_key: String = ""
+var _shop_ui_last_key: String = ""
+var _profile_ui_last_key: String = ""
+var _stats_ui_last_key: String = ""
+var _rating_ui_last_key: String = ""
+var _news_ui_built: bool = false
 
 func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
     # Ищем среди ВСЕХ видимых ScrollContainer, под которыми находится точка.
-    # Не зависим от того, какой дочерний Label/Button оказался сверху.
+    # Для горизонтальных списков (например, категории достижений) вертикальная
+    # прокрутка может быть отключена — поэтому учитываем оба направления.
     var best: ScrollContainer = null
     var best_area: float = INF
     var stack: Array[Node] = [node]
@@ -4786,12 +4818,12 @@ func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
         var current: Node = stack.pop_back()
         if current is ScrollContainer:
             var scroll := current as ScrollContainer
-            if scroll.visible and scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
+            var can_vertical := scroll.visible and scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED
+            var can_horizontal := scroll.visible and scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED
+            if can_vertical or can_horizontal:
                 if scroll.get_global_rect().has_point(point):
                     var size := scroll.size
                     var area := maxf(size.x * size.y, 1.0)
-                    # Из нескольких вложенных окон выбираем самое маленькое
-                    # подходящее — обычно это конкретное открытое окно.
                     if area < best_area:
                         best = scroll
                         best_area = area
@@ -4802,31 +4834,50 @@ func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
     return best
 
 func _handle_free_screen_scroll(event: InputEventScreenDrag) -> bool:
-    # Цель уже захвачена при первом касании. Неважно, куда палец
-    # переместился внутри окна и над каким Control он сейчас находится.
     if _free_scroll_target == null or not is_instance_valid(_free_scroll_target):
         return false
     var scroll := _free_scroll_target
-    var bar := scroll.get_v_scroll_bar()
-    var max_scroll := maxf(bar.max_value, 0.0)
-    if max_scroll <= 0.0:
+    var vs := scroll.get_v_scroll_bar()
+    var hs := scroll.get_h_scroll_bar()
+    var can_vertical := scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED and vs and vs.max_value > 0.0
+    var can_horizontal := scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED and hs and hs.max_value > 0.0
+    if not can_vertical and not can_horizontal:
         return false
-    # 1:1 со скоростью пальца, с защитой от выхода за границы.
-    scroll.scroll_vertical = clampf(scroll.scroll_vertical - event.relative.y, 0.0, max_scroll)
-    return true
+
+    # Выбираем направление по фактическому движению пальца. Для одностороннего
+    # списка направление фиксировано. Это не даёт горизонтальному списку
+    # "залипнуть" на вертикальной обработке.
+    if _free_scroll_axis == 0:
+        if can_horizontal and not can_vertical:
+            _free_scroll_axis = 2
+        elif can_vertical and not can_horizontal:
+            _free_scroll_axis = 1
+        elif absf(event.relative.x) > absf(event.relative.y):
+            _free_scroll_axis = 2
+        else:
+            _free_scroll_axis = 1
+
+    if _free_scroll_axis == 2 and can_horizontal:
+        scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(event.relative.x)), 0, int(hs.max_value))
+        return true
+    if _free_scroll_axis == 1 and can_vertical:
+        scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(event.relative.y)), 0, int(vs.max_value))
+        return true
+    return false
 
 func _input(event: InputEvent) -> void:
-    # Свободный скроллинг работает как настоящий свайп: сначала захватываем
-    # окно, затем листаем его до отпускания пальца. Кнопки и пункты внутри
-    # окна не мешают прокрутке.
+    # Свободный скроллинг работает как настоящий свайп: окно захватывается
+    # один раз при начале касания и не теряется при проходе над кнопками/Label.
     if event is InputEventScreenTouch:
         var touch := event as InputEventScreenTouch
         if touch.pressed:
             _free_scroll_touch_id = touch.index
             _free_scroll_target = _find_scroll_container_at(self, touch.position)
+            _free_scroll_axis = 0
         elif touch.index == _free_scroll_touch_id:
             _free_scroll_touch_id = -1
             _free_scroll_target = null
+            _free_scroll_axis = 0
         return
 
     if event is InputEventScreenDrag:
@@ -5230,49 +5281,58 @@ func build_daily_login_panel() -> void:
     v.add_child(hint)
 
 func update_daily_login_ui() -> void:
-    if not daily_claim_button: return
+    if not daily_claim_button:
+        return
     if daily_claim_available:
         daily_claim_button.modulate.a = 0.65 + 0.35 * (0.5 + 0.5 * sin(time_alive * 5.0))
     else:
         daily_claim_button.modulate.a = 0.65
 
-    if daily_login_panel and daily_login_panel.visible:
-        var detail := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginText") as Label
-        var current_day := mini(login_streak + (1 if daily_claim_available else 0), 7)
-        var reward := 20 + current_day * 5
-        if detail:
-            detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
-        var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
-        var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
-        if daily_timer:
-            daily_timer.visible = false
-            if not daily_claim_available:
-                daily_timer.text = "СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
-                daily_timer.visible = true
-        if daily_hint:
-            daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен —\nжди новый"
-            daily_hint.visible = daily_timer == null or not daily_timer.visible
+    if not daily_login_panel or not daily_login_panel.visible:
+        return
 
-        for i in range(daily_day_buttons.size()):
-            var day := i + 1
-            var btn := daily_day_buttons[i]
-            var claimed := day <= login_streak
-            var available := daily_claim_available and day == current_day
-            # Не блокируем кнопки через disabled: на некоторых Android-сборках
-            # отключённая кнопка визуально выглядит доступной, но не получает touch.
-            # Обработчик сам проверяет, можно ли забрать этот день.
-            btn.disabled = false
-            if claimed:
-                btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ\nПОЛУЧЕН" % day
-                btn.tooltip_text = "Приз за этот день уже получен"
-                style_button(btn, Color("#76583F"))
-            elif available:
-                btn.text = "🎁 ДЕНЬ %d\n+%d ₽\nЗАБРАТЬ" % [day, 20 + day * 5]
-                btn.tooltip_text = "Забрать приз за сегодняшний день"
-                style_button(btn, Color("#C09A70"))
-            else:
-                btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
-                style_button(btn, Color("#4A3022"))
+    # Не перестраиваем 7 кнопок и тексты каждый кадр. Обновление состояния
+    # выполняется только при изменении серии/доступности или раз в секунду для таймера.
+    var now_second := int(Time.get_unix_time_from_system())
+    var current_day := mini(login_streak + (1 if daily_claim_available else 0), 7)
+    var state_key := "%d|%d|%s" % [login_streak, int(daily_claim_available), str(current_day)]
+    if state_key == _daily_ui_last_key and now_second == _daily_ui_last_second:
+        return
+    _daily_ui_last_key = state_key
+    _daily_ui_last_second = now_second
+
+    var detail := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginText") as Label
+    var reward := 20 + current_day * 5
+    if detail:
+        detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
+    var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
+    var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
+    if daily_timer:
+        daily_timer.visible = false
+        if not daily_claim_available:
+            daily_timer.text = "СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
+            daily_timer.visible = true
+    if daily_hint:
+        daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен —\nжди новый"
+        daily_hint.visible = daily_timer == null or not daily_timer.visible
+
+    for i in range(daily_day_buttons.size()):
+        var day := i + 1
+        var btn := daily_day_buttons[i]
+        var claimed := day <= login_streak
+        var available := daily_claim_available and day == current_day
+        btn.disabled = false
+        if claimed:
+            btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ\nПОЛУЧЕН" % day
+            btn.tooltip_text = "Приз за этот день уже получен"
+            style_button(btn, Color("#76583F"))
+        elif available:
+            btn.text = "🎁 ДЕНЬ %d\n+%d ₽\nЗАБРАТЬ" % [day, 20 + day * 5]
+            btn.tooltip_text = "Забрать приз за сегодняшний день"
+            style_button(btn, Color("#C09A70"))
+        else:
+            btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
+            style_button(btn, Color("#4A3022"))
 
 func toggle_daily_login() -> void:
     if not daily_login_panel:
@@ -5991,6 +6051,10 @@ func show_shop_feedback(message: String, seconds: float = 2.4) -> void:
 
 func refresh_shop() -> void:
     if not shop_content: return
+    var shop_key := "%s|%d|%s|%s|%s|%s|%s" % [shop_category, coins, str(upgrade_levels), str(owned_claw_skins), str(owned_toy_skins), str(owned_machine_skins), str([selected_claw_skin, selected_toy_skin, selected_machine_skin])]
+    if shop_key == _shop_ui_last_key and shop_content.has_meta("shop_ui_built"):
+        return
+    _shop_ui_last_key = shop_key
     for child in shop_content.get_children(): child.queue_free()
     var wallet := shop_panel.get_node_or_null("VBoxContainer/ShopWallet")
     if wallet: wallet.text = "💰  БАЛАНС: %d ₽" % coins
@@ -6004,6 +6068,7 @@ func refresh_shop() -> void:
         "claw_skins": build_shop_claw_skins()
         "toy_skins": build_shop_toy_skins()
         "machine_skins": build_shop_machine_skins()
+    shop_content.set_meta("shop_ui_built", true)
 
 func shop_section(title: String, desc: String) -> void:
     var h := Label.new()
@@ -6293,7 +6358,7 @@ func build_seasons_panel() -> PanelContainer:
     style_scroll_container_brown(scroll)
     scroll.name = "SeasonsScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 10)
+    scroll.add_theme_constant_override("scroll_bar_width", 5)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -6392,6 +6457,10 @@ func refresh_seasons_panel() -> void:
         return
 
     var season := get_current_season()
+    var seasons_key := "%s|%s|%d" % [String(season.get("id", "")), Time.get_date_string_from_system(), holiday_calendar.size()]
+    if seasons_key == _seasons_ui_last_key and seasons_panel.has_meta("seasons_ui_built"):
+        return
+    _seasons_ui_last_key = seasons_key
     active_season_id = String(season.get("id", ""))
     var today_event := get_today_event()
     var profile := get_event_profile(today_event)
@@ -6475,8 +6544,7 @@ func refresh_seasons_panel() -> void:
             item.add_theme_font_size_override("font_size", 17)
             item.modulate = Color("#E0D4C6")
             upcoming_list.add_child(item)
-
-    save_game()
+    seasons_panel.set_meta("seasons_ui_built", true)
 
 func chest_rarity_for_win(rarity: String) -> String:
     var r := randf()
@@ -6640,7 +6708,7 @@ func build_chests_panel() -> PanelContainer:
     style_scroll_container_brown(scroll)
     scroll.name = "ChestScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 10)
+    scroll.add_theme_constant_override("scroll_bar_width", 5)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -6823,6 +6891,10 @@ func workshop_toggle_overclock() -> void:
 
 func refresh_workshop_panel() -> void:
     if not workshop_panel: return
+    var workshop_key := "%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%s|%d" % [workshop_parts, workshop_level, workshop_claw_power, workshop_speed, workshop_precision, workshop_luck, workshop_motor, workshop_servo, workshop_cable, workshop_damper, workshop_cooling, workshop_controller, workshop_calibration, workshop_overclock_games, str(workshop_blueprints), int(workshop_job_active)]
+    if workshop_key == _workshop_ui_last_key and workshop_panel.has_meta("workshop_ui_built"):
+        return
+    _workshop_ui_last_key = workshop_key
     var info := workshop_panel.get_node_or_null("ScrollContainer/VBoxContainer/WorkshopInfo") as Label
     if info:
         info.text = "Детали: %d   •   Уровень мастерской: %d   •   Всего уровней: %d\n🏭 %d/10  •  📚 %d/10  •  🔑 %d/10  •  🎁 %d/10\n⚙ Мотор %d/15  •  Сервопривод %d/15  •  Трос %d/15\n🛡 Демпфер %d/15  •  ❄ Охлаждение %d/15  •  🧠 Контроллер %d/15  •  🎯 Калибровка %d/5" % [workshop_parts, workshop_level, total_workshop_levels(), workshop_claw_power, workshop_speed, workshop_precision, workshop_luck, workshop_motor, workshop_servo, workshop_cable, workshop_damper, workshop_cooling, workshop_controller, workshop_calibration]
@@ -6935,6 +7007,7 @@ func refresh_workshop_panel() -> void:
     desc.add_theme_font_size_override("font_size", 14)
     desc.modulate = Color("#CDBBA7")
     list.add_child(desc)
+    workshop_panel.set_meta("workshop_ui_built", true)
 
 func workshop_module_effect_text(stat: String, level: int) -> String:
     var effects := {"claw_power":"+1.5% к шансу захвата за уровень", "speed":"+0.8% к скорости движения клешни", "precision":"+1.0% к шансу захвата и лучше учитывает наведение", "luck":"+0.6% к шансу успешного захвата", "motor":"+1.5% к скорости движения клешни", "servo":"ускоряет закрытие и открытие клешни", "cable":"+0.3% к стабильности захвата за уровень", "damper":"+0.3% к стабильности и меньше срывов", "cooling":"усиливает эффект оверклока", "controller":"+0.4% к шансу захвата и точности"}
@@ -7007,6 +7080,9 @@ func build_workshop_panel() -> PanelContainer:
     close.add_theme_font_size_override("font_size", 20)
     close.pressed.connect(close_gameplay_overlay)
     v.add_child(close)
+    # Строим тяжёлые строки один раз во время загрузки, чтобы первый вход
+    # в мастерскую не создавал десятки Control-узлов в одном кадре.
+    refresh_workshop_panel()
     return p
 
 func build_collection_panel() -> PanelContainer:
@@ -7136,6 +7212,7 @@ func build_achievements_panel() -> PanelContainer:
     category_scroll.custom_minimum_size = Vector2(0, 92)
     category_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     category_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+    style_scroll_container_brown(category_scroll)
     v.add_child(category_scroll)
 
     var categories := HBoxContainer.new()
@@ -7169,12 +7246,17 @@ func build_achievements_panel() -> PanelContainer:
     style_button(close, Color("#8A684C"))
     close.pressed.connect(func(): show_main_menu())
     v.add_child(close)
+    # Список достижений создаётся во время загрузки, а при открытии окна
+    # только обновляются тексты/видимость. Это убирает главный рывок Android.
+    refresh_achievements_panel()
     return p
 
 func refresh_achievements_panel() -> void:
-    if not achievements_panel: return
+    if not achievements_panel:
+        return
     var root := achievements_panel.get_child(0)
-    if not root: return
+    if not root:
+        return
     var v := root.get_child(0)
     var summary: Label = v.get_node("AchievementSummary")
     var list: VBoxContainer = v.get_node("AchievementList")
@@ -7184,34 +7266,58 @@ func refresh_achievements_panel() -> void:
         if achievement_matches_category(spec, selected_achievement_category):
             visible_count += 1
     summary.text = "ОТКРЫТО: %d / %d    •    ПОКАЗАНО: %d" % [done, achievement_specs.size(), visible_count]
+
+    var category_names := [
+        "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
+        "ПРОГРЕСС", "ЭКОНОМИКА", "КЛЕШНИ", "УЛУЧШЕНИЯ",
+        "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
+    ]
     for i in range(achievement_category_buttons.size()):
         var cb := achievement_category_buttons[i]
-        var cat: String = str([
-            "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
-            "ПРОГРЕСС", "ЭКОНОМИКА", "КЛЕШНИ", "УЛУЧШЕНИЯ",
-            "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
-        ][i])
+        var cat: String = String(category_names[i])
         if cat == selected_achievement_category:
             cb.add_theme_stylebox_override("normal", make_style(Color("#4A3022"), Color("#C19A70"), 18, 3))
         else:
             cb.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
-    for child in list.get_children(): child.queue_free()
+
+    # Первый вызов создаёт строки. Все последующие вызовы только обновляют
+    # существующие узлы — без queue_free/add_child и без массового GC-фриза.
+    if not achievements_panel.has_meta("achievement_rows_built"):
+        for spec in achievement_specs:
+            var row := PanelContainer.new()
+            row.set_meta("achievement_id", String(spec["id"]))
+            style_panel(row, Color("#3A271D"), Color("#76583F"), 18, 2)
+            row.custom_minimum_size = Vector2(0, 76)
+            var label := Label.new()
+            label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            label.add_theme_font_size_override("font_size", 18)
+            row.add_child(label)
+            list.add_child(row)
+        achievements_panel.set_meta("achievement_rows_built", true)
+
+    var spec_by_id: Dictionary = {}
     for spec in achievement_specs:
-        if not achievement_matches_category(spec, selected_achievement_category):
+        spec_by_id[String(spec.get("id", ""))] = spec
+    var rows := list.get_children()
+    for row_node in rows:
+        var row := row_node as PanelContainer
+        if not row:
             continue
-        var row := PanelContainer.new()
-        style_panel(row, Color("#3A271D"), Color("#76583F"), 18, 2)
-        row.custom_minimum_size = Vector2(0, 76)
-        var label := Label.new()
-        var unlocked := unlocked_achievements.has(String(spec["id"]))
-        var target := int(spec.get("value", 1))
-        var progress_value := target if unlocked else mini(achievement_value(spec), target)
-        label.text = ("✓  " if unlocked else "○  ") + String(spec["name"]) + "\n     " + String(spec["desc"]) + "\n     Прогресс: %d / %d\n     🎁 %s" % [progress_value, target, achievement_reward_text(spec)]
-        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        label.add_theme_font_size_override("font_size", 18)
+        var id := String(row.get_meta("achievement_id", ""))
+        var spec_match: Dictionary = spec_by_id.get(id, {})
+        var label := row.get_child(0) as Label
+        if spec_match.is_empty() or not label:
+            row.visible = false
+            continue
+        var visible := achievement_matches_category(spec_match, selected_achievement_category)
+        row.visible = visible
+        if not visible:
+            continue
+        var unlocked := unlocked_achievements.has(id)
+        var target := int(spec_match.get("value", 1))
+        var progress_value := target if unlocked else mini(achievement_value(spec_match), target)
+        label.text = ("✓  " if unlocked else "○  ") + String(spec_match["name"]) + "\n     " + String(spec_match["desc"]) + "\n     Прогресс: %d / %d\n     🎁 %s" % [progress_value, target, achievement_reward_text(spec_match)]
         label.modulate = Color("#E8D2B5") if unlocked else Color("#A58D76")
-        row.add_child(label)
-        list.add_child(row)
 
 func _on_achievement_category_pressed(category: String) -> void:
     selected_achievement_category = category
@@ -7624,6 +7730,10 @@ func copy_profile_value(value: String, title: String, button: Button = null) -> 
 
 func refresh_profile_panel() -> void:
     if not profile_panel: return
+    var profile_key := "%s|%d|%d|%d|%d|%d|%d|%d|%d|%d" % [player_name, player_avatar_index, coins, total_games, total_prizes_won, player_level, player_xp, unlocked_achievements.size(), completed_collections.size(), workshop_parts]
+    if profile_key == _profile_ui_last_key and profile_panel.has_meta("profile_ui_built"):
+        return
+    _profile_ui_last_key = profile_key
     var scroll := profile_panel.get_node_or_null("ProfileScroll") as ScrollContainer
     if not scroll: return
     var v := scroll.get_node_or_null("ProfileVBox") as VBoxContainer
@@ -7730,6 +7840,7 @@ func refresh_profile_panel() -> void:
         val.add_theme_font_size_override("font_size", 15)
         val.modulate = Color("#E7D8C6")
         row_box.add_child(val)
+    profile_panel.set_meta("profile_ui_built", true)
 
 func get_player_title() -> String:
     if total_prizes_won >= 500: return "ЛЕГЕНДА"
@@ -7774,6 +7885,10 @@ func build_stats_panel() -> PanelContainer:
 
 func refresh_stats_panel() -> void:
     if not stats_panel: return
+    var stats_key := "%d|%d|%d|%d|%d|%d|%d|%d" % [coins, total_games, total_prizes_won, player_level, player_xp, unlocked_achievements.size(), completed_collections.size(), workshop_parts]
+    if stats_key == _stats_ui_last_key and stats_panel.has_meta("stats_ui_built"):
+        return
+    _stats_ui_last_key = stats_key
     var list: VBoxContainer = stats_panel.get_node("ScrollContainer/VBoxContainer/StatsList") if stats_panel.has_node("ScrollContainer/VBoxContainer/StatsList") else null
     if not list: return
     for child in list.get_children(): child.queue_free()
@@ -7828,6 +7943,7 @@ func refresh_stats_panel() -> void:
             label.modulate = Color("#F0E1CE")
             row.add_child(label)
             list.add_child(row)
+    stats_panel.set_meta("stats_ui_built", true)
 
 func count_owned_claws() -> int:
     var seen: Dictionary = {}
@@ -8574,6 +8690,17 @@ func update_ui() -> void:
     if news_menu_button and is_instance_valid(news_menu_button):
         news_menu_button.text = "📰  НОВОСТИ"
 
+func _gameplay_simulation_active() -> bool:
+    # Когда открыто любое меню/полноэкранное окно, не тратим кадры на 3D-симуляцию
+    # автомата. Это не меняет содержимое окон, но резко снижает нагрузку на Android.
+    if not game_initialized:
+        return false
+    if not hud_layer or not hud_layer.visible:
+        return false
+    if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker) and gameplay_modal_blocker.visible:
+        return false
+    return true
+
 func _process(delta: float) -> void:
     time_alive += delta
     # Таймер не участвует в старте: после запуска проверяем его максимум раз в секунду.
@@ -8612,7 +8739,8 @@ func _process(delta: float) -> void:
         if _server_action("settings_update", {"settings":settings_payload}):
             server_settings_dirty = false
             server_settings_sync_timer = 30.0
-    update_connection_status_ui()
+    # Статус соединения не меняется каждый кадр: обновляем его только при
+    # изменении/проверке соединения, чтобы не перерисовывать Label 60 раз/с.
     remote_auth_retry_timer -= delta
     if _server_ready() and player_token == "" and remote_request_kind == "":
         if remote_auth_retry_timer <= 0.0:
@@ -8651,28 +8779,38 @@ func _process(delta: float) -> void:
                 loading_tip_index = next_tip
                 loading_tip.text = tips[loading_tip_index]
         return
+    var gameplay_simulation_active := _gameplay_simulation_active()
     if aim_marker and is_instance_valid(aim_marker):
-        aim_marker.position.x = claw_pos.x
-        aim_marker.position.z = claw_pos.z
-        aim_marker.position.y = 3.08
-        aim_marker.visible = hud_layer.visible and drop_state == 0
-        aim_marker.scale = Vector3.ONE * (1.0 + sin(time_alive * 3.0) * 0.05)
-    animate_camera(delta)
-    animate_machine_lights()
-    process_claw(delta)
+        if gameplay_simulation_active:
+            aim_marker.position.x = claw_pos.x
+            aim_marker.position.z = claw_pos.z
+            aim_marker.position.y = 3.08
+            aim_marker.visible = drop_state == 0
+            aim_marker.scale = Vector3.ONE * (1.0 + sin(time_alive * 3.0) * 0.05)
+        else:
+            aim_marker.visible = false
+    if gameplay_simulation_active:
+        animate_camera(delta)
+        animate_machine_lights()
+        process_claw(delta)
     if start_button and menu_layer.visible:
         start_button.modulate.a = 0.72 + 0.28 * (0.5 + 0.5 * sin(time_alive * 3.8))
+    # Игровая анимация остаётся покадровой, а тяжёлые обновления окон выполняются
+    # раз в секунду. Это заметно снижает нагрузку, когда открыто длинное окно.
     update_daily_login_ui()
     process_workshop_job()
-    update_return_bonus_state()
-    if season_pass_panel and season_pass_panel.visible:
-        refresh_season_pass_panel()
-    if promo_panel and promo_panel.visible:
-        refresh_promo_panel()
-    if rating_panel and rating_panel.visible:
-        refresh_rating_panel()
-    if return_bonus_panel and return_bonus_panel.visible:
-        refresh_return_bonus_panel()
+    _ui_refresh_accum += delta
+    if _ui_refresh_accum >= 1.0:
+        _ui_refresh_accum = 0.0
+        update_return_bonus_state()
+        if season_pass_panel and season_pass_panel.visible:
+            refresh_season_pass_panel()
+        if promo_panel and promo_panel.visible:
+            refresh_promo_panel()
+        if rating_panel and rating_panel.visible:
+            refresh_rating_panel()
+        if return_bonus_panel and return_bonus_panel.visible:
+            refresh_return_bonus_panel()
     if not android_touch_hint_shown and hud_layer and hud_layer.visible:
         android_touch_hint_shown = true
         if toast_label:
@@ -8681,7 +8819,7 @@ func _process(delta: float) -> void:
             get_tree().create_timer(3.0).timeout.connect(func():
                 if is_instance_valid(toast_label): toast_label.visible = false
             )
-    if event_button and hud_layer and hud_layer.visible:
+    if event_button and gameplay_simulation_active:
         if active_event_end_unix <= int(Time.get_unix_time_from_system()):
             activate_calendar_event()
             if prize_bodies.size() < TARGET_PRIZE_COUNT:
@@ -8691,7 +8829,7 @@ func _process(delta: float) -> void:
         if event_ui_update_timer <= 0.0:
             event_ui_update_timer = 0.5
             update_event_panel()
-    if hud_layer and hud_layer.visible and drop_state == 0:
+    if gameplay_simulation_active and drop_state == 0:
         waiting_idle_time += delta
         if waiting_idle_time > 8.0:
             show_waiting_screen()
@@ -8740,7 +8878,7 @@ func _process(delta: float) -> void:
         collection_completion_popup_timer -= delta
         if collection_completion_popup_timer <= 0.0 and collection_completion_popup and is_instance_valid(collection_completion_popup):
             collection_completion_popup.visible = false
-    if drop_state == 0 and hud_layer.visible:
+    if gameplay_simulation_active and drop_state == 0:
         # Движение не прыгает между точками: кнопка задаёт цель, а каретка
         # плавно догоняет её с инерцией. Клавиатура также работает плавно.
         var keyboard_speed := 2.6
