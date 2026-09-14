@@ -6676,6 +6676,22 @@ func build_collection_panel() -> PanelContainer:
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
+        var difficulty := Label.new()
+        var total_weight: float = 0.0
+        for toy in toys:
+            if String(toy["collection"]) == cname:
+                total_weight += float(toy.get("weight", 0.0))
+        var difficulty_text := "ОЧЕНЬ РЕДКАЯ"
+        if total_weight >= 100.0:
+            difficulty_text = "ЛЁГКАЯ"
+        elif total_weight >= 70.0:
+            difficulty_text = "СРЕДНЯЯ"
+        elif total_weight >= 30.0:
+            difficulty_text = "СЛОЖНАЯ"
+        difficulty.text = "Сложность: " + difficulty_text
+        difficulty.add_theme_font_size_override("font_size", 17)
+        difficulty.modulate = Color("#C7B4A0")
+        card.add_child(difficulty)
         var names := Label.new()
         var parts: Array[String] = []
         for toy in toys:
