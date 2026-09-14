@@ -36,12 +36,12 @@ const STEEL := Color("#34435B")
 
 # Единая палитра UI: тёплая бронза/медь/латунь вместо случайных цветных обводок.
 # Используется только для интерфейса; цвета игровых игрушек, скинов и 3D-материалов не трогаются.
-const UI_BROWN_DEEP := Color("#6E4B33")
-const UI_BROWN := Color("#8A684C")
-const UI_COPPER := Color("#9A7653")
-const UI_BRASS := Color("#B08A57")
-const UI_GOLD := Color("#C09A70")
-const UI_GOLD_LIGHT := Color("#E1C29A")
+const UI_BROWN_DEEP := Color("#5A3B29")
+const UI_BROWN := Color("#765238")
+const UI_COPPER := Color("#A96F43")
+const UI_BRASS := Color("#C18A4B")
+const UI_GOLD := Color("#D1A35A")
+const UI_GOLD_LIGHT := Color("#E6C786")
 const UI_TEXT := Color("#F1E5D6")
 const UI_TEXT_MUTED := Color("#B9A28D")
 
@@ -4048,10 +4048,58 @@ func build_particles() -> void:
     sparkle_particles = null
 
 func apply_global_brown_ui_theme() -> void:
-    # Единая коричневая тема для стандартных Godot-контролов.
-    # Не меняет игровую механику — только внешний вид системных меню/окон.
-    # Стандартные контролы оформляются точечно через helpers ниже,
-    # потому что главный скрипт является Node3D, а не Control.
+    # Глобальная тема применяется к КОРНЮ окна, чтобы стандартные Godot
+    # контролы, включая динамически создаваемые PopupMenu/OptionButton/
+    # CheckButton/ScrollBar/LineEdit, не откатывались к системному серому.
+    var theme := Theme.new()
+    var panel := make_style(Color("#241B16"), Color("#76583F"), 18, 2)
+    var panel_hover := make_style(Color("#3A2A20"), Color("#B98B5C"), 18, 2)
+    var panel_pressed := make_style(Color("#4A3022"), Color("#D1A35A"), 18, 3)
+    var panel_focus := make_style(Color("#30231B"), Color("#C09A70"), 18, 2)
+    # Все базовые интерактивные контролы используют одну тему. Разные акценты
+    # задаются локально через style_button(), а системные состояния остаются тёплыми.
+    for type_name in ["Button", "OptionButton", "CheckButton", "MenuButton"]:
+        theme.set_color("font_color", type_name, Color("#F1E5D6"))
+        theme.set_color("font_hover_color", type_name, Color("#FFF4E5"))
+        theme.set_color("font_pressed_color", type_name, Color("#FFFFFF"))
+        theme.set_color("font_focus_color", type_name, Color("#FFF4E5"))
+        theme.set_color("font_disabled_color", type_name, Color("#8F7B6B"))
+        theme.set_stylebox("normal", type_name, panel)
+        theme.set_stylebox("hover", type_name, panel_hover)
+        theme.set_stylebox("pressed", type_name, panel_pressed)
+        theme.set_stylebox("focus", type_name, panel_focus)
+    theme.set_stylebox("panel", "PopupMenu", make_style(Color("#241B16"), Color("#8A684C"), 12, 2))
+    theme.set_stylebox("hover", "PopupMenu", make_style(Color("#4A3022"), Color("#B98B5C"), 10, 2))
+    theme.set_color("font_color", "PopupMenu", Color("#F1E5D6"))
+    theme.set_color("font_hover_color", "PopupMenu", Color("#FFFFFF"))
+    theme.set_color("font_pressed_color", "PopupMenu", Color("#FFFFFF"))
+    theme.set_color("font_disabled_color", "PopupMenu", Color("#8F7B6B"))
+    theme.set_stylebox("normal", "LineEdit", make_style(Color("#17120F"), Color("#76583F"), 12, 2))
+    theme.set_stylebox("focus", "LineEdit", make_style(Color("#1F1712"), Color("#D1A35A"), 12, 2))
+    theme.set_color("font_color", "LineEdit", Color("#F1E5D6"))
+    theme.set_color("caret_color", "LineEdit", Color("#E6C786"))
+    theme.set_stylebox("slider", "HSlider", make_style(Color("#17120F"), Color("#6E4B33"), 8, 1))
+    theme.set_stylebox("grabber_area", "HSlider", make_style(Color("#5A3B29"), Color("#5A3B29"), 8, 1))
+    theme.set_stylebox("grabber_area_highlighted", "HSlider", make_style(Color("#8A684C"), Color("#D1A35A"), 8, 1))
+    theme.set_stylebox("scroll", "VScrollBar", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+    theme.set_stylebox("grabber", "VScrollBar", make_style(Color("#765238"), Color("#A96F43"), 6, 1))
+    theme.set_stylebox("grabber_highlighted", "VScrollBar", make_style(Color("#A96F43"), Color("#D1A35A"), 6, 1))
+    theme.set_stylebox("scroll", "HScrollBar", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+    theme.set_stylebox("grabber", "HScrollBar", make_style(Color("#765238"), Color("#A96F43"), 6, 1))
+    theme.set_stylebox("grabber_highlighted", "HScrollBar", make_style(Color("#A96F43"), Color("#D1A35A"), 6, 1))
+    theme.set_icon("unchecked", "CheckButton", load("res://assets/ui_toggle_off.svg"))
+    theme.set_icon("unchecked_disabled", "CheckButton", load("res://assets/ui_toggle_off.svg"))
+    theme.set_icon("checked", "CheckButton", load("res://assets/ui_toggle_on.svg"))
+    theme.set_icon("checked_disabled", "CheckButton", load("res://assets/ui_toggle_on.svg"))
+    for type_name in ["CheckBox"]:
+        theme.set_color("font_color", type_name, Color("#F1E5D6"))
+        theme.set_color("font_hover_color", type_name, Color("#FFF4E5"))
+        theme.set_color("font_pressed_color", type_name, Color("#FFFFFF"))
+        theme.set_color("font_focus_color", type_name, Color("#FFF4E5"))
+        theme.set_color("font_disabled_color", type_name, Color("#8F7B6B"))
+    if get_tree() and get_tree().root:
+        get_tree().root.theme = theme
+
 
 func style_option_button_brown(o: OptionButton) -> void:
     o.add_theme_color_override("font_color", Color("#F1E5D6"))
@@ -4071,7 +4119,7 @@ func style_option_button_brown(o: OptionButton) -> void:
         pop.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
         pop.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#76583F"), 14, 2))
         pop.add_theme_stylebox_override("hover", make_style(Color("#4A3022"), Color("#A3754D"), 10, 2))
-        pop.add_theme_stylebox_override("separator", make_style(Color("#6E4B33"), Color("#6E4B33"), 0, 1))
+        pop.add_theme_stylebox_override("separator", make_style(UI_BROWN_DEEP, UI_BROWN_DEEP, 0, 1))
         pop.add_theme_font_size_override("font_size", 19)
 
 func style_check_button_brown(c: CheckButton) -> void:
@@ -4096,7 +4144,7 @@ func style_check_button_brown(c: CheckButton) -> void:
 
 func style_slider_brown(slider: HSlider) -> void:
     slider.add_theme_stylebox_override("slider", make_style(Color("#17120F"), Color("#6E4B33"), 8, 1))
-    slider.add_theme_stylebox_override("grabber_area", make_style(Color("#6E4B33"), Color("#6E4B33"), 8, 1))
+    slider.add_theme_stylebox_override("grabber_area", make_style(UI_BROWN_DEEP, UI_BROWN_DEEP, 8, 1))
     slider.add_theme_stylebox_override("grabber_area_highlighted", make_style(Color("#8A684C"), Color("#8A684C"), 8, 1))
     slider.add_theme_icon_override("grabber", load("res://assets/ui_slider_grabber.svg"))
     slider.add_theme_icon_override("grabber_highlighted", load("res://assets/ui_slider_grabber_highlighted.svg"))
@@ -4106,47 +4154,88 @@ func style_scroll_container_brown(scroll: ScrollContainer) -> void:
     var hs := scroll.get_h_scroll_bar()
     if vs:
         vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-        vs.add_theme_stylebox_override("grabber", make_style(Color("#76583F"), Color("#A3754D"), 6, 1))
-        vs.add_theme_stylebox_override("grabber_highlighted", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+        vs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
+        vs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
     if hs:
         hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-        hs.add_theme_stylebox_override("grabber", make_style(Color("#76583F"), Color("#A3754D"), 6, 1))
-        hs.add_theme_stylebox_override("grabber_highlighted", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+        hs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
+        hs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
+
+func show_brown_modal(title_text: String, message_text: String, action: Callable, ok_text: String = "OK", cancel_text: String = "ОТМЕНА", large: bool = false) -> void:
+    # Не используем ConfirmationDialog/AcceptDialog: на Android их Window
+    # может получить системный серый фон. Это обычное игровое окно внутри
+    # menu_layer, поэтому оно всегда наследует нашу тему.
+    var overlay := ColorRect.new()
+    overlay.name = "BrownModalOverlay"
+    overlay.color = Color(0.03, 0.02, 0.015, 0.72)
+    overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+    overlay.z_index = 5000
+    menu_layer.add_child(overlay)
+
+    var center := CenterContainer.new()
+    center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+    overlay.add_child(center)
+
+    var panel := PanelContainer.new()
+    panel.custom_minimum_size = Vector2(620, 320 if large else 280)
+    style_panel(panel, Color("#241B16"), Color("#8A684C"), 18, 2)
+    center.add_child(panel)
+
+    var box := VBoxContainer.new()
+    box.add_theme_constant_override("separation", 14)
+    panel.add_child(box)
+
+    var title := Label.new()
+    title.text = title_text
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.add_theme_font_size_override("font_size", 24)
+    title.modulate = Color("#E1C29A")
+    box.add_child(title)
+
+    var message := Label.new()
+    message.text = message_text
+    message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    message.custom_minimum_size = Vector2(0, 100 if large else 80)
+    message.add_theme_font_size_override("font_size", 18)
+    message.modulate = Color("#F0E1CE")
+    box.add_child(message)
+
+    var buttons := HBoxContainer.new()
+    buttons.alignment = BoxContainer.ALIGNMENT_CENTER
+    buttons.add_theme_constant_override("separation", 12)
+    box.add_child(buttons)
+
+    var cancel := Button.new()
+    cancel.text = cancel_text
+    cancel.custom_minimum_size = Vector2(190, 58)
+    style_button(cancel, Color("#6E4B33"))
+    buttons.add_child(cancel)
+
+    var ok := Button.new()
+    ok.text = ok_text
+    ok.custom_minimum_size = Vector2(190, 58)
+    style_button(ok, Color("#A8754A"))
+    buttons.add_child(ok)
+
+    var close_modal := func() -> void:
+        if is_instance_valid(overlay):
+            overlay.queue_free()
+    cancel.pressed.connect(close_modal)
+    ok.pressed.connect(func():
+        close_modal.call()
+        if action.is_valid():
+            action.call()
+    )
 
 func style_standard_dialog(dialog: Window, large: bool = false) -> void:
-    # Убираем серое системное окно Godot и делаем обычную компактную панель
-    # в той же коричневой гамме, что и остальные окна игры.
+    # Оставлен только для совместимости со старыми вызовами. Новые модальные
+    # окна должны использовать show_brown_modal(), а не системный Window.
     dialog.borderless = true
     dialog.transparent_bg = true
-    dialog.min_size = Vector2(620, 300 if not large else 360)
-    var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
-    panel_style.content_margin_left = 28.0
-    panel_style.content_margin_right = 28.0
-    panel_style.content_margin_top = 24.0
-    panel_style.content_margin_bottom = 24.0
-    dialog.add_theme_stylebox_override("panel", panel_style)
     dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
-    dialog.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
-    dialog.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
-    dialog.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
-    dialog.add_theme_font_size_override("font_size", 21 if not large else 24)
-    var label := dialog.get_label()
-    if label:
-        label.add_theme_color_override("font_color", Color("#F1E5D6"))
-        label.add_theme_font_size_override("font_size", 21 if not large else 24)
-        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        label.custom_minimum_size = Vector2(520, 110 if not large else 150)
-    var ok := dialog.get_ok_button()
-    var cancel := dialog.get_cancel_button()
-    if ok:
-        style_button(ok, Color("#A8754A"))
-        ok.custom_minimum_size = Vector2(190, 58)
-        ok.add_theme_font_size_override("font_size", 18)
-    if cancel:
-        style_button(cancel, Color("#6E4B33"))
-        cancel.custom_minimum_size = Vector2(190, 58)
-        cancel.add_theme_font_size_override("font_size", 18)
 
 func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 2) -> StyleBoxFlat:
     var st := StyleBoxFlat.new()
@@ -4161,32 +4250,64 @@ func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 
     return st
 
 func ui_accent(source: Color) -> Color:
-    # Любой внешний accent из старых меню нормализуем в нашу коричневую UI-палитру.
-    # Так цветные скины/события не могут случайно перекрасить обводку интерфейса.
-    var v := (source.r * 0.2126) + (source.g * 0.7152) + (source.b * 0.0722)
-    if v < 0.28:
-        return UI_BROWN_DEEP
-    if v < 0.48:
+    # Основная UI-гамма остаётся коричневой, но акцент получает спокойный
+    # тематический оттенок. Насыщенность намеренно снижена, чтобы цвет не бил в глаза.
+    var h := source.h
+    var s := source.s
+    var v := source.v
+    if s < 0.12:
+        return UI_COPPER if v > 0.55 else UI_BROWN
+    # Тёплые акценты оставляем тёплыми; холодные переводим в приглушённые
+    # teal/olive/plum/blue-grey, сохраняя общий ретро-стиль интерфейса.
+    if h < 0.08 or h >= 0.95:
+        return Color("#B96B4A") # терракота
+    if h < 0.18:
+        return Color("#C18A4B") # латунь
+    if h < 0.30:
+        return Color("#B79A55") # оливковое золото
+    if h < 0.50:
+        return Color("#6F9A8A") # приглушённая патина
+    if h < 0.68:
+        return Color("#6F8799") # пыльный сине-серый
+    if h < 0.82:
+        return Color("#92758F") # приглушённая слива
+    return Color("#A8755A") # медь
+
+func semantic_ui_accent(b: Button, fallback: Color) -> Color:
+    # Если конкретной кнопке не задан цвет, выбираем мягкий акцент по её смыслу.
+    # Это даёт интерфейсу разные цвета, но не разрушает коричневую основу.
+    var t := (String(b.text) + " " + String(b.name)).to_lower()
+    if t.contains("сезон") or t.contains("event") or t.contains("событ"):
+        return Color("#92758F")
+    if t.contains("сундук") or t.contains("chest") or t.contains("награ") or t.contains("daily"):
+        return UI_GOLD
+    if t.contains("мастер") or t.contains("workshop") or t.contains("улучш"):
+        return Color("#6F9A8A")
+    if t.contains("профил") or t.contains("аватар") or t.contains("profile"):
+        return Color("#6F8799")
+    if t.contains("магаз") or t.contains("куп") or t.contains("shop") or t.contains("скин") or t.contains("claw"):
+        return Color("#B96B4A")
+    if t.contains("рейтинг") or t.contains("rating"):
+        return Color("#B79A55")
+    if t.contains("настрой") or t.contains("setting") or t.contains("язык"):
+        return Color("#A8755A")
+    if t.contains("назад") or t.contains("закры") or t.contains("отмен") or t.contains("close"):
         return UI_BROWN
-    if v < 0.68:
-        return UI_COPPER
-    if v < 0.84:
-        return UI_BRASS
-    return UI_GOLD
+    return ui_accent(fallback)
 
 func style_button(b: Button, accent: Color = UI_COPPER, large: bool = false) -> void:
     if not b.has_meta("ui_sfx_bound"):
         b.set_meta("ui_sfx_bound", true)
         b.pressed.connect(func(): play_ui_sound("button"))
-    var ring := ui_accent(accent)
+    var ring := semantic_ui_accent(b, accent)
     b.add_theme_color_override("font_color", UI_TEXT)
     b.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
     b.add_theme_color_override("font_pressed_color", Color.WHITE)
     b.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
     b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 18, 2))
-    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.16), 18, 3))
+    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.24), 18, 3))
     b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 18, 3))
-    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.08), 18, 2))
+    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.16), 18, 2))
     b.add_theme_font_size_override("font_size", 30 if large else 22)
 
 func style_panel(p: PanelContainer, bg: Color = Color("#1D1612"), border: Color = Color("#76583F"), radius: int = 26, border_width: int = 3) -> void:
@@ -4730,18 +4851,18 @@ func build_extra_hud() -> void:
     # ЛЕВАЯ ВЕРТИКАЛЬ: сезоны/праздники + сундуки + мастерская.
     # Эти кнопки находятся только на игровом экране и НЕ добавляются в главное меню.
     var season_icon := get_current_season_icon()
-    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), UI_COPPER)
+    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), UI_BRASS)
     seasons_btn.name = "SeasonsCircleButton"
     seasons_btn.pressed.connect(func(): open_panel("seasons"))
     hud_layer.add_child(seasons_btn)
 
     # Возвращаем сундуки и мастерскую на главный экран: это НЕ пункты меню.
-    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), UI_BRASS)
+    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), UI_GOLD)
     chests_btn.name = "ChestsCircleButton"
     chests_btn.pressed.connect(func(): open_panel("chests"))
     hud_layer.add_child(chests_btn)
 
-    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), UI_BROWN)
+    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), UI_COPPER)
     workshop_btn.name = "WorkshopCircleButton"
     workshop_btn.pressed.connect(func(): open_panel("workshop"))
     hud_layer.add_child(workshop_btn)
@@ -4750,7 +4871,7 @@ func build_extra_hud() -> void:
     daily_btn.text = "🎯"
     daily_btn.position = Vector2(948, 185)
     daily_btn.size = Vector2(82, 82)
-    style_button(daily_btn, Color("#9A7653"))
+    style_button(daily_btn, UI_GOLD)
     daily_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_BRASS, 41, 3))
     daily_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_GOLD, 41, 4))
     daily_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
@@ -4763,7 +4884,7 @@ func build_extra_hud() -> void:
     weekly_btn.text = "🏆"
     weekly_btn.position = Vector2(948, 280)
     weekly_btn.size = Vector2(82, 82)
-    style_button(weekly_btn, Color("#76583F"))
+    style_button(weekly_btn, UI_BRASS)
     weekly_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_BROWN, 41, 3))
     weekly_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_COPPER, 41, 4))
     weekly_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
@@ -4776,7 +4897,7 @@ func build_extra_hud() -> void:
     daily_claim_button.text = "🎁"
     daily_claim_button.position = Vector2(948, 375)
     daily_claim_button.size = Vector2(82, 82)
-    style_button(daily_claim_button, Color("#C09A70"))
+    style_button(daily_claim_button, UI_GOLD_LIGHT)
     daily_claim_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_GOLD, 41, 3))
     daily_claim_button.add_theme_font_size_override("font_size", 28)
     daily_claim_button.tooltip_text = "Ежедневная серия"
@@ -4788,7 +4909,7 @@ func build_extra_hud() -> void:
     event_button.text = "⚡"
     event_button.position = Vector2(948, 470)
     event_button.size = Vector2(82, 82)
-    style_button(event_button, Color("#8A684C"))
+    style_button(event_button, UI_COPPER)
     event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_COPPER, 41, 3))
     event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_GOLD, 41, 4))
     event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
@@ -5459,10 +5580,10 @@ func make_menu_circle_button(icon_text: String, tooltip_text: String, pos: Vecto
     b.add_theme_font_size_override("font_size", 30)
     # Важные круглые пункты получают разные, но близкие тёплые оттенки.
     var ring := ui_accent(accent)
-    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 39, 3))
-    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.16), 39, 4))
+    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 39, 4))
+    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.24), 39, 5))
     b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 39, 4))
-    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.08), 39, 3))
+    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.16), 39, 4))
     return b
 
 func make_menu_button(text_value: String, pos: Vector2, size_value: Vector2, accent: Color = CYAN, large: bool = false) -> Button:
@@ -5561,7 +5682,7 @@ func build_hud() -> void:
     xp_bar.custom_minimum_size = Vector2(118, 7)
     xp_bar.show_percentage = false
     xp_bar.add_theme_stylebox_override("background", make_style(Color("#120F0D"), Color("#4B392B"), 6, 1))
-    xp_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+    xp_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 6, 1))
     xp_bar.value = 0.0
     level_box.add_child(xp_bar)
 
@@ -6727,7 +6848,7 @@ func refresh_workshop_panel() -> void:
         module_bar.max_value = max_level
         module_bar.value = level
         module_bar.add_theme_stylebox_override("background", make_style(Color("#17120F"), Color("#4B392B"), 5, 1))
-        module_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 5, 1))
+        module_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 5, 1))
         text_box.add_child(module_bar)
 
         var upgrade := Button.new()
@@ -7240,7 +7361,7 @@ func build_profile_panel() -> PanelContainer:
     xp_bar.custom_minimum_size = Vector2(0, 9)
     xp_bar.show_percentage = false
     xp_bar.add_theme_stylebox_override("background", make_style(Color("#120F0D"), Color("#4B392B"), 6, 1))
-    xp_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+    xp_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 6, 1))
     xp_bar.max_value = maxi(1, xp_to_next)
     xp_bar.value = clampi(player_xp, 0, xp_to_next)
     identity_info.add_child(xp_bar)
@@ -8034,28 +8155,10 @@ func reset_settings_defaults() -> void:
         settings_panel.visible = true
 
 func confirm_reset_settings() -> void:
-    var dialog := ConfirmationDialog.new()
-    dialog.title = "Настройки по умолчанию"
-    dialog.dialog_text = "Вернуть звук, графику и управление к исходным значениям? Прогресс игры не будет затронут."
-    dialog.ok_button_text = "ВОССТАНОВИТЬ"
-    dialog.cancel_button_text = "ОТМЕНА"
-    style_standard_dialog(dialog)
-    menu_layer.add_child(dialog)
-    dialog.confirmed.connect(func(): reset_settings_defaults(); dialog.queue_free())
-    dialog.canceled.connect(func(): dialog.queue_free())
-    dialog.popup_centered()
+    show_brown_modal("Настройки по умолчанию", "Вернуть звук, графику и управление к исходным значениям? Прогресс игры не будет затронут.", Callable(self, "reset_settings_defaults"), "ВОССТАНОВИТЬ", "ОТМЕНА")
 
 func confirm_reset_progress() -> void:
-    var dialog := ConfirmationDialog.new()
-    dialog.title = "Сброс прогресса"
-    dialog.dialog_text = "Весь прогресс, покупки и коллекция будут удалены. Продолжить?"
-    dialog.ok_button_text = "СБРОСИТЬ"
-    dialog.cancel_button_text = "ОТМЕНА"
-    style_standard_dialog(dialog, true)
-    menu_layer.add_child(dialog)
-    dialog.confirmed.connect(func(): reset_progress(); dialog.queue_free())
-    dialog.canceled.connect(func(): dialog.queue_free())
-    dialog.popup_centered()
+    show_brown_modal("Сброс прогресса", "Весь прогресс, покупки и коллекция будут удалены. Продолжить?", Callable(self, "reset_progress"), "СБРОСИТЬ", "ОТМЕНА", true)
 
 func quality_name() -> String:
     var names := ["ПЛОХО", "НИЗКО", "СРЕДНЕ", "ВЫСОКО", "УЛЬТРА"]
@@ -8298,12 +8401,7 @@ func start_game() -> void:
         register_player_remote()
         return
     if online_maintenance:
-        var dialog := AcceptDialog.new()
-        dialog.title = "Технические работы"
-        dialog.dialog_text = online_announcement if online_announcement != "" else "Игра временно недоступна. Попробуйте позже."
-        style_standard_dialog(dialog)
-        menu_layer.add_child(dialog)
-        dialog.popup_centered()
+        show_brown_modal("Технические работы", online_announcement if online_announcement != "" else "Игра временно недоступна. Попробуйте позже.", Callable(), "ЗАКРЫТЬ", "")
         return
     close_all_panels()
     register_game_activity()
@@ -9787,22 +9885,7 @@ func rarity_reward(rarity: String) -> int:
     return 5
 
 func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ", chest_style: bool = false) -> void:
-    var dialog := ConfirmationDialog.new()
-    dialog.title = title_text
-    dialog.dialog_text = message_text
-    dialog.ok_button_text = ok_text
-    dialog.cancel_button_text = "ОТМЕНА"
-
-    style_standard_dialog(dialog, chest_style)
-    menu_layer.add_child(dialog)
-    dialog.confirmed.connect(action)
-    dialog.confirmed.connect(func(): dialog.queue_free())
-    dialog.canceled.connect(func(): dialog.queue_free())
-    dialog.close_requested.connect(func(): dialog.queue_free())
-    if chest_style:
-        dialog.popup_centered(Vector2(700, 390))
-    else:
-        dialog.popup_centered(Vector2(700, 320))
+    show_brown_modal(title_text, message_text, action, ok_text, "ОТМЕНА", chest_style)
 
 func buy_claw(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= claw_specs.size(): return
