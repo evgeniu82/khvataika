@@ -615,38 +615,9 @@ func get_collection_names() -> Array[String]:
     var result: Array[String] = []
     for toy in toys:
         var name := String(toy.get("collection", ""))
-        if name != "" and not result.has(name): result.append(name)
-    if not result.is_empty(): return result
-    return [
-        "ЛЕСНЫЕ ДРУЗЬЯ", "МИЛЫЕ МАЛЫШИ", "ДЖУНГЛИ", "ОКЕАН",
-        "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР",
-        "ДИНОЗАВРЫ", "СУПЕРГЕРОИ", "СЛАДКИЙ МИР", "ПИРАТЫ",
-        "РОБОТЫ", "ФАНТАСТИКА", "СПОРТ", "МИР МОНСТРОВ"
-    ]
-
-func add_progressive_achievements() -> void:
-    # Многоуровневые достижения: каждый следующий уровень требует больше предыдущего.
-    var tiers := [
-        {"kind":"toys","prefix":"toy_master","name":"ОХОТНИК","desc":"Достаньте %d игрушек.","values":[75,150,300,600,1200,2500,5000,10000]},
-        {"kind":"games","prefix":"game_master","name":"МАРАФОНЕЦ","desc":"Сыграйте %d раз.","values":[1000,2500,5000,10000,20000,40000,75000,150000]},
-        {"kind":"collections","prefix":"collection_master","name":"КОЛЛЕКЦИОНЕР","desc":"Завершите %d коллекций.","values":[10,12,14,16]},
-        {"kind":"level","prefix":"level_master","name":"УРОВЕНЬ","desc":"Достигните %d уровня.","values":[150,300,450,600,750,850,925,975]},
-        {"kind":"rarity","rarity":"РЕДКАЯ","prefix":"rare_master","name":"ОХОТНИК ЗА РЕДКИМИ","desc":"Получите %d редких игрушек.","values":[20,50,100,250,500,1000]},
-        {"kind":"rarity","rarity":"ЭПИЧЕСКАЯ","prefix":"epic_master","name":"ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР","desc":"Получите %d эпических игрушек.","values":[10,25,50,100,250,500]},
-        {"kind":"rarity","rarity":"ЛЕГЕНДАРНАЯ","prefix":"legend_master","name":"ЛЕГЕНДАРНЫЙ ОХОТНИК","desc":"Получите %d легендарных игрушек.","values":[2,5,10,25,50,100]},
-        {"kind":"upgrades","prefix":"upgrade_master","name":"ИНЖЕНЕР","desc":"Купите %d уровней улучшений.","values":[60,80,100,125,150,200]}
-    ]
-    for tier in tiers:
-        var values: Array = tier["values"]
-        for i in range(values.size()):
-            var value: int = int(values[i])
-            var id := "%s_%d" % [String(tier["prefix"]), i + 1]
-            if _achievement_exists(id):
-                continue
-            var spec: Dictionary = {"id":id,"name":"%s %d" % [String(tier["name"]), i + 1],"desc":String(tier["desc"]) % value,"kind":String(tier["kind"]),"value":value}
-            if tier.has("rarity"): spec["rarity"] = String(tier["rarity"])
-            achievement_specs.append(spec)
-
+        if name != "" and not result.has(name):
+            result.append(name)
+    return result
 
 func add_diverse_achievements() -> void:
     # Дополнительные достижения разных типов: серии, сундуки, мастерская,
@@ -729,6 +700,7 @@ func _ready() -> void:
         return
 
     if not STARTUP_CONTROL_TEST:
+        add_extended_collections()
         add_progressive_achievements()
         add_diverse_achievements()
         owned_claw_skins.resize(claw_skin_specs.size())
@@ -6579,46 +6551,6 @@ func build_workshop_panel() -> PanelContainer:
     v.add_child(close)
     return p
 
-func collection_total_weight(collection_name: String) -> float:
-    var total := 0.0
-    for toy in toys:
-        if String(toy.get("collection", "")) == collection_name:
-            total += maxf(0.001, float(toy.get("weight", 1.0)))
-    return total
-
-func collection_difficulty(collection_name: String) -> String:
-    var total := collection_total_weight(collection_name)
-    if total >= 100.0:
-        return "ЛЁГКАЯ"
-    if total >= 70.0:
-        return "СРЕДНЯЯ"
-    if total >= 30.0:
-        return "СЛОЖНАЯ"
-    return "ОЧЕНЬ РЕДКАЯ"
-
-func collection_reward(collection_name: String) -> Dictionary:
-    match collection_difficulty(collection_name):
-        "ЛЁГКАЯ":
-            return {"rubles":50, "keys":0, "parts":0}
-        "СРЕДНЯЯ":
-            return {"rubles":75, "keys":1, "parts":0}
-        "СЛОЖНАЯ":
-            return {"rubles":100, "keys":1, "parts":5}
-        "ОЧЕНЬ РЕДКАЯ":
-            return {"rubles":250, "keys":2, "parts":10}
-    return {"rubles":50, "keys":0, "parts":0}
-
-func collection_reward_text(collection_name: String) -> String:
-    var r := collection_reward(collection_name)
-    var items: Array[String] = []
-    var rubles := int(r.get("rubles", 0))
-    var keys := int(r.get("keys", 0))
-    var parts := int(r.get("parts", 0))
-    if rubles > 0: items.append("%d ₽" % rubles)
-    if keys > 0: items.append("%d ключ%s" % [keys, "" if keys == 1 else "а"])
-    if parts > 0: items.append("%d деталей" % parts)
-    return " + ".join(items)
-
 func build_collection_panel() -> PanelContainer:
     var p := PanelContainer.new()
     p.position = Vector2(35, 150)
@@ -6630,58 +6562,52 @@ func build_collection_panel() -> PanelContainer:
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 12)
+    v.add_theme_constant_override("separation", 8)
     v.custom_minimum_size = Vector2(940, 0)
     scroll.add_child(v)
     var h := Label.new()
     h.text = "КОЛЛЕКЦИИ"
     h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    h.add_theme_font_size_override("font_size", 40)
+    h.add_theme_font_size_override("font_size", 34)
     v.add_child(h)
     var progress := Label.new()
-    var complete_count: int = completed_collections.size()
-    var collection_names: Array[String] = get_collection_names()
-    progress.text = "КОЛЛЕКЦИИ: %d / %d    •    УРОВЕНЬ %d" % [complete_count, collection_names.size(), player_level]
+    var names_list: Array[String] = get_collection_names()
+    progress.text = "СОБРАНО: %d / %d" % [completed_collections.size(), names_list.size()]
     progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    progress.add_theme_font_size_override("font_size", 21)
+    progress.add_theme_font_size_override("font_size", 20)
     progress.modulate = GOLD
     v.add_child(progress)
-    for cname in collection_names:
-        var needed: int = 0
-        var got: int = 0
+    for cname in names_list:
+        var needed := 0
+        var got := 0
+        var toy_names: Array[String] = []
         for toy in toys:
-            if String(toy["collection"]) == cname:
-                needed += 1
-                if collection.has(String(toy["name"])): got += 1
-        var card := VBoxContainer.new()
-        card.add_theme_constant_override("separation", 3)
+            if String(toy.get("collection", "")) != cname:
+                continue
+            needed += 1
+            var toy_name := String(toy.get("name", ""))
+            if collection.has(toy_name): got += 1
+            toy_names.append(("✓ " if collection.has(toy_name) else "○ ") + toy_name)
         var title := Label.new()
-        var done: bool = completed_collections.has(cname)
-        title.text = ("🏆 " if done else "▣ ") + cname + "   •   %d / %d" % [got, needed]
-        title.add_theme_font_size_override("font_size", 25)
+        title.text = ("🏆 " if completed_collections.has(cname) else "▣ ") + cname + "   %d/%d" % [got, needed]
+        title.add_theme_font_size_override("font_size", 23)
         title.modulate = Color("#E1C29A")
-        card.add_child(title)
-        var reward_line := Label.new()
-        reward_line.text = "Сложность: %s   •   Приз за полную коллекцию: %s" % [collection_difficulty(cname), collection_reward_text(cname)]
-        reward_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        reward_line.add_theme_font_size_override("font_size", 15)
-        reward_line.modulate = GOLD
-        card.add_child(reward_line)
+        v.add_child(title)
         var names := Label.new()
-        var parts: Array[String] = []
-        for toy in toys:
-            if String(toy["collection"]) == cname:
-                var mark: String = "✓" if collection.has(String(toy["name"])) else "○"
-                parts.append(mark + " " + String(toy["name"]) + " • " + String(toy.get("rarity", "ОБЫЧНАЯ")))
-        names.text = "   •   ".join(parts)
+        names.text = "   •   ".join(toy_names)
         names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        names.add_theme_font_size_override("font_size", 18)
+        names.add_theme_font_size_override("font_size", 17)
         names.modulate = Color("#F0E7DC") if got == needed else Color("#9B8D80")
-        card.add_child(names)
-        v.add_child(card)
+        v.add_child(names)
+        var reward := Label.new()
+        var reward_rub := 50 if needed >= 4 and needed <= 4 else 100
+        reward.text = "Приз: %d ₽ за полную коллекцию" % reward_rub
+        reward.add_theme_font_size_override("font_size", 16)
+        reward.modulate = Color("#C9A96E")
+        v.add_child(reward)
     var close := Button.new()
     close.text = "НАЗАД К АВТОМАТУ"
-    close.custom_minimum_size = Vector2(0, 82)
+    close.custom_minimum_size = Vector2(0, 72)
     close.pressed.connect(func(): show_main_menu())
     v.add_child(close)
     return p
@@ -8765,6 +8691,7 @@ func finalize_delivered_prize() -> void:
     last_prize_collection = String(d.get("collection", ""))
     last_prize_rarity = String(d.get("rarity", ""))
     var previous_count: int = 0
+    var collection_completed_now := false
     if kind == "capsule":
         last_reward_rubles = randi_range(int(d.get("reward_min", 3)), int(d.get("reward_max", 12)))
         last_reward_rubles = maxi(last_reward_rubles, int(round(last_reward_rubles * active_event_reward_mult)))
@@ -8799,7 +8726,7 @@ func finalize_delivered_prize() -> void:
             if last_prize_xp > best_result_xp:
                 best_result_xp = last_prize_xp
                 best_result = "%s • +%d XP" % [last_prize_name, last_prize_xp]
-        var collection_completed_now := check_collection_completion(last_prize_collection)
+        collection_completed_now = check_collection_completion(last_prize_collection)
         current_result = "🎉 ДОСТАЛ: %s • %s" % [last_prize_name, last_prize_rarity]
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
@@ -8818,10 +8745,14 @@ func finalize_delivered_prize() -> void:
     if kind == "toy":
         last_reward_rubles = maxi(0, coins - coins_before_prize)
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
-        if collection_completed_now:
-            show_collection_completion_popup(last_prize_collection)
-        else:
-            show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
+        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
+        if collection_completed_now and result_popup:
+            if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
+            popup_name_label.text = last_prize_collection
+            popup_info_label.text = "Все игрушки коллекции собраны"
+            popup_xp_label.text = current_result
+            if popup_rating_label: popup_rating_label.text = "Награда уже зачислена"
+            popup_timer = 4.0
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8957,29 +8888,24 @@ func award_toy_xp(rarity: String) -> int:
     return gained
 
 func check_collection_completion(collection_name: String) -> bool:
-    if collection_name == "" or completed_collections.has(collection_name):
+    if completed_collections.has(collection_name):
         return false
-    var needed: int = 0
-    var got: int = 0
+    var needed := 0
+    var got := 0
     for toy in toys:
-        if String(toy["collection"]) == collection_name:
+        if String(toy.get("collection", "")) == collection_name:
             needed += 1
-            if collection.has(String(toy["name"])):
+            if collection.has(String(toy.get("name", ""))):
                 got += 1
-    if needed <= 0 or got < needed:
-        return false
-    completed_collections[collection_name] = true
-    var reward := collection_reward(collection_name)
-    var rubles := int(reward.get("rubles", 0))
-    var keys := int(reward.get("keys", 0))
-    var parts := int(reward.get("parts", 0))
-    coins += rubles
-    chest_keys += keys
-    total_keys_earned += keys
-    workshop_parts += parts
-    current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • %s" % [collection_name, collection_reward_text(collection_name)]
-    check_achievements()
-    return true
+    if needed > 0 and got >= needed:
+        completed_collections[collection_name] = true
+        # Простая награда без новых окон и тяжёлых систем.
+        var reward := 50 if needed <= 4 else 100
+        coins += reward
+        current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
+        check_achievements()
+        return true
+    return false
 
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
@@ -9105,29 +9031,6 @@ func check_achievements() -> void:
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         if pending_prize_data.is_empty():
             show_achievement_popup()
-
-func show_collection_completion_popup(collection_name: String) -> void:
-    if not result_popup: return
-    if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
-    popup_name_label.text = collection_name
-    var toy_lines: Array[String] = []
-    for toy in toys:
-        if String(toy.get("collection", "")) == collection_name:
-            toy_lines.append("• %s — %s" % [String(toy.get("name", "Игрушка")), String(toy.get("rarity", "ОБЫЧНАЯ"))])
-    popup_info_label.text = "\n".join(toy_lines)
-    popup_info_label.add_theme_font_size_override("font_size", 15)
-    popup_xp_label.text = "🎁 ПРИЗ ЗА СБОР: %s" % collection_reward_text(collection_name)
-    popup_xp_label.add_theme_font_size_override("font_size", 27)
-    if popup_rating_label:
-        popup_rating_label.text = "Сложность: %s • Приз уже зачислен" % collection_difficulty(collection_name)
-        popup_rating_label.add_theme_font_size_override("font_size", 18)
-    if popup_achievement_label:
-        popup_achievement_label.text = "Коллекция полностью собрана! Все указанные игрушки входят в неё."
-        popup_achievement_label.add_theme_font_size_override("font_size", 15)
-    popup_timer = 5.0
-    result_popup.visible = true
-    pending_new_achievements.clear()
-    pending_achievement_rewards_text.clear()
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
