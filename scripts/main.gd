@@ -4828,7 +4828,7 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Положение такое же, как у «Миссия дня» и «Недельное задание».
     # Размер окна не меняем.
-    daily_login_panel.position = Vector2(630, 170)
+    daily_login_panel.position = Vector2(610, 170)
     daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.custom_minimum_size = Vector2(300, 165)
     daily_login_panel.visible = false
@@ -4961,7 +4961,7 @@ func toggle_daily_login() -> void:
         gameplay_modal_blocker.visible = true
     # Открываем тем же способом, что и остальные информационные окна.
     # Позиция и размер окна не меняются во время открытия.
-    daily_login_panel.position = Vector2(630, 170)
+    daily_login_panel.position = Vector2(610, 170)
     update_daily_login_ui()
     animate_panel_in(daily_login_panel)
     update_android_navigation()
