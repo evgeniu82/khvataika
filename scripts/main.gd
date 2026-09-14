@@ -39,6 +39,7 @@ var highest_balance_rubles: int = 120
 var selected_claw: int = 0
 var music_player: AudioStreamPlayer
 var owned_claws: Array[bool] = [true, false, false, false, false, false, false, false, false, false]
+var owned_claw_ids: Array[String] = ["claw_1"]
 var music_on: bool = true
 var sfx_on: bool = true
 var collection: Dictionary = {}
@@ -1326,7 +1327,7 @@ func get_server_game_state() -> Dictionary:
         "daily_mission_completed_at": daily_mission_completed_at, "weekly_mission_completed_at": weekly_mission_completed_at,
         "daily_series_claimed_at": daily_series_claimed_at,
         "season_pass_xp": season_pass_xp, "season_pass_level": season_pass_level, "active_season_id": active_season_id,
-        "owned_claws": owned_claws, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
+        "owned_claws": owned_claws, "owned_claw_ids": owned_claw_ids, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
         "owned_machine_skins": owned_machine_skins, "selected_claw_skin": selected_claw_skin,
         "selected_toy_skin": selected_toy_skin, "selected_machine_skin": selected_machine_skin,
         "vip_owned": vip_owned, "vip_selected": vip_selected, "collection": collection,
@@ -7543,10 +7544,13 @@ func refresh_stats_panel() -> void:
             list.add_child(row)
 
 func count_owned_claws() -> int:
-    var count := 0
-    for owned in owned_claws:
-        if owned: count += 1
-    return count
+    var seen: Dictionary = {}
+    for i in range(mini(owned_claws.size(), claw_specs.size())):
+        if owned_claws[i]: seen[i] = true
+    for raw_id in owned_claw_ids:
+        var idx := int(String(raw_id).trim_prefix("claw_")) - 1
+        if idx >= 0 and idx < claw_specs.size(): seen[idx] = true
+    return seen.size()
 
 func total_upgrade_levels() -> int:
     var count := 0
@@ -9216,47 +9220,70 @@ func hide_collection_completion_popup() -> void:
     if collection_completion_popup and is_instance_valid(collection_completion_popup):
         collection_completion_popup.visible = false
 
+func _canonical_claw_id(raw_id: Variant) -> String:
+    var sid := String(raw_id).strip_edges()
+    if sid.begins_with("claw_") and not sid.begins_with("claw_skin_"):
+        var idx := int(sid.trim_prefix("claw_")) - 1
+        if idx >= 0 and idx < claw_specs.size():
+            return "claw_%d" % (idx + 1)
+    return ""
+
 func recover_claw_ownership_from_saved_sources(data: Dictionary) -> bool:
-    # В старых версиях владение клешнями могло находиться не только в
-    # owned_claws, но и в серверном/магазинном списке owned_items. Никогда
-    # не заменяем уже известное владение на более короткий список — только
-    # объединяем все подтверждённые источники.
+    # Единый неизменяемый журнал владения клешнями. Объединяем ВСЕ
+    # подтверждённые источники и никогда не уменьшаем уже известное владение.
     var changed := false
-    if data.has("owned_items") and data["owned_items"] is Array:
-        for raw_id in data["owned_items"]:
-            var sid := String(raw_id)
-            if sid.begins_with("claw_") and not sid.begins_with("claw_skin_"):
-                var n := int(sid.trim_prefix("claw_"))
-                var idx := n - 1
-                if idx >= 0 and idx < owned_claws.size() and not owned_claws[idx]:
-                    owned_claws[idx] = true
-                    changed = true
-    # Некоторые старые snapshots использовали словарь покупок.
-    for field in ["purchases", "purchase_history", "shop_purchases"]:
+    var ids: Array[String] = []
+    for raw_id in owned_claw_ids:
+        var cid := _canonical_claw_id(raw_id)
+        if cid != "" and not ids.has(cid): ids.append(cid)
+
+    for i in range(mini(owned_claws.size(), claw_specs.size())):
+        if owned_claws[i]:
+            var cid := "claw_%d" % (i + 1)
+            if not ids.has(cid): ids.append(cid)
+
+    # Flat legacy/server sources.
+    for field in ["owned_items", "purchases", "purchase_history", "shop_purchases", "owned_claw_ids"]:
         var raw: Variant = data.get(field, null)
         if raw is Array:
             for entry in raw:
-                var sid := ""
-                if entry is String:
-                    sid = String(entry)
-                elif entry is Dictionary:
-                    sid = String(entry.get("item_id", entry.get("id", "")))
-                if sid.begins_with("claw_") and not sid.begins_with("claw_skin_"):
-                    var idx := int(sid.trim_prefix("claw_")) - 1
-                    if idx >= 0 and idx < owned_claws.size() and not owned_claws[idx]:
-                        owned_claws[idx] = true
-                        changed = true
+                var value: Variant = entry.get("item_id", entry.get("id", "")) if entry is Dictionary else entry
+                var cid := _canonical_claw_id(value)
+                if cid != "" and not ids.has(cid): ids.append(cid)
         elif raw is Dictionary:
             for key in raw.keys():
-                var sid := String(key)
-                var val: Variant = raw[key]
-                if sid.begins_with("claw_") and not sid.begins_with("claw_skin_") and bool(val):
-                    var idx := int(sid.trim_prefix("claw_")) - 1
-                    if idx >= 0 and idx < owned_claws.size() and not owned_claws[idx]:
-                        owned_claws[idx] = true
-                        changed = true
-    if not owned_claws.is_empty() and not owned_claws[0]:
-        owned_claws[0] = true
+                if bool(raw[key]):
+                    var cid := _canonical_claw_id(key)
+                    if cid != "" and not ids.has(cid): ids.append(cid)
+
+    # Some snapshots nest ownership inside inventory.
+    var inv: Variant = data.get("inventory", null)
+    if inv is Dictionary:
+        for field in ["owned_items", "owned_claws", "claw_ids"]:
+            var raw_inv: Variant = inv.get(field, null)
+            if raw_inv is Array:
+                for entry in raw_inv:
+                    var value: Variant = entry.get("item_id", entry.get("id", "")) if entry is Dictionary else entry
+                    var cid := _canonical_claw_id(value)
+                    if cid != "" and not ids.has(cid): ids.append(cid)
+            elif raw_inv is Dictionary:
+                for key in raw_inv.keys():
+                    if bool(raw_inv[key]):
+                        var cid := _canonical_claw_id(key)
+                        if cid != "" and not ids.has(cid): ids.append(cid)
+
+    if not ids.has("claw_1"): ids.push_front("claw_1")
+    var normalized: Array[bool] = []
+    normalized.resize(claw_specs.size())
+    for i in range(normalized.size()): normalized[i] = false
+    for sid in ids:
+        var idx := int(String(sid).trim_prefix("claw_")) - 1
+        if idx >= 0 and idx < normalized.size(): normalized[idx] = true
+    if owned_claws != normalized:
+        owned_claws = normalized
+        changed = true
+    if owned_claw_ids != ids:
+        owned_claw_ids = ids
         changed = true
     return changed
 
@@ -9323,10 +9350,14 @@ func audit_achievement_source_state() -> void:
     # важно для старых сохранений, где массивы были короче актуального списка.
     owned_claws = migrate_bool_array(owned_claws, claw_specs.size(), owned_claws)
     owned_claws[0] = true
+    recover_claw_ownership_from_saved_sources({"owned_claws": owned_claws, "owned_claw_ids": owned_claw_ids})
     # Выбранная клешня/скин не может быть "не открыта": сам факт выбора из
     # сохранённого состояния подтверждает владение.
     if selected_claw >= 0 and selected_claw < owned_claws.size():
         owned_claws[selected_claw] = true
+        var selected_id := "claw_%d" % (selected_claw + 1)
+        if not owned_claw_ids.has(selected_id):
+            owned_claw_ids.append(selected_id)
     owned_claw_skins = migrate_bool_array(owned_claw_skins, claw_skin_specs.size(), owned_claw_skins)
     owned_toy_skins = migrate_bool_array(owned_toy_skins, toy_skin_specs.size(), owned_toy_skins)
     owned_machine_skins = migrate_bool_array(owned_machine_skins, machine_skin_specs.size(), owned_machine_skins)
@@ -9354,8 +9385,15 @@ func achievement_value(spec: Dictionary) -> int:
         "level": current = player_level
         "rubles": current = maxi(coins, highest_balance_rubles)
         "claws":
+            var seen_claws: Dictionary = {}
             for owned in owned_claws:
                 if owned: current += 1
+            for sid in owned_claw_ids:
+                var cidx := int(String(sid).trim_prefix("claw_")) - 1
+                if cidx >= 0 and cidx < claw_specs.size() and not seen_claws.has(cidx):
+                    seen_claws[cidx] = true
+            # Ledger is authoritative for historical ownership.
+            current = maxi(current, seen_claws.size())
         "upgrades":
             for lvl in upgrade_levels: current += lvl
         "best_streak": current = best_win_streak
@@ -9598,10 +9636,16 @@ func buy_claw(index: int, skip_confirmation: bool = false) -> void:
         return
     if owned_claws[index]:
         selected_claw = index
+        if not owned_claw_ids.has("claw_%d" % (index + 1)):
+            owned_claw_ids.append("claw_%d" % (index + 1))
         current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
+        check_achievements()
+        save_game()
     elif coins >= int(claw_specs[index]["price"]):
         coins -= int(claw_specs[index]["price"])
         owned_claws[index] = true
+        if not owned_claw_ids.has("claw_%d" % (index + 1)):
+            owned_claw_ids.append("claw_%d" % (index + 1))
         selected_claw = index
         current_result = "КУПЛЕНА: %s" % String(claw_specs[index]["name"])
         check_achievements()
@@ -9720,6 +9764,7 @@ func reset_progress() -> void:
     coins = 120
     selected_claw = 0
     owned_claws = [true, false, false, false, false, false, false, false, false, false]
+    owned_claw_ids = ["claw_1"]
     collection.clear()
     toy_inventory_counts.clear()
     completed_collections.clear()
@@ -10231,6 +10276,11 @@ func load_save() -> void:
     # первые 3/4/6 предметов. Раньше такие массивы полностью игнорировались,
     # из-за чего уже купленные клешни/скины возвращались в состояние "не куплено".
     owned_claws = migrate_bool_array(data.get("owned_claws", owned_claws), claw_specs.size(), owned_claws)
+    var saved_claw_ids: Variant = data.get("owned_claw_ids", owned_claw_ids)
+    if saved_claw_ids is Array:
+        owned_claw_ids = []
+        for raw_id in saved_claw_ids:
+            owned_claw_ids.append(String(raw_id))
     recover_claw_ownership_from_saved_sources(data)
     owned_claws[0] = true
     var saved_claw_skins: Variant = data.get("owned_claw_skins", owned_claw_skins)
