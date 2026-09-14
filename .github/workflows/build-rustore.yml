@@ -120,12 +120,12 @@ jobs:
           set -euo pipefail
           test -f project.godot
           test -f VERSION.txt
-          test "$(tr -d '[:space:]' < VERSION.txt)" = "1.14.1"
+          test "$(tr -d '[:space:]' < VERSION.txt)" = "2.0.0"
           test -f export_presets.cfg
           grep -q 'name="Android RuStore AAB"' export_presets.cfg
-          grep -q 'config/version="1.14.1"' project.godot
-          grep -q 'version/name="1.14.1"' export_presets.cfg
-          grep -q 'export_path="build/rustore/khvataika-1.14.1.aab"' export_presets.cfg
+          grep -q 'config/version="2.0.0"' project.godot
+          grep -q 'version/name="2.0.0"' export_presets.cfg
+          grep -q 'export_path="build/rustore/khvataika-2.0.0.aab"' export_presets.cfg
           grep -q 'textures/vram_compression/import_etc2_astc=true' project.godot
           test -f audio/claw_move.wav
           test -s audio/claw_move.wav
@@ -156,16 +156,16 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/rustore
-          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-1.14.1.aab
-          test -s build/rustore/khvataika-1.14.1.aab
-          file build/rustore/khvataika-1.14.1.aab
+          "$HOME/godot/godot" --headless --path . --export-release "Android RuStore AAB" build/rustore/khvataika-2.0.0.aab
+          test -s build/rustore/khvataika-2.0.0.aab
+          file build/rustore/khvataika-2.0.0.aab
           echo "AAB export completed"
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
         with:
-          name: khvataika-1.14.1-rustore-aab
-          path: build/rustore/khvataika-1.14.1.aab
+          name: khvataika-2.0.0-rustore-aab
+          path: build/rustore/khvataika-2.0.0.aab
           if-no-files-found: error
           retention-days: 14
 
@@ -179,22 +179,22 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p build/rustore
-          rm -f build/rustore/khvataika-1.14.1.apk
+          rm -f build/rustore/khvataika-2.0.0.apk
           echo "Exporting final signed APK..."
           "$HOME/godot/godot" \
             --headless \
             --path . \
             --export-release \
             "Android" \
-            "build/rustore/khvataika-1.14.1.apk"
-          test -s build/rustore/khvataika-1.14.1.apk
-          file build/rustore/khvataika-1.14.1.apk
+            "build/rustore/khvataika-2.0.0.apk"
+          test -s build/rustore/khvataika-2.0.0.apk
+          file build/rustore/khvataika-2.0.0.apk
           echo "APK export completed"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: khvataika-1.14.1-apk
-          path: build/rustore/khvataika-1.14.1.apk
+          name: khvataika-2.0.0-apk
+          path: build/rustore/khvataika-2.0.0.apk
           if-no-files-found: error
           retention-days: 14
