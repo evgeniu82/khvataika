@@ -555,7 +555,7 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"collections_1","name":"СОБРАНО!","desc":"Завершите 1 коллекцию.","kind":"collections","value":1},
     {"id":"collections_2","name":"ДВА НАБОРА","desc":"Завершите 2 коллекции.","kind":"collections","value":2},
     {"id":"collections_4","name":"ПОЛОВИНА ПУТИ","desc":"Завершите 4 коллекции.","kind":"collections","value":4},
-    {"id":"collections_8","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 8 коллекций.","kind":"collections","value":8},
+    {"id":"collections_8","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":8},
     {"id":"level_5","name":"НОВИЧОК","desc":"Достигните 5 уровня.","kind":"level","value":5},
     {"id":"level_10","name":"УВЕРЕННЫЙ ИГРОК","desc":"Достигните 10 уровня.","kind":"level","value":10},
     {"id":"level_25","name":"ПРОДВИНУТЫЙ","desc":"Достигните 25 уровня.","kind":"level","value":25},
@@ -6656,7 +6656,7 @@ func build_collection_panel() -> PanelContainer:
     var progress := Label.new()
     var complete_count: int = completed_collections.size()
     var collection_names: Array[String] = get_collection_names()
-    progress.text = "КОЛЛЕКЦИИ: %d / %d    •    УРОВЕНЬ %d" % [complete_count, collection_names.size(), player_level]
+    progress.text = "КОЛЛЕКЦИИ: %d / %d" % [complete_count, collection_names.size()]
     progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     progress.add_theme_font_size_override("font_size", 21)
     progress.modulate = GOLD
@@ -6689,8 +6689,9 @@ func build_collection_panel() -> PanelContainer:
         card.add_child(names)
         v.add_child(card)
     var close := Button.new()
-    close.text = "НАЗАД К АВТОМАТУ"
-    close.custom_minimum_size = Vector2(0, 82)
+    close.text = "←  НАЗАД"
+    close.custom_minimum_size = Vector2(0, 74)
+    style_button(close, Color("#9A7653"))
     close.pressed.connect(func(): show_main_menu())
     v.add_child(close)
     return p
@@ -7291,7 +7292,7 @@ func refresh_profile_panel() -> void:
         ["Процент побед", "%.1f%%" % win_rate],
         ["Лучшая серия", str(best_win_streak)],
         ["Достижения", "%d / %d" % [unlocked_achievements.size(), achievement_specs.size()]],
-        ["Коллекции", "%d / 8" % completed_collections.size()],
+        ["Коллекции", "%d / 16" % completed_collections.size()],
         ["Клешни", "%d / %d" % [owned_claws_count, claw_specs.size()]],
         ["Уровней улучшений", str(total_upgrades)],
         ["Текущая клешня", String(claw_specs[selected_claw]["name"])],
@@ -7404,7 +7405,7 @@ func refresh_stats_panel() -> void:
         ["ПРОГРЕСС", [
             ["Уровень игрока", str(player_level)],
             ["Достижения", "%d / %d" % [unlocked_achievements.size(), achievement_specs.size()]],
-            ["Завершённые коллекции", "%d / 8" % completed_collections.size()],
+            ["Завершённые коллекции", "%d / 16" % completed_collections.size()],
             ["Открытые клешни", "%d / %d" % [count_owned_claws(), claw_specs.size()]],
             ["Уровни улучшений", str(total_upgrade_levels())]
         ]]
