@@ -2110,7 +2110,20 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 "action:shop_buy":
                     var bought: Variant = data.get("item", {})
                     if bought is Dictionary and String(bought.get("category", "")) == "claws":
-                        selected_claw = clampi(int((bought.get("effect", {}) as Dictionary).get("claw_index", selected_claw)), 0, claw_specs.size()-1)
+                        var bought_effect: Dictionary = bought.get("effect", {}) if bought.get("effect", {}) is Dictionary else {}
+                        var bought_index := clampi(int(bought_effect.get("claw_index", selected_claw)), 0, claw_specs.size() - 1)
+                        selected_claw = bought_index
+                        # Сервер подтвердил покупку: сразу записываем владение
+                        # в оба локальных источника, чтобы прогресс достижения
+                        # обновился в этом же кадре.
+                        if bought_index < owned_claws.size():
+                            owned_claws[bought_index] = true
+                        var bought_id := "claw_%d" % (bought_index + 1)
+                        if not owned_claw_ids.has(bought_id):
+                            owned_claw_ids.append(bought_id)
+                        synchronize_achievement_ownership()
+                        check_achievements()
+                        save_game()
                     apply_shop_visuals()
                     refresh_shop()
                     show_shop_feedback("✓ ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ", 2.8)
@@ -5845,55 +5858,52 @@ func build_hud() -> void:
 func build_achievement_strip() -> void:
     achievement_strip = PanelContainer.new()
     achievement_strip.name = "AchievementStrip"
-    # Центр между вторыми боковыми кружками: примерно напротив
-    # сундуков слева и недельной миссии справа.
-    achievement_strip.position = Vector2(225, 280)
-    achievement_strip.size = Vector2(630, 68)
+    # Одна лёгкая строка строго по центру между вторыми боковыми кружками.
+    # Фиксированный размер не зависит от длины текста и не создаёт растяжения.
+    achievement_strip.position = Vector2(190, 286)
+    achievement_strip.size = Vector2(700, 48)
     achievement_strip.visible = false
     achievement_strip.z_index = 650
-    style_panel(achievement_strip, Color("#241B16"), Color("#8A684C"), 18, 2)
+    style_panel(achievement_strip, Color("#241B16"), Color("#9A704B"), 14, 2)
     hud_layer.add_child(achievement_strip)
     achievement_strip_label = Label.new()
     achievement_strip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     achievement_strip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    achievement_strip_label.add_theme_font_size_override("font_size", 17)
-    achievement_strip_label.modulate = Color("#E1C29A")
+    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+    achievement_strip_label.clip_text = true
+    achievement_strip_label.add_theme_font_size_override("font_size", 14)
+    achievement_strip_label.modulate = Color("#E8C58E")
+    achievement_strip_label.add_theme_color_override("font_outline_color", Color("#120E0A"))
+    achievement_strip_label.add_theme_constant_override("outline_size", 2)
     achievement_strip.add_child(achievement_strip_label)
+
+func _achievement_strip_short_name(value: String) -> String:
+    var text := value.replace("\n", " • ").strip_edges()
+    # Длинные серверные названия не должны переноситься на вторую строку.
+    if text.length() > 28:
+        text = text.substr(0, 27).strip_edges() + "…"
+    return text
 
 func show_achievement_strip() -> void:
     if not achievement_strip or not achievement_strip_label:
         return
-    if pending_new_achievements.is_empty() and pending_achievement_rewards_text.is_empty():
+    if pending_new_achievements.is_empty():
         return
 
-    # Компактная очередь: максимум 3 достижения в одной полоске.
-    # После показа первой тройки автоматически показывается следующая тройка.
+    # Одно уведомление = одно достижение. Никаких троек, объединённых
+    # в одну строку: так окно всегда выглядит одинаково аккуратно.
     var total := pending_new_achievements.size()
-    if total <= 0:
-        total = pending_achievement_rewards_text.size()
-    if total <= 0:
-        return
+    achievement_strip_batch_index = clampi(achievement_strip_batch_index, 0, total - 1)
+    var achievement_name := _achievement_strip_short_name(
+        String(pending_new_achievements[achievement_strip_batch_index])
+    )
 
-    var batch_count := int(ceil(float(total) / 3.0))
-    achievement_strip_batch_index = clampi(achievement_strip_batch_index, 0, batch_count - 1)
-    var from_index := achievement_strip_batch_index * 3
-    var to_index := mini(from_index + 3, total)
-    var names: Array[String] = []
-
-    # Названия берём из очереди достижений. Если она отсутствует, используем
-    # сохранённые строки наград как резервный источник.
-    if not pending_new_achievements.is_empty():
-        for i in range(from_index, to_index):
-            names.append(String(pending_new_achievements[i]))
-    else:
-        for i in range(from_index, to_index):
-            names.append(String(pending_achievement_rewards_text[i]).replace("\n", " • "))
-
-    achievement_strip_label.text = "🏆  " + "  •  ".join(names)
-    achievement_strip.size = Vector2(630, 68)
-    achievement_strip_label.add_theme_font_size_override("font_size", 15)
-    achievement_strip_timer = 4.0
+    achievement_strip_label.text = "🏆  " + achievement_name
+    # Небольшая фиксированная строка по центру HUD. Текст не переносится и
+    # никогда не меняет размер окна.
+    achievement_strip.position = Vector2(190, 286)
+    achievement_strip.size = Vector2(700, 48)
+    achievement_strip_timer = 2.8
     achievement_strip.visible = true
 
 func hide_achievement_strip() -> void:
@@ -5903,10 +5913,6 @@ func hide_achievement_strip() -> void:
     achievement_strip_batch_index = 0
     pending_new_achievements.clear()
     pending_achievement_rewards_text.clear()
-
-    achievement_strip_timer = 0.0
-    if achievement_strip and is_instance_valid(achievement_strip):
-        achievement_strip.visible = false
 
 func make_control_button(text_value: String, pos: Vector2) -> Button:
     var b := Button.new()
@@ -8894,8 +8900,7 @@ func _process(delta: float) -> void:
         achievement_strip_timer -= delta
         if achievement_strip_timer <= 0.0:
             var total_pending := pending_new_achievements.size()
-            var total_batches := int(ceil(float(total_pending) / 3.0)) if total_pending > 0 else 1
-            if achievement_strip_batch_index + 1 < total_batches:
+            if achievement_strip_batch_index + 1 < total_pending:
                 achievement_strip_batch_index += 1
                 show_achievement_strip()
             else:
@@ -9878,6 +9883,26 @@ func audit_achievement_source_state() -> void:
     if history_changed:
         save_game()
 
+func get_owned_claw_count() -> int:
+    # Считаем уникальные реально открытые клешни из обоих источников.
+    # Это защищает прогресс достижения от рассинхронизации bool-массива и
+    # журнала ID после покупки или загрузки старого сохранения.
+    var owned_ids: Dictionary = {}
+    for i in range(mini(owned_claws.size(), claw_specs.size())):
+        if owned_claws[i]:
+            owned_ids[i] = true
+    for raw_id in owned_claw_ids:
+        var cid := _canonical_claw_id(raw_id)
+        if cid == "":
+            continue
+        var idx := int(cid.trim_prefix("claw_")) - 1
+        if idx >= 0 and idx < claw_specs.size():
+            owned_ids[idx] = true
+    # Стартовая клешня всегда принадлежит игроку.
+    if claw_specs.size() > 0:
+        owned_ids[0] = true
+    return owned_ids.size()
+
 func achievement_value(spec: Dictionary) -> int:
     var current := 0
     match String(spec.get("kind", "")):
@@ -9888,15 +9913,7 @@ func achievement_value(spec: Dictionary) -> int:
         "level": current = player_level
         "rubles": current = maxi(coins, highest_balance_rubles)
         "claws":
-            var seen_claws: Dictionary = {}
-            for owned in owned_claws:
-                if owned: current += 1
-            for sid in owned_claw_ids:
-                var cidx := int(String(sid).trim_prefix("claw_")) - 1
-                if cidx >= 0 and cidx < claw_specs.size() and not seen_claws.has(cidx):
-                    seen_claws[cidx] = true
-            # Ledger is authoritative for historical ownership.
-            current = maxi(current, seen_claws.size())
+            current = get_owned_claw_count()
         "upgrades":
             for lvl in upgrade_levels: current += lvl
         "best_streak": current = best_win_streak
@@ -10060,8 +10077,8 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
         popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
         popup_achievement_label.text = "Игрушка уже есть в коллекции. Выберите: продать дубль или оставить его."
     result_popup.visible = true
-    pending_new_achievements.clear()
-    pending_achievement_rewards_text.clear()
+    # Не очищаем очередь достижений: уведомление должно показаться
+    # отдельной компактной строкой даже после окна получения игрушки.
 
 func show_achievement_popup() -> void:
     # Старое отдельное окно достижений больше не используется:
