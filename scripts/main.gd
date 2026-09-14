@@ -4826,9 +4826,10 @@ func setup_login_streak() -> void:
 func build_daily_login_panel() -> void:
     daily_login_panel = PanelContainer.new()
     daily_login_panel.name = "DailyLoginPanel"
-    # Карточка открывается непосредственно рядом с кнопкой ежедневной серии,
-    # как остальные правые информационные окна. Размер по высоте не меняем.
-    daily_login_panel.position = Vector2(630, 360)
+    # Карточка открывается в той же зоне, что и «Миссия дня» /
+    # «Недельное задание»: небольшой верхний отступ и такой же зазор
+    # до правого ряда круглых кнопок. Размер окна НЕ меняем.
+    daily_login_panel.position = Vector2(630, 170)
     daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.custom_minimum_size = Vector2(300, 165)
     daily_login_panel.visible = false
@@ -4950,26 +4951,26 @@ func toggle_daily_login() -> void:
     if not daily_login_panel:
         return
     if daily_login_panel.visible:
+        animate_panel_out(daily_login_panel)
         daily_login_panel.visible = false
+        daily_login_panel.scale = Vector2.ONE
+        daily_login_panel.modulate.a = 1.0
         if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
             gameplay_modal_blocker.visible = false
+        update_android_navigation()
         return
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
     daily_login_panel.visible = true
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
-    # Окно появляется непосредственно рядом с правым кругом и уезжает влево.
-    # Высота и размер окна остаются прежними.
-    var final_pos := Vector2(630, 360)
-    daily_login_panel.position = Vector2(940, 360)
-    daily_login_panel.modulate.a = 0.0
-    var tween := create_tween()
-    tween.set_parallel(true)
-    tween.tween_property(daily_login_panel, "position", final_pos, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-    tween.tween_property(daily_login_panel, "modulate:a", 1.0, 0.14)
+    # Открываем окно тем же универсальным способом, что и «Миссия дня»
+    # и «Недельное задание»: масштаб + прозрачность. Позиция фиксирована
+    # в общей правой зоне, с малым зазором до круглых кнопок.
+    # Размер окна НЕ меняем.
+    daily_login_panel.position = Vector2(630, 170)
     update_daily_login_ui()
-    play_ui_sound("open")
+    animate_panel_in(daily_login_panel)
     update_android_navigation()
 func claim_login_reward() -> void:
     # Оставляем совместимость со старой кнопкой, но теперь награда забирается
@@ -7972,8 +7973,7 @@ func build_help_panel() -> PanelContainer:
     style_button(vk, Color("#526F8E"))
     vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
-        current_result = "VK: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
-        update_ui()
+        DisplayServer.shell_open("https://vk.ru/simulator_khvataika")
     )
     social_row.add_child(vk)
 
@@ -7994,8 +7994,7 @@ func build_help_panel() -> PanelContainer:
     style_button(max_btn, Color("#7A5D91"))
     max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
-        current_result = "MAX: ССЫЛКА БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ"
-        update_ui()
+        DisplayServer.shell_open("https://max.ru/channel_simulator_khvataika")
     )
     social_row.add_child(max_btn)
 
