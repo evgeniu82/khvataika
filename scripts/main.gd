@@ -779,8 +779,11 @@ func _ready() -> void:
     await get_tree().process_frame
 
     if startup_diagnostic_previous != "" and startup_diagnostic_previous != "DONE":
-        _startup_diag_halt(startup_diagnostic_previous)
-        return
+        # Старый диагностический маркер после зависшего запуска не должен
+        # блокировать следующий запуск игры. Записываем восстановление и
+        # продолжаем обычную инициализацию.
+        print("Startup recovery: previous phase was ", startup_diagnostic_previous)
+        _startup_write_phase("RECOVERED")
 
     if not STARTUP_CONTROL_TEST:
         add_progressive_achievements()
@@ -4158,9 +4161,9 @@ func build_ui() -> void:
     await get_tree().process_frame
     await set_loading_progress(84.0, "МАГАЗИН ГОТОВ")
 
-    await set_loading_status("КОЛЛЕКЦИЯ ГОТОВА...")
-    collection_panel = build_collection_panel()
-    await get_tree().process_frame
+    # Коллекция строится лениво — только при первом открытии.
+    # Это не нагружает старт Android и не задерживает загрузочный экран.
+    collection_panel = null
     await set_loading_progress(85.0, "КОЛЛЕКЦИЯ ГОТОВА")
 
     await set_loading_status("НАСТРОЙКИ ГОТОВЫ...")
@@ -8132,7 +8135,11 @@ func open_panel(which: String) -> void:
     set_main_menu_controls(false)
     menu_layer.visible = true
     if which == "shop": shop_panel.visible = true
-    elif which == "collection": collection_panel.visible = true
+    elif which == "collection":
+        # Собираем тяжёлый список коллекций только по запросу игрока.
+        if collection_panel == null or not is_instance_valid(collection_panel):
+            collection_panel = build_collection_panel()
+        collection_panel.visible = true
     elif which == "settings": settings_panel.visible = true
     elif which == "achievements":
         achievements_panel.visible = true
