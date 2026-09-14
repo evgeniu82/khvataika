@@ -793,6 +793,9 @@ func _ready() -> void:
         for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
+    # ID игрока нужен и в полностью офлайн-режиме, чтобы профиль не зависал
+    # на «ПОЛУЧАЕМ…». Генерируем его сразу после загрузки сохранения.
+    ensure_player_id()
     if not STARTUP_CONTROL_TEST and SERVER_AUTHORITATIVE:
         ensure_player_id()
         remote_http = HTTPRequest.new()
@@ -4828,7 +4831,7 @@ func build_daily_login_panel() -> void:
     daily_login_panel.name = "DailyLoginPanel"
     # Положение такое же, как у «Миссия дня» и «Недельное задание».
     # Размер окна не меняем.
-    daily_login_panel.position = Vector2(610, 170)
+    daily_login_panel.position = Vector2(500, 170)
     daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.custom_minimum_size = Vector2(300, 165)
     daily_login_panel.visible = false
@@ -4961,7 +4964,7 @@ func toggle_daily_login() -> void:
         gameplay_modal_blocker.visible = true
     # Открываем тем же способом, что и остальные информационные окна.
     # Позиция и размер окна не меняются во время открытия.
-    daily_login_panel.position = Vector2(610, 170)
+    daily_login_panel.position = Vector2(500, 170)
     update_daily_login_ui()
     animate_panel_in(daily_login_panel)
     update_android_navigation()
