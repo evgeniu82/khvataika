@@ -129,11 +129,24 @@ var referral_invites: int = 0
 var referral_reward_per_friend: int = 100
 var referral_welcome_reward: int = 50
 var referral_used: bool = false
+# Новая реферальная система подготовлена офлайн. Сервер пока намеренно не подключается.
+const REFERRAL_SERVER_ENABLED: bool = false
+const REFERRAL_PAGE_SIZE: int = 10
+var referral_invited_players: Array = []
+var referral_page: int = 0
+var referral_total_reward: int = 0
+var referral_completed_count: int = 0
+var referral_active_count: int = 0
 var referral_panel: PanelContainer
 var referral_link_label: Label
 var referral_invites_label: Label
 var referral_status_label: Label
 var referral_code_input: LineEdit
+var referral_list_container: VBoxContainer
+var referral_list_toggle: Button
+var referral_page_label: Label
+var referral_prev_button: Button
+var referral_next_button: Button
 
 # Дополнительные игровые системы
 var daily_mission_progress: int = 0
@@ -1605,6 +1618,9 @@ func apply_server_game_state(data: Dictionary) -> void:
     workshop_parts = engineering_parts if workshop_parts == 0 and engineering_parts > 0 else workshop_parts
     if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
     if data.has("referral_used"): referral_used = bool(data.get("referral_used", referral_used))
+    if data.has("referral_invited_players") and data.get("referral_invited_players") is Array:
+        referral_invited_players = data.get("referral_invited_players")
+    if data.has("referral_total_reward"): referral_total_reward = int(data.get("referral_total_reward", referral_total_reward))
     if not STARTUP_CONTROL_TEST:
         apply_shop_visuals()
     update_ui()
@@ -2198,9 +2214,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         var server_player: Dictionary = data["player"]
         if server_player.has("player_id") and String(server_player.get("player_id", "")) != "":
             player_id = String(server_player.get("player_id", player_id))
-        if server_player.has("referral_code") and String(server_player.get("referral_code", "")) != "":
+        if REFERRAL_SERVER_ENABLED and server_player.has("referral_code") and String(server_player.get("referral_code", "")) != "":
             referral_code = String(server_player.get("referral_code", referral_code))
-        if server_player.has("referral_invites"):
+        if REFERRAL_SERVER_ENABLED and server_player.has("referral_invites"):
             referral_invites = maxi(0, int(server_player.get("referral_invites", referral_invites)))
         if kind == "sync" and server_player.has("coins"):
             coins = maxi(0, int(server_player.get("coins", coins)))
@@ -8011,11 +8027,13 @@ func ensure_referral_code() -> void:
         return
     var seed := str(Time.get_unix_time_from_system()) + str(randi())
     var hash_value := hash(seed)
-    referral_code = ("CLAW%06X" % (absi(hash_value) % 16777216)).to_upper()
+    referral_code = ("KHVA-%08X" % (absi(hash_value) % 4294967296)).to_upper()
     save_game()
 
 func get_referral_link() -> String:
-    return "claw://invite?ref=" + referral_code
+    # Публичная HTTPS-ссылка заранее подготовлена под будущую серверную часть.
+    # Домен можно заменить перед публикацией, не меняя UI или структуру данных.
+    return "https://khvataika.ru/r/" + referral_code
 
 func process_incoming_referral() -> void:
     if referral_used:
@@ -8036,7 +8054,7 @@ func process_incoming_referral() -> void:
         return
     # На Android серверная привязка выполняется после загрузки конфигурации.
     # Так реферальная цепочка сохраняется между разными устройствами.
-    if _server_ready():
+    if REFERRAL_SERVER_ENABLED and _server_ready():
         pending_incoming_referral = incoming
         return
     # Офлайн-режим сохраняет прежнее поведение как резервный вариант.
@@ -8047,85 +8065,158 @@ func process_incoming_referral() -> void:
 
 func build_referral_panel() -> PanelContainer:
     var p := PanelContainer.new()
-    p.position = Vector2(55, 220)
-    p.size = Vector2(970, 1380)
+    p.position = Vector2(55, 150)
+    p.size = Vector2(970, 1500)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
+
     var scroll := ScrollContainer.new()
     style_scroll_container_brown(scroll)
     p.add_child(scroll)
     var v := VBoxContainer.new()
     v.custom_minimum_size = Vector2(880, 0)
-    v.add_theme_constant_override("separation", 16)
+    v.add_theme_constant_override("separation", 12)
     scroll.add_child(v)
 
     var title := Label.new()
-    title.text = "👥 РЕФЕРАЛЬНАЯ СИСТЕМА"
+    title.text = "👥  РЕФЕРАЛЬНАЯ СИСТЕМА"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 34)
+    title.add_theme_font_size_override("font_size", 31)
+    title.modulate = GOLD
     v.add_child(title)
 
     var info := Label.new()
-    info.text = "Приглашай друзей в Хватайку.\nДруг получает подарок за первый вход по твоей ссылке, а ты получаешь приз за каждого приглашённого друга."
+    info.text = "Приглашай друзей в «Хватайку» и получай награды.
+Друг получает подарок, а ты — награду после выполнения им условия."
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    info.add_theme_font_size_override("font_size", 21)
+    info.add_theme_font_size_override("font_size", 18)
+    info.modulate = Color("#E1D2C1")
     v.add_child(info)
 
-    var code_title := Label.new()
-    code_title.text = "ТВОЙ РЕФЕРАЛЬНЫЙ КОД"
-    code_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    code_title.add_theme_font_size_override("font_size", 25)
-    v.add_child(code_title)
+    var reward_card := PanelContainer.new()
+    style_panel(reward_card, Color("#1A130F"), Color("#9A7653"), 16, 2)
+    reward_card.custom_minimum_size = Vector2(0, 92)
+    v.add_child(reward_card)
+    var reward_text := Label.new()
+    reward_text.text = "🎁 НОВОМУ ИГРОКУ  +50 ₽    •    🏆 ТЕБЕ ЗА ДРУГА  +100 ₽
+Условие награды: приглашённый должен сыграть 3 игры."
+    reward_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    reward_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    reward_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    reward_text.add_theme_font_size_override("font_size", 17)
+    reward_card.add_child(reward_text)
 
+    var code_card := PanelContainer.new()
+    style_panel(code_card, Color("#1A130F"), Color("#76583F"), 16, 2)
+    v.add_child(code_card)
+    var cv := VBoxContainer.new()
+    cv.add_theme_constant_override("separation", 6)
+    code_card.add_child(cv)
+    var code_caption := Label.new()
+    code_caption.text = "ТВОЙ РЕФЕРАЛЬНЫЙ КОД"
+    code_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    code_caption.add_theme_font_size_override("font_size", 14)
+    code_caption.modulate = Color("#C09A70")
+    cv.add_child(code_caption)
+    var code_value := Label.new()
+    code_value.name = "ReferralCodeValue"
+    code_value.text = referral_code if referral_code != "" else "ПОЛУЧАЕМ…"
+    code_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    code_value.add_theme_font_size_override("font_size", 25)
+    code_value.modulate = Color("#F0D4A9")
+    cv.add_child(code_value)
+    var copy_code := Button.new()
+    copy_code.text = "📋  КОПИРОВАТЬ КОД"
+    copy_code.custom_minimum_size = Vector2(0, 55)
+    style_button(copy_code, Color("#76583F"))
+    copy_code.pressed.connect(func():
+        DisplayServer.clipboard_set(referral_code)
+        referral_status_label.text = "Код скопирован."
+    )
+    cv.add_child(copy_code)
+
+    var link_title := Label.new()
+    link_title.text = "ТВОЯ ПЕРСОНАЛЬНАЯ ССЫЛКА"
+    link_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    link_title.add_theme_font_size_override("font_size", 14)
+    link_title.modulate = Color("#C09A70")
+    v.add_child(link_title)
     referral_link_label = Label.new()
     referral_link_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     referral_link_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    referral_link_label.add_theme_font_size_override("font_size", 22)
+    referral_link_label.add_theme_font_size_override("font_size", 17)
     referral_link_label.modulate = Color("#E1C29A")
     v.add_child(referral_link_label)
-
     var copy := Button.new()
-    copy.text = "📋 СКОПИРОВАТЬ ССЫЛКУ"
-    copy.custom_minimum_size = Vector2(0, 82)
+    copy.text = "🔗  СКОПИРОВАТЬ ССЫЛКУ"
+    copy.custom_minimum_size = Vector2(0, 58)
     style_button(copy, Color("#9A7653"))
     copy.pressed.connect(func():
         DisplayServer.clipboard_set(get_referral_link())
         referral_status_label.text = "Ссылка скопирована. Отправь её другу."
     )
     v.add_child(copy)
+    var share := Button.new()
+    share.text = "📤  ПРИГЛАСИТЬ ДРУГА"
+    share.custom_minimum_size = Vector2(0, 62)
+    style_button(share, Color("#B98B5C"))
+    share.pressed.connect(func():
+        DisplayServer.clipboard_set(get_referral_link())
+        referral_status_label.text = "Ссылка скопирована — отправь её другу через удобный мессенджер."
+    )
+    v.add_child(share)
 
-    referral_invites_label = Label.new()
-    referral_invites_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    referral_invites_label.add_theme_font_size_override("font_size", 26)
-    v.add_child(referral_invites_label)
+    var stats_card := PanelContainer.new()
+    style_panel(stats_card, Color("#1A130F"), Color("#76583F"), 16, 2)
+    v.add_child(stats_card)
+    var stats := GridContainer.new()
+    stats.columns = 2
+    stats.add_theme_constant_override("h_separation", 18)
+    stats.add_theme_constant_override("v_separation", 4)
+    stats_card.add_child(stats)
+    for pair in [["ПРИГЛАШЕНО", "ReferralInvited"], ["ВЫПОЛНИЛИ УСЛОВИЕ", "ReferralCompleted"], ["АКТИВНЫХ", "ReferralActive"], ["ПОЛУЧЕНО", "ReferralReward"]]:
+        var l := Label.new()
+        l.name = String(pair[1])
+        l.text = String(pair[0])
+        l.add_theme_font_size_override("font_size", 15)
+        l.modulate = Color("#C09A70")
+        stats.add_child(l)
+        var val := Label.new()
+        val.name = String(pair[1]) + "Value"
+        val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+        val.add_theme_font_size_override("font_size", 18)
+        val.modulate = Color("#F0D4A9")
+        stats.add_child(val)
 
-    var reward := Label.new()
-    reward.text = "🎁 Приз за приглашение: +%d ₽\n🎁 Подарок новому игроку: +%d ₽" % [referral_reward_per_friend, referral_welcome_reward]
-    reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    reward.add_theme_font_size_override("font_size", 21)
-    v.add_child(reward)
+    referral_list_toggle = Button.new()
+    referral_list_toggle.text = "👥  МОИ ПРИГЛАШЕНИЯ  ▼"
+    referral_list_toggle.custom_minimum_size = Vector2(0, 60)
+    style_button(referral_list_toggle, Color("#76583F"))
+    referral_list_toggle.pressed.connect(func(): toggle_referral_list())
+    v.add_child(referral_list_toggle)
 
-    var sep := HSeparator.new()
-    v.add_child(sep)
+    referral_list_container = VBoxContainer.new()
+    referral_list_container.name = "ReferralListContainer"
+    referral_list_container.add_theme_constant_override("separation", 5)
+    referral_list_container.visible = false
+    v.add_child(referral_list_container)
 
     var enter_title := Label.new()
-    enter_title.text = "ЕСТЬ КОД ДРУГА?"
+    enter_title.text = "🎁  ЕСТЬ КОД ДРУГА?"
     enter_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    enter_title.add_theme_font_size_override("font_size", 25)
+    enter_title.add_theme_font_size_override("font_size", 20)
     v.add_child(enter_title)
-
     referral_code_input = LineEdit.new()
-    referral_code_input.placeholder_text = "Введите код приглашения"
+    referral_code_input.placeholder_text = "KHVA-XXXXXXXX"
     referral_code_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
-    referral_code_input.custom_minimum_size = Vector2(0, 65)
-    referral_code_input.add_theme_font_size_override("font_size", 22)
+    referral_code_input.custom_minimum_size = Vector2(0, 58)
+    referral_code_input.add_theme_font_size_override("font_size", 19)
     v.add_child(referral_code_input)
-
     var claim := Button.new()
-    claim.text = "🎁 ПОЛУЧИТЬ ПОДАРОК"
-    claim.custom_minimum_size = Vector2(0, 82)
+    claim.text = "🎁  ПРИМЕНИТЬ КОД"
+    claim.custom_minimum_size = Vector2(0, 62)
     style_button(claim, Color("#C09A70"))
     claim.pressed.connect(func(): claim_referral_code(referral_code_input.text))
     v.add_child(claim)
@@ -8133,20 +8224,21 @@ func build_referral_panel() -> PanelContainer:
     referral_status_label = Label.new()
     referral_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     referral_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    referral_status_label.add_theme_font_size_override("font_size", 19)
+    referral_status_label.add_theme_font_size_override("font_size", 16)
+    referral_status_label.modulate = Color("#D8C3AA")
     v.add_child(referral_status_label)
 
     var note := Label.new()
-    note.text = "Рефералы учитываются на сервере. Один игрок может активировать только один код, а приглашения и награды сохраняются между устройствами."
+    note.text = "Сейчас реферальная система работает в офлайн-режиме. Серверный учёт, RuStore-переход и автоматическая привязка после установки будут подключены отдельным этапом."
     note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    note.add_theme_font_size_override("font_size", 16)
-    note.modulate = Color("#B9A28D")
+    note.add_theme_font_size_override("font_size", 14)
+    note.modulate = Color("#9E8A76")
     v.add_child(note)
 
     var close := Button.new()
-    close.text = "← НАЗАД"
-    close.custom_minimum_size = Vector2(0, 82)
+    close.text = "←  НАЗАД"
+    close.custom_minimum_size = Vector2(0, 62)
     style_button(close, Color("#76583F"))
     close.pressed.connect(func(): show_main_menu())
     v.add_child(close)
@@ -8155,11 +8247,115 @@ func build_referral_panel() -> PanelContainer:
 func refresh_referral_panel() -> void:
     ensure_referral_code()
     if referral_link_label:
-        referral_link_label.text = referral_code + "\n" + get_referral_link()
-    if referral_invites_label:
-        referral_invites_label.text = "👥 ПРИШЛО ДРУЗЕЙ: %d" % referral_invites
+        referral_link_label.text = get_referral_link()
     if referral_status_label and referral_status_label.text == "":
         referral_status_label.text = "Приглашай друзей и получай +%d ₽ за каждого." % referral_reward_per_friend
+    refresh_referral_stats()
+
+func refresh_referral_stats() -> void:
+    var total := referral_invited_players.size()
+    referral_completed_count = 0
+    referral_active_count = 0
+    referral_total_reward = 0
+    for item in referral_invited_players:
+        var status := String(item.get("status", "pending")) if item is Dictionary else "pending"
+        if status == "completed":
+            referral_completed_count += 1
+            referral_total_reward += referral_reward_per_friend
+        elif status == "active":
+            referral_active_count += 1
+    referral_invites = total
+    if not referral_invites_label:
+        return
+    var stats_card := referral_panel.find_child("ReferralInvited", true, false) if referral_panel else null
+    if stats_card:
+        var v := stats_card.get_parent().get_node_or_null("ReferralInvitedValue")
+        if v: v.text = str(total)
+    for key in ["ReferralCompleted", "ReferralActive", "ReferralReward"]:
+        var n := referral_panel.find_child(key, true, false) if referral_panel else null
+        if n:
+            var value := n.get_parent().get_node_or_null(key + "Value")
+            if value:
+                if key == "ReferralCompleted": value.text = str(referral_completed_count)
+                elif key == "ReferralActive": value.text = str(referral_active_count)
+                else: value.text = "%d ₽" % referral_total_reward
+    if referral_list_container and referral_list_container.visible:
+        render_referral_page()
+
+func toggle_referral_list() -> void:
+    if not referral_list_container:
+        return
+    referral_list_container.visible = not referral_list_container.visible
+    referral_page = 0
+    referral_list_toggle.text = "👥  МОИ ПРИГЛАШЕНИЯ  ▲" if referral_list_container.visible else "👥  МОИ ПРИГЛАШЕНИЯ  ▼"
+    if referral_list_container.visible:
+        render_referral_page()
+
+func render_referral_page() -> void:
+    if not referral_list_container:
+        return
+    for child in referral_list_container.get_children():
+        child.queue_free()
+    var total := referral_invited_players.size()
+    if total == 0:
+        var empty := Label.new()
+        empty.text = "Пока никто не приглашён. Поделись своей ссылкой!"
+        empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        empty.add_theme_font_size_override("font_size", 16)
+        empty.modulate = Color("#B9A28D")
+        referral_list_container.add_child(empty)
+        return
+    var pages := maxi(1, int(ceil(float(total) / float(REFERRAL_PAGE_SIZE))))
+    referral_page = clampi(referral_page, 0, pages - 1)
+    var from_idx := referral_page * REFERRAL_PAGE_SIZE
+    var to_idx := mini(from_idx + REFERRAL_PAGE_SIZE, total)
+    for i in range(from_idx, to_idx):
+        var item = referral_invited_players[i]
+        var row := PanelContainer.new()
+        style_panel(row, Color("#1A130F"), Color("#76583F"), 10, 1)
+        row.custom_minimum_size = Vector2(0, 50)
+        var label := Label.new()
+        var nick := String(item.get("name", "Игрок"))
+        var status := String(item.get("status", "pending"))
+        var status_text := "🟢 Награда получена" if status == "completed" else ("🟡 Играет — ждём условие" if status == "active" else "⚪ Приглашение принято")
+        label.text = "%d. 👤 %s
+    %s" % [i + 1, nick, status_text]
+        label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+        label.add_theme_font_size_override("font_size", 15)
+        label.modulate = Color("#E8D7C3")
+        row.add_child(label)
+        referral_list_container.add_child(row)
+    var nav := HBoxContainer.new()
+    nav.alignment = BoxContainer.ALIGNMENT_CENTER
+    nav.add_theme_constant_override("separation", 12)
+    referral_prev_button = Button.new()
+    referral_prev_button.text = "◀"
+    referral_prev_button.custom_minimum_size = Vector2(70, 46)
+    referral_prev_button.disabled = referral_page <= 0
+    style_button(referral_prev_button, Color("#76583F"))
+    referral_prev_button.pressed.connect(func():
+        referral_page = maxi(0, referral_page - 1)
+        render_referral_page()
+    )
+    nav.add_child(referral_prev_button)
+    referral_page_label = Label.new()
+    referral_page_label.text = "%d / %d" % [referral_page + 1, pages]
+    referral_page_label.custom_minimum_size = Vector2(90, 46)
+    referral_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    referral_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    referral_page_label.add_theme_font_size_override("font_size", 17)
+    nav.add_child(referral_page_label)
+    referral_next_button = Button.new()
+    referral_next_button.text = "▶"
+    referral_next_button.custom_minimum_size = Vector2(70, 46)
+    referral_next_button.disabled = referral_page >= pages - 1
+    style_button(referral_next_button, Color("#76583F"))
+    referral_next_button.pressed.connect(func():
+        referral_page = mini(pages - 1, referral_page + 1)
+        render_referral_page()
+    )
+    nav.add_child(referral_next_button)
+    referral_list_container.add_child(nav)
 
 func claim_referral_code(code: String) -> void:
     if referral_used:
@@ -8169,7 +8365,7 @@ func claim_referral_code(code: String) -> void:
     if clean == "" or clean == referral_code:
         referral_status_label.text = "Введите корректный код друга."
         return
-    if _server_ready():
+    if REFERRAL_SERVER_ENABLED and _server_ready():
         referral_status_label.text = "Проверяем код на сервере…"
         apply_referral_remote(clean)
         return
@@ -8178,7 +8374,7 @@ func claim_referral_code(code: String) -> void:
         return
     referral_used = true
     coins += referral_welcome_reward
-    referral_status_label.text = "Подарок получен: +%d ₽" % referral_welcome_reward
+    referral_status_label.text = "Офлайн-режим: подарок +%d ₽ получен. Серверный учёт пока выключен." % referral_welcome_reward
     current_result = "🎁 ПОДАРОК ЗА ПРИГЛАШЕНИЕ • +%d ₽" % referral_welcome_reward
     save_game()
     check_achievements()
@@ -10670,6 +10866,8 @@ func save_game() -> void:
             "referral_code": referral_code,
             "referral_invites": referral_invites,
             "referral_used": referral_used,
+            "referral_invited_players": referral_invited_players,
+            "referral_total_reward": referral_total_reward,
             "best_result": best_result,
             "best_result_xp": best_result_xp,
             "current_win_streak": current_win_streak,
