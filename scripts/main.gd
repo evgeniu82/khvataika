@@ -8998,7 +8998,18 @@ func check_collection_completion(collection_name: String) -> void:
                 got += 1
     if needed > 0 and got >= needed:
         completed_collections[collection_name] = true
-        var reward: int = 60 + needed * 10
+        # Награда за коллекцию совпадает с призом, который заранее показан в окне коллекций.
+        var total_weight: float = 0.0
+        for toy in toys:
+            if String(toy["collection"]) == collection_name:
+                total_weight += float(toy.get("weight", 0.0))
+        var reward: int = 50
+        if total_weight < 100.0 and total_weight >= 70.0:
+            reward = 75
+        elif total_weight < 70.0 and total_weight >= 30.0:
+            reward = 100
+        elif total_weight < 30.0:
+            reward = 250
         coins += reward
         current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
         check_achievements()
