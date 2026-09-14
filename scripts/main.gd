@@ -4623,8 +4623,11 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
     if scroll.has_meta("android_scroll_configured"):
         return
     scroll.set_meta("android_scroll_configured", true)
-    scroll.follow_focus = true
-    scroll.scroll_deadzone = 1
+    # Не пересчитываем позицию при фокусе кнопок: на Android это вызывает
+    # лишние layout/scroll события во время свайпа.
+    scroll.follow_focus = false
+    scroll.scroll_deadzone = 8
+    scroll.clip_contents = true
     scroll.add_theme_constant_override("scroll_bar_width", 5)
     scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
     if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
@@ -6405,9 +6408,12 @@ func build_seasons_panel() -> PanelContainer:
     holiday_header.modulate = GOLD
     v.add_child(holiday_header)
 
-    var list := VBoxContainer.new()
+    var list := Label.new()
     list.name = "HolidayList"
-    list.add_theme_constant_override("separation", 8)
+    list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    list.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+    list.add_theme_font_size_override("font_size", 18)
+    list.modulate = Color("#F0E1CE")
     v.add_child(list)
 
     var all_header := Label.new()
@@ -6418,9 +6424,12 @@ func build_seasons_panel() -> PanelContainer:
     all_header.modulate = GOLD
     v.add_child(all_header)
 
-    var seasons_list := VBoxContainer.new()
+    var seasons_list := Label.new()
     seasons_list.name = "AllSeasonsList"
-    seasons_list.add_theme_constant_override("separation", 8)
+    seasons_list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    seasons_list.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+    seasons_list.add_theme_font_size_override("font_size", 18)
+    seasons_list.modulate = Color("#E0D4C6")
     v.add_child(seasons_list)
 
     var upcoming_header := Label.new()
@@ -6431,9 +6440,12 @@ func build_seasons_panel() -> PanelContainer:
     upcoming_header.modulate = GOLD
     v.add_child(upcoming_header)
 
-    var upcoming_list := VBoxContainer.new()
+    var upcoming_list := Label.new()
     upcoming_list.name = "UpcomingList"
-    upcoming_list.add_theme_constant_override("separation", 7)
+    upcoming_list.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    upcoming_list.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+    upcoming_list.add_theme_font_size_override("font_size", 17)
+    upcoming_list.modulate = Color("#E0D4C6")
     v.add_child(upcoming_list)
 
     var note := Label.new()
@@ -6483,44 +6495,27 @@ func refresh_seasons_panel() -> void:
             int(float(profile.get("toy", 0.0)) * 100.0)
         ]
 
-    var list := seasons_panel.get_node_or_null("SeasonsScroll/SeasonsContent/HolidayList") as VBoxContainer
+    var list := seasons_panel.get_node_or_null("SeasonsScroll/SeasonsContent/HolidayList") as Label
     if list:
-        for c in list.get_children():
-            c.queue_free()
-        var found := 0
+        var holiday_lines: Array[String] = []
         for h in holiday_calendar:
             if String(h.get("season", "")) == active_season_id:
-                var b := Label.new()
-                b.text = "📌  %s  —  %s" % [String(h.get("date", "")), String(h.get("name", "Праздник"))]
-                b.add_theme_font_size_override("font_size", 18)
-                b.modulate = Color("#F0E1CE")
-                list.add_child(b)
-                found += 1
-        if found == 0:
-            var empty := Label.new()
-            empty.text = "В этом сезоне пока нет праздничных событий."
-            empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-            empty.add_theme_font_size_override("font_size", 18)
-            list.add_child(empty)
+                holiday_lines.append("📌  %s  —  %s" % [String(h.get("date", "")), String(h.get("name", "Праздник"))])
+        list.text = "\n".join(holiday_lines) if not holiday_lines.is_empty() else "В этом сезоне пока нет праздничных событий."
 
-    var seasons_list := seasons_panel.get_node_or_null("SeasonsScroll/SeasonsContent/AllSeasonsList") as VBoxContainer
+    var seasons_list := seasons_panel.get_node_or_null("SeasonsScroll/SeasonsContent/AllSeasonsList") as Label
     if seasons_list:
-        for c in seasons_list.get_children():
-            c.queue_free()
+        var season_lines: Array[String] = []
         for s in season_specs:
             var sid := String(s.get("id", ""))
             var marker := "▶  " if sid == active_season_id else ""
-            var item := Label.new()
-            item.text = "%s%s\n   %s" % [marker, String(s.get("name", "Сезон")), String(s.get("theme", ""))]
-            item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            item.add_theme_font_size_override("font_size", 18)
-            item.modulate = GOLD if sid == active_season_id else Color("#E0D4C6")
-            seasons_list.add_child(item)
+            season_lines.append("%s%s\n   %s" % [marker, String(s.get("name", "Сезон")), String(s.get("theme", ""))])
+        seasons_list.text = "\n".join(season_lines)
+        seasons_list.modulate = GOLD if active_season_id != "" else Color("#E0D4C6")
 
-    var upcoming_list := seasons_panel.get_node_or_null("SeasonsScroll/SeasonsContent/UpcomingList") as VBoxContainer
+    var upcoming_list := seasons_panel.get_node_or_null("SeasonsScroll/SeasonsContent/UpcomingList") as Label
     if upcoming_list:
-        for c in upcoming_list.get_children():
-            c.queue_free()
+        var upcoming_lines: Array[String] = []
         var now_day := int(floor(Time.get_unix_time_from_system() / 86400.0))
         var upcoming: Array[Dictionary] = []
         var dt := Time.get_datetime_dict_from_system()
@@ -6542,12 +6537,8 @@ func refresh_seasons_panel() -> void:
         var limit := mini(8, upcoming.size())
         for i in range(limit):
             var h: Dictionary = upcoming[i]
-            var item := Label.new()
-            item.text = "📅 %s  —  %s\n   Через %d дн. • %s" % [String(h.get("date", "")), String(h.get("name", "Праздник")), int(h.get("days", 0)), String(h.get("season", "")).to_upper()]
-            item.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            item.add_theme_font_size_override("font_size", 17)
-            item.modulate = Color("#E0D4C6")
-            upcoming_list.add_child(item)
+            upcoming_lines.append("📅 %s  —  %s\n   Через %d дн. • %s" % [String(h.get("date", "")), String(h.get("name", "Праздник")), int(h.get("days", 0)), String(h.get("season", "")).to_upper()])
+        upcoming_list.text = "\n".join(upcoming_lines)
     seasons_panel.set_meta("seasons_ui_built", true)
 
 func chest_rarity_for_win(rarity: String) -> String:
@@ -6937,14 +6928,16 @@ func refresh_workshop_panel() -> void:
         desc.add_theme_font_size_override("font_size", 15)
         desc.modulate = Color("#CDBBA7")
         text_box.add_child(desc)
-        var module_bar := ProgressBar.new()
-        module_bar.custom_minimum_size = Vector2(0, 10)
-        module_bar.show_percentage = false
-        module_bar.max_value = max_level
-        module_bar.value = level
-        module_bar.add_theme_stylebox_override("background", make_style(Color("#17120F"), Color("#4B392B"), 5, 1))
-        module_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 5, 1))
-        text_box.add_child(module_bar)
+        # Лёгкий текстовый индикатор вместо отдельного ProgressBar.
+        # На Android это заметно уменьшает число перерисовываемых Control-узлов
+        # при быстром свайпе длинного окна.
+        var progress := Label.new()
+        var filled := mini(level, max_level)
+        var empty := maxi(0, max_level - filled)
+        progress.text = "▰".repeat(filled) + "▱".repeat(empty)
+        progress.add_theme_font_size_override("font_size", 11)
+        progress.modulate = Color("#A3754D")
+        text_box.add_child(progress)
 
         var upgrade := Button.new()
         upgrade.text = "УЛУЧШИТЬ\n%d 🔧" % cost
