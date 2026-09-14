@@ -639,6 +639,16 @@ func sync_collection_from_inventory() -> void:
             collection[toy_name] = String(toy.get("rarity", "ОБЫЧНАЯ"))
 
 
+func refresh_collection_panel() -> void:
+    # Окно коллекций создаётся заново при открытии, чтобы сразу показать
+    # актуальные отметки после получения новой игрушки.
+    sync_collection_from_inventory()
+    if collection_panel and is_instance_valid(collection_panel):
+        menu_layer.remove_child(collection_panel)
+        collection_panel.queue_free()
+    collection_panel = build_collection_panel()
+
+
 func add_extended_collections() -> void:
     var extra_toys: Array[Dictionary] = [
         # ДИНОЗАВРЫ
@@ -8123,7 +8133,9 @@ func open_panel(which: String) -> void:
     set_main_menu_controls(false)
     menu_layer.visible = true
     if which == "shop": shop_panel.visible = true
-    elif which == "collection": collection_panel.visible = true
+    elif which == "collection":
+        refresh_collection_panel()
+        collection_panel.visible = true
     elif which == "settings": settings_panel.visible = true
     elif which == "achievements":
         achievements_panel.visible = true
