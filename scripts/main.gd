@@ -56,6 +56,9 @@ var total_games: int = 0
 var total_prizes_won: int = 0
 var rarity_wins: Dictionary = {}
 var unlocked_achievements: Dictionary = {}
+# Исторические максимумы/накопленные значения достижений. Нужны, чтобы после
+# покупок, трат и миграций прогресс никогда не откатывался.
+var achievement_historical_values: Dictionary = {}
 var pending_new_achievements: Array[String] = []
 var pending_achievement_rewards_text: Array[String] = []
 var last_daily_bonus_date: String = ""
@@ -1312,6 +1315,7 @@ func get_server_game_state() -> Dictionary:
         "workshop_job_active": workshop_job_active, "workshop_job_name": workshop_job_name, "workshop_job_reward": workshop_job_reward,
         "level": player_level, "xp": player_xp, "xp_to_next": xp_to_next, "games": total_games,
         "total_prizes_won": total_prizes_won, "rarity_wins": rarity_wins, "achievements": unlocked_achievements,
+            "achievement_historical_values": achievement_historical_values,
         "last_daily_bonus_date": last_daily_bonus_date, "login_streak": login_streak, "last_login_claim_date": last_login_claim_date,
         "best_result": best_result, "best_result_xp": best_result_xp, "current_win_streak": current_win_streak,
         "best_win_streak": best_win_streak, "total_xp_earned": total_xp_earned, "highest_reward_rubles": highest_reward_rubles,
@@ -1528,8 +1532,13 @@ func apply_server_game_state(data: Dictionary) -> void:
         apply_music_settings()
         apply_language()
     if data.has("owned_items") and data["owned_items"] is Array:
+        # Серверный список — дополнительный источник истины. Объединяем его
+        # с локальным состоянием, не затирая уже известные покупки.
         var owned_server: Array = data.get("owned_items")
-        for i in range(owned_claws.size()): owned_claws[i] = owned_server.has("claw_%d" % (i + 1))
+        for i in range(owned_claws.size()):
+            if owned_server.has("claw_%d" % (i + 1)):
+                owned_claws[i] = true
+        owned_claws[0] = true
     if data.has("selected_claw"): selected_claw = clampi(int(data.get("selected_claw", selected_claw)), 0, claw_specs.size()-1)
     if data.has("upgrade_levels") and data["upgrade_levels"] is Array:
         upgrade_levels = _int_array_from_variant(data.get("upgrade_levels"), upgrade_levels)
@@ -9207,6 +9216,67 @@ func hide_collection_completion_popup() -> void:
     if collection_completion_popup and is_instance_valid(collection_completion_popup):
         collection_completion_popup.visible = false
 
+func recover_claw_ownership_from_saved_sources(data: Dictionary) -> bool:
+    # В старых версиях владение клешнями могло находиться не только в
+    # owned_claws, но и в серверном/магазинном списке owned_items. Никогда
+    # не заменяем уже известное владение на более короткий список — только
+    # объединяем все подтверждённые источники.
+    var changed := false
+    if data.has("owned_items") and data["owned_items"] is Array:
+        for raw_id in data["owned_items"]:
+            var sid := String(raw_id)
+            if sid.begins_with("claw_") and not sid.begins_with("claw_skin_"):
+                var n := int(sid.trim_prefix("claw_"))
+                var idx := n - 1
+                if idx >= 0 and idx < owned_claws.size() and not owned_claws[idx]:
+                    owned_claws[idx] = true
+                    changed = true
+    # Некоторые старые snapshots использовали словарь покупок.
+    for field in ["purchases", "purchase_history", "shop_purchases"]:
+        var raw: Variant = data.get(field, null)
+        if raw is Array:
+            for entry in raw:
+                var sid := ""
+                if entry is String:
+                    sid = String(entry)
+                elif entry is Dictionary:
+                    sid = String(entry.get("item_id", entry.get("id", "")))
+                if sid.begins_with("claw_") and not sid.begins_with("claw_skin_"):
+                    var idx := int(sid.trim_prefix("claw_")) - 1
+                    if idx >= 0 and idx < owned_claws.size() and not owned_claws[idx]:
+                        owned_claws[idx] = true
+                        changed = true
+        elif raw is Dictionary:
+            for key in raw.keys():
+                var sid := String(key)
+                var val: Variant = raw[key]
+                if sid.begins_with("claw_") and not sid.begins_with("claw_skin_") and bool(val):
+                    var idx := int(sid.trim_prefix("claw_")) - 1
+                    if idx >= 0 and idx < owned_claws.size() and not owned_claws[idx]:
+                        owned_claws[idx] = true
+                        changed = true
+    if not owned_claws.is_empty() and not owned_claws[0]:
+        owned_claws[0] = true
+        changed = true
+    return changed
+
+func update_achievement_historical_values() -> bool:
+    # Только показатели, которые по смыслу являются накопительными или
+    # историческими. Ежедневные/недельные текущие задания сюда не входят.
+    var changed := false
+    var historical_kinds := ["toys", "games", "rarity", "collections", "level", "rubles", "claws", "upgrades", "best_streak", "perfect", "heavy", "lucky", "xp", "max_reward", "chests_opened", "keys_earned", "exclusive", "workshop_level", "parts", "calibration", "overclock", "claw_skins", "toy_skins", "machine_skins", "referrals"]
+    for spec in achievement_specs:
+        var kind := String(spec.get("kind", ""))
+        if not historical_kinds.has(kind):
+            continue
+        var id := String(spec.get("id", ""))
+        var current := achievement_value(spec)
+        var old := int(achievement_historical_values.get(id, 0))
+        if current > old:
+            achievement_historical_values[id] = current
+            changed = true
+    return changed
+
 func audit_achievement_source_state() -> void:
     # Единая проверка источников достижений. Важно запускать её после загрузки
     # сохранения: старые версии могли сохранить инвентарь, но не заполнить
@@ -9270,57 +9340,55 @@ func audit_achievement_source_state() -> void:
     # «Накопите X ₽» означает когда-либо достигнутый баланс, а не деньги,
     # которые игрок обязан держать после последующей покупки.
     highest_balance_rubles = maxi(highest_balance_rubles, coins)
+    var history_changed := update_achievement_historical_values()
+    if history_changed:
+        save_game()
 
 func achievement_value(spec: Dictionary) -> int:
+    var current := 0
     match String(spec.get("kind", "")):
-        "toys": return total_prizes_won
-        "games": return total_games
-        "rarity": return int(rarity_wins.get(String(spec.get("rarity", "")), 0))
-        "collections": return completed_collections.size()
-        "level": return player_level
-        "rubles": return maxi(coins, highest_balance_rubles)
+        "toys": current = total_prizes_won
+        "games": current = total_games
+        "rarity": current = int(rarity_wins.get(String(spec.get("rarity", "")), 0))
+        "collections": current = completed_collections.size()
+        "level": current = player_level
+        "rubles": current = maxi(coins, highest_balance_rubles)
         "claws":
-            var count := 0
             for owned in owned_claws:
-                if owned: count += 1
-            return count
+                if owned: current += 1
         "upgrades":
-            var total := 0
-            for lvl in upgrade_levels: total += lvl
-            return total
-        "best_streak": return best_win_streak
-        "perfect": return perfect_grabs
-        "heavy": return heavy_toy_wins
-        "lucky": return lucky_toy_wins
-        "xp": return total_xp_earned
-        "max_reward": return highest_reward_rubles
-        "chests_opened": return total_chests_opened
-        "keys_earned": return total_keys_earned
-        "exclusive": return chest_exclusive_reward_count
-        "workshop_level": return workshop_level
-        "parts": return workshop_parts
-        "calibration": return workshop_calibration
-        "overclock": return 1 if workshop_overclock_games > 0 or workshop_overclock else 0
+            for lvl in upgrade_levels: current += lvl
+        "best_streak": current = best_win_streak
+        "perfect": current = perfect_grabs
+        "heavy": current = heavy_toy_wins
+        "lucky": current = lucky_toy_wins
+        "xp": current = total_xp_earned
+        "max_reward": current = highest_reward_rubles
+        "chests_opened": current = total_chests_opened
+        "keys_earned": current = total_keys_earned
+        "exclusive": current = chest_exclusive_reward_count
+        "workshop_level": current = workshop_level
+        "parts": current = workshop_parts
+        "calibration": current = workshop_calibration
+        "overclock": current = 1 if workshop_overclock_games > 0 or workshop_overclock else 0
         "claw_skins":
-            var count_claw_skins := 0
             for owned in owned_claw_skins:
-                if owned: count_claw_skins += 1
-            return count_claw_skins
+                if owned: current += 1
         "toy_skins":
-            var count_toy_skins := 0
             for owned in owned_toy_skins:
-                if owned: count_toy_skins += 1
-            return count_toy_skins
+                if owned: current += 1
         "machine_skins":
-            var count_machine_skins := 0
             for owned in owned_machine_skins:
-                if owned: count_machine_skins += 1
-            return count_machine_skins
-        "login_streak": return login_streak
-        "daily_claims": return total_daily_claims
-        "weekly_claims": return total_weekly_claims
-        "referrals": return referral_invites
-    return 0
+                if owned: current += 1
+        "login_streak": current = login_streak
+        "daily_claims": current = total_daily_claims
+        "weekly_claims": current = total_weekly_claims
+        "referrals": current = referral_invites
+    var kind := String(spec.get("kind", ""))
+    var historical_kinds := ["toys", "games", "rarity", "collections", "level", "rubles", "claws", "upgrades", "best_streak", "perfect", "heavy", "lucky", "xp", "max_reward", "chests_opened", "keys_earned", "exclusive", "workshop_level", "parts", "calibration", "overclock", "claw_skins", "toy_skins", "machine_skins", "referrals"]
+    if historical_kinds.has(kind):
+        current = maxi(current, int(achievement_historical_values.get(String(spec.get("id", "")), 0)))
+    return current
 
 func achievement_reward(spec: Dictionary) -> Dictionary:
     if spec.has("reward") and spec["reward"] is Dictionary:
@@ -10048,6 +10116,7 @@ func save_game() -> void:
             "total_prizes_won": total_prizes_won,
             "rarity_wins": rarity_wins,
             "achievements": unlocked_achievements,
+            "achievement_historical_values": achievement_historical_values,
             "last_daily_bonus_date": last_daily_bonus_date,
             "login_streak": login_streak,
             "last_login_claim_date": last_login_claim_date,
@@ -10162,6 +10231,7 @@ func load_save() -> void:
     # первые 3/4/6 предметов. Раньше такие массивы полностью игнорировались,
     # из-за чего уже купленные клешни/скины возвращались в состояние "не куплено".
     owned_claws = migrate_bool_array(data.get("owned_claws", owned_claws), claw_specs.size(), owned_claws)
+    recover_claw_ownership_from_saved_sources(data)
     owned_claws[0] = true
     var saved_claw_skins: Variant = data.get("owned_claw_skins", owned_claw_skins)
     owned_claw_skins = migrate_bool_array(saved_claw_skins, claw_skin_specs.size(), owned_claw_skins)
@@ -10228,6 +10298,8 @@ func load_save() -> void:
     if saved_rarity is Dictionary: rarity_wins = saved_rarity
     var saved_ach: Variant = data.get("achievements", {})
     if saved_ach is Dictionary: unlocked_achievements = saved_ach
+    var saved_ach_hist: Variant = data.get("achievement_historical_values", {})
+    if saved_ach_hist is Dictionary: achievement_historical_values = saved_ach_hist
     last_daily_bonus_date = String(data.get("last_daily_bonus_date", ""))
     login_streak = maxi(0, int(data.get("login_streak", 0)))
     last_login_claim_date = String(data.get("last_login_claim_date", ""))
