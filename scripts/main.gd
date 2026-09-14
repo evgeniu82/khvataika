@@ -594,9 +594,9 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"rubles_500","name":"ПЕРВЫЕ НАКОПЛЕНИЯ","desc":"Накопите 500 ₽.","kind":"rubles","value":500},
     {"id":"rubles_1000","name":"КАПИТАЛ","desc":"Накопите 1000 ₽.","kind":"rubles","value":1000},
     {"id":"rubles_5000","name":"БОЛЬШОЙ БАЛАНС","desc":"Накопите 5000 ₽.","kind":"rubles","value":5000},
-    {"id":"claws_3","name":"АРСЕНАЛ","desc":"Откройте 3 разные клешни.","kind":"claws","value":3},
-    {"id":"claws_6","name":"КОЛЛЕКЦИЯ КЛЕШНЕЙ","desc":"Откройте 6 разных клешней.","kind":"claws","value":6},
-    {"id":"claws_10","name":"ПОЛНЫЙ АРСЕНАЛ","desc":"Откройте все 10 клешней.","kind":"claws","value":10},
+    {"id":"games_1000","name":"ВЕЛИКИЙ МАРАФОН","desc":"Сыграйте 1000 раз.","kind":"games","value":1000},
+    {"id":"toys_1000","name":"БОЛЬШАЯ КОЛЛЕКЦИЯ","desc":"Достаньте 1000 игрушек.","kind":"toys","value":1000},
+    {"id":"rubles_10000","name":"СЕРЬЁЗНЫЙ КАПИТАЛ","desc":"Накопите 10 000 ₽.","kind":"rubles","value":10000},
     {"id":"upgrades_5","name":"ПЕРВАЯ НАСТРОЙКА","desc":"Купите 5 уровней улучшений.","kind":"upgrades","value":5},
     {"id":"upgrades_15","name":"ТЕХНИК","desc":"Купите 15 уровней улучшений.","kind":"upgrades","value":15},
     {"id":"upgrades_30","name":"ИНЖЕНЕР","desc":"Купите 30 уровней улучшений.","kind":"upgrades","value":30},
@@ -7270,7 +7270,7 @@ func build_achievements_panel() -> PanelContainer:
 
     var category_names := [
         "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
-        "ПРОГРЕСС", "ЭКОНОМИКА", "КЛЕШНИ", "УЛУЧШЕНИЯ",
+        "ПРОГРЕСС", "ЭКОНОМИКА", "УЛУЧШЕНИЯ",
         "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
     ]
     for category in category_names:
@@ -7317,7 +7317,7 @@ func refresh_achievements_panel() -> void:
 
     var category_names := [
         "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
-        "ПРОГРЕСС", "ЭКОНОМИКА", "КЛЕШНИ", "УЛУЧШЕНИЯ",
+        "ПРОГРЕСС", "ЭКОНОМИКА", "УЛУЧШЕНИЯ",
         "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
     ]
     for i in range(achievement_category_buttons.size()):
@@ -7388,14 +7388,12 @@ func achievement_matches_category(spec: Dictionary, category: String) -> bool:
             return kind == "level" or kind == "xp"
         "ЭКОНОМИКА":
             return kind == "rubles" or kind == "max_reward"
-        "КЛЕШНИ":
-            return kind == "claws" or kind == "calibration"
         "УЛУЧШЕНИЯ":
             return kind == "upgrades"
         "СУНДУКИ":
             return kind == "chests_opened" or kind == "keys_earned" or kind == "exclusive"
         "МАСТЕРСКАЯ":
-            return kind == "workshop_level"
+            return kind == "workshop_level" or kind == "parts" or kind == "calibration" or kind == "overclock"
         "СКИНЫ":
             return kind == "claw_skins" or kind == "toy_skins" or kind == "machine_skins"
         "СЕРИИ":
