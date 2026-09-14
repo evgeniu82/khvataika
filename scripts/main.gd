@@ -501,6 +501,9 @@ var popup_timer: float = 0.0
 var collection_completion_popup_name: String = ""
 var collection_completion_popup_reward: int = 0
 var collection_completion_popup_toys: String = ""
+var collection_completion_popup: PanelContainer
+var collection_completion_popup_timer: float = 0.0
+var collection_completion_popup_pending: bool = false
 var popup_achievement_label: Label
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
@@ -4242,6 +4245,7 @@ func build_ui() -> void:
     live_systems_panel = null
     await set_loading_status("ОКНО РЕЗУЛЬТАТА ГОТОВО...")
     build_result_popup()
+    build_collection_completion_popup()
     await get_tree().process_frame
     await set_loading_progress(93.0, "ОКНО РЕЗУЛЬТАТА ГОТОВО")
     await set_loading_status("HUD ЗАВЕРШЁН...")
@@ -8190,6 +8194,7 @@ func close_all_panels() -> void:
     if live_systems_panel: live_systems_panel.visible = false
     if stats_panel: stats_panel.visible = false
     if result_popup: result_popup.visible = false
+    if collection_completion_popup: collection_completion_popup.visible = false
     if sale_panel: sale_panel.visible = false
     if waiting_overlay: waiting_overlay.visible = false
     close_side_panels()
@@ -8367,6 +8372,13 @@ func _process(delta: float) -> void:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
             result_popup.visible = false
+            if collection_completion_popup_pending:
+                collection_completion_popup_pending = false
+                show_collection_completion_popup()
+    if collection_completion_popup_timer > 0.0:
+        collection_completion_popup_timer -= delta
+        if collection_completion_popup_timer <= 0.0 and collection_completion_popup and is_instance_valid(collection_completion_popup):
+            collection_completion_popup.visible = false
     if drop_state == 0 and hud_layer.visible:
         # Движение не прыгает между точками: кнопка задаёт цель, а каретка
         # плавно догоняет её с инерцией. Клавиатура также работает плавно.
@@ -8881,7 +8893,7 @@ func finalize_delivered_prize() -> void:
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
         if collection_completion_popup_name != "":
-            show_collection_completion_popup()
+            collection_completion_popup_pending = true
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -9053,22 +9065,85 @@ func check_collection_completion(collection_name: String) -> void:
         current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
         check_achievements()
 
+func build_collection_completion_popup() -> void:
+    collection_completion_popup = PanelContainer.new()
+    collection_completion_popup.name = "CollectionCompletionPopup"
+    collection_completion_popup.position = Vector2(105, 330)
+    collection_completion_popup.size = Vector2(870, 650)
+    collection_completion_popup.visible = false
+    collection_completion_popup.z_index = 700
+    style_panel(collection_completion_popup, Color("#241B16"), Color("#A3754D"), 26, 3)
+    hud_layer.add_child(collection_completion_popup)
+    var v := VBoxContainer.new()
+    v.alignment = BoxContainer.ALIGNMENT_CENTER
+    v.add_theme_constant_override("separation", 12)
+    collection_completion_popup.add_child(v)
+    var title := Label.new()
+    title.name = "Title"
+    title.text = "🏆  НОВАЯ КОЛЛЕКЦИЯ ОТКРЫТА!"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.add_theme_font_size_override("font_size", 30)
+    title.modulate = Color("#C6A27A")
+    v.add_child(title)
+    var name := Label.new()
+    name.name = "CollectionName"
+    name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    name.add_theme_font_size_override("font_size", 38)
+    name.modulate = Color("#F39C32")
+    v.add_child(name)
+    var info := Label.new()
+    info.name = "Info"
+    info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    info.add_theme_font_size_override("font_size", 20)
+    info.modulate = Color("#D8C3AA")
+    v.add_child(info)
+    var toys_label := Label.new()
+    toys_label.name = "Toys"
+    toys_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    toys_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    toys_label.add_theme_font_size_override("font_size", 18)
+    toys_label.modulate = Color("#F0E7DC")
+    v.add_child(toys_label)
+    var reward := Label.new()
+    reward.name = "Reward"
+    reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    reward.add_theme_font_size_override("font_size", 28)
+    reward.modulate = Color("#E1C29A")
+    v.add_child(reward)
+    var cont := Button.new()
+    cont.name = "ContinueButton"
+    cont.text = "▶  ПРОДОЛЖИТЬ СБОР КОЛЛЕКЦИЙ"
+    cont.custom_minimum_size = Vector2(0, 74)
+    cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+    style_button(cont, Color("#9A7653"))
+    cont.add_theme_font_size_override("font_size", 20)
+    cont.pressed.connect(hide_collection_completion_popup)
+    v.add_child(cont)
+
 func show_collection_completion_popup() -> void:
-    if not result_popup or collection_completion_popup_name == "":
+    if not collection_completion_popup or collection_completion_popup_name == "":
         return
-    if popup_title_label:
-        popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
-    popup_name_label.text = collection_completion_popup_name
-    popup_info_label.text = "Полная коллекция • Приз зачислен"
-    popup_xp_label.text = "💰 +%d ₽" % collection_completion_popup_reward
-    if popup_rating_label:
-        popup_rating_label.text = ""
-    popup_achievement_label.text = "🧸 " + collection_completion_popup_toys
-    popup_timer = 3.8
-    result_popup.visible = true
+    var title := collection_completion_popup.get_node_or_null("VBoxContainer/Title") as Label
+    var name := collection_completion_popup.get_node_or_null("VBoxContainer/CollectionName") as Label
+    var info := collection_completion_popup.get_node_or_null("VBoxContainer/Info") as Label
+    var toys_label := collection_completion_popup.get_node_or_null("VBoxContainer/Toys") as Label
+    var reward := collection_completion_popup.get_node_or_null("VBoxContainer/Reward") as Label
+    if title: title.text = "🏆  НОВАЯ КОЛЛЕКЦИЯ ОТКРЫТА!"
+    if name: name.text = collection_completion_popup_name
+    if info: info.text = "Коллекция полностью собрана!"
+    if toys_label: toys_label.text = "🧸 " + collection_completion_popup_toys
+    if reward: reward.text = "💰 ПОЛУЧЕНО: +%d ₽" % collection_completion_popup_reward
+    collection_completion_popup_timer = 8.0
+    collection_completion_popup.visible = true
     collection_completion_popup_name = ""
     collection_completion_popup_reward = 0
     collection_completion_popup_toys = ""
+
+func hide_collection_completion_popup() -> void:
+    collection_completion_popup_timer = 0.0
+    if collection_completion_popup and is_instance_valid(collection_completion_popup):
+        collection_completion_popup.visible = false
 
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
