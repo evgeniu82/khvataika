@@ -615,9 +615,92 @@ func get_collection_names() -> Array[String]:
     var result: Array[String] = []
     for toy in toys:
         var name := String(toy.get("collection", ""))
-        if name != "" and not result.has(name):
-            result.append(name)
-    return result
+        if name != "" and not result.has(name): result.append(name)
+    if not result.is_empty(): return result
+    return [
+        "ЛЕСНЫЕ ДРУЗЬЯ", "МИЛЫЕ МАЛЫШИ", "ДЖУНГЛИ", "ОКЕАН",
+        "КОСМОС", "ДРАКОНЫ", "ВОЛШЕБСТВО", "КИБЕР",
+        "ДИНОЗАВРЫ", "СУПЕРГЕРОИ", "СЛАДКИЙ МИР", "ПИРАТЫ",
+        "РОБОТЫ", "ФАНТАСТИКА", "СПОРТ", "МИР МОНСТРОВ"
+    ]
+
+func add_extended_collections() -> void:
+    var extra_toys: Array[Dictionary] = [
+        # ДИНОЗАВРЫ
+        {"name":"Рекс Рокки","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#6FA45A")},
+        {"name":"Трицератопс Три","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#8C6A4A")},
+        {"name":"Раптор Рэй","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":15.0,"color":Color("#E27A42")},
+        {"name":"Бронто Бум","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":11.0,"color":Color("#4D9A87")},
+        {"name":"Мега-Тиран","collection":"ДИНОЗАВРЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.2,"color":Color("#B53D58")},
+        # СУПЕРГЕРОИ
+        {"name":"Капитан Плюш","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":29.0,"color":Color("#356DDB")},
+        {"name":"Молния Макс","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#F2C23E")},
+        {"name":"Ночной Ниндзя","collection":"СУПЕРГЕРОИ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#4B4D70")},
+        {"name":"Робо-Герой","collection":"СУПЕРГЕРОИ","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#45B7C8")},
+        {"name":"Золотой Герой","collection":"СУПЕРГЕРОИ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.22,"color":Color("#F5B93D")},
+        # СЛАДКИЙ МИР
+        {"name":"Пончик Пинки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":32.0,"color":Color("#F38DB4")},
+        {"name":"Маршмеллоу Мими","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#F2E5D5")},
+        {"name":"Кекс Куки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#B97852")},
+        {"name":"Леденец Лаки","collection":"СЛАДКИЙ МИР","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#68C9E8")},
+        {"name":"Шоколадный Король","collection":"СЛАДКИЙ МИР","rarity":"ЭПИЧЕСКАЯ","weight":2.0,"color":Color("#6E3F32")},
+        # ПИРАТЫ
+        {"name":"Капитан Бакс","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#8B6548")},
+        {"name":"Попугай Пират","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#E44C55")},
+        {"name":"Кракен Крош","collection":"ПИРАТЫ","rarity":"РЕДКАЯ","weight":14.0,"color":Color("#7557B5")},
+        {"name":"Призрак Палубы","collection":"ПИРАТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.5,"color":Color("#B9D9D1")},
+        {"name":"Золотой Капитан","collection":"ПИРАТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.18,"color":Color("#E8B93D")},
+        # РОБОТЫ
+        {"name":"Бот Биби","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#6D8299")},
+        {"name":"Дроид Дэн","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#4FA5B7")},
+        {"name":"Меха-Лис","collection":"РОБОТЫ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#D46D45")},
+        {"name":"Кибер-Гигант","collection":"РОБОТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.7,"color":Color("#4C5DE7")},
+        {"name":"Омега-9000","collection":"РОБОТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.14,"color":Color("#B7C8D8")},
+        # ФАНТАСТИКА
+        {"name":"Дракончик Эмбер","collection":"ФАНТАСТИКА","rarity":"ОБЫЧНАЯ","weight":25.0,"color":Color("#E36A43")},
+        {"name":"Грифон Грей","collection":"ФАНТАСТИКА","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#8B78C9")},
+        {"name":"Феникс Файр","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#EF6B38")},
+        {"name":"Лунный Дух","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":1.8,"color":Color("#8AB5F2")},
+        {"name":"Древний Дракон","collection":"ФАНТАСТИКА","rarity":"ЛЕГЕНДАРНАЯ","weight":0.08,"color":Color("#D7A93D")},
+        # СПОРТ
+        {"name":"Футбольный Боб","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":33.0,"color":Color("#F4F4F0")},
+        {"name":"Баскет-Би","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#E98537")},
+        {"name":"Хоккейный Хаски","collection":"СПОРТ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#6A89C8")},
+        {"name":"Чемпион","collection":"СПОРТ","rarity":"ЭПИЧЕСКАЯ","weight":2.4,"color":Color("#D3A33C")},
+        {"name":"Олимпийский Легендар","collection":"СПОРТ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.10,"color":Color("#7BC6A8")},
+        # МИР МОНСТРОВ
+        {"name":"Монстрик Мио","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#63B76D")},
+        {"name":"Пухлый Буба","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#7D63B8")},
+        {"name":"Зубастик Зик","collection":"МИР МОНСТРОВ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#B84F62")},
+        {"name":"Теневой Монстр","collection":"МИР МОНСТРОВ","rarity":"ЭПИЧЕСКАЯ","weight":2.3,"color":Color("#4B4A67")},
+        {"name":"Король Монстров","collection":"МИР МОНСТРОВ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.07,"color":Color("#B7A143")}
+    ]
+    for toy in extra_toys:
+        toys.append(toy)
+
+func add_progressive_achievements() -> void:
+    # Многоуровневые достижения: каждый следующий уровень требует больше предыдущего.
+    var tiers := [
+        {"kind":"toys","prefix":"toy_master","name":"ОХОТНИК","desc":"Достаньте %d игрушек.","values":[75,150,300,600,1200,2500,5000,10000]},
+        {"kind":"games","prefix":"game_master","name":"МАРАФОНЕЦ","desc":"Сыграйте %d раз.","values":[1000,2500,5000,10000,20000,40000,75000,150000]},
+        {"kind":"collections","prefix":"collection_master","name":"КОЛЛЕКЦИОНЕР","desc":"Завершите %d коллекций.","values":[10,12,14,16]},
+        {"kind":"level","prefix":"level_master","name":"УРОВЕНЬ","desc":"Достигните %d уровня.","values":[150,300,450,600,750,850,925,975]},
+        {"kind":"rarity","rarity":"РЕДКАЯ","prefix":"rare_master","name":"ОХОТНИК ЗА РЕДКИМИ","desc":"Получите %d редких игрушек.","values":[20,50,100,250,500,1000]},
+        {"kind":"rarity","rarity":"ЭПИЧЕСКАЯ","prefix":"epic_master","name":"ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР","desc":"Получите %d эпических игрушек.","values":[10,25,50,100,250,500]},
+        {"kind":"rarity","rarity":"ЛЕГЕНДАРНАЯ","prefix":"legend_master","name":"ЛЕГЕНДАРНЫЙ ОХОТНИК","desc":"Получите %d легендарных игрушек.","values":[2,5,10,25,50,100]},
+        {"kind":"upgrades","prefix":"upgrade_master","name":"ИНЖЕНЕР","desc":"Купите %d уровней улучшений.","values":[60,80,100,125,150,200]}
+    ]
+    for tier in tiers:
+        var values: Array = tier["values"]
+        for i in range(values.size()):
+            var value: int = int(values[i])
+            var id := "%s_%d" % [String(tier["prefix"]), i + 1]
+            if _achievement_exists(id):
+                continue
+            var spec: Dictionary = {"id":id,"name":"%s %d" % [String(tier["name"]), i + 1],"desc":String(tier["desc"]) % value,"kind":String(tier["kind"]),"value":value}
+            if tier.has("rarity"): spec["rarity"] = String(tier["rarity"])
+            achievement_specs.append(spec)
+
 
 func add_diverse_achievements() -> void:
     # Дополнительные достижения разных типов: серии, сундуки, мастерская,
@@ -6562,52 +6645,52 @@ func build_collection_panel() -> PanelContainer:
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 8)
+    v.add_theme_constant_override("separation", 12)
     v.custom_minimum_size = Vector2(940, 0)
     scroll.add_child(v)
     var h := Label.new()
     h.text = "КОЛЛЕКЦИИ"
     h.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    h.add_theme_font_size_override("font_size", 34)
+    h.add_theme_font_size_override("font_size", 40)
     v.add_child(h)
     var progress := Label.new()
-    var names_list: Array[String] = get_collection_names()
-    progress.text = "СОБРАНО: %d / %d" % [completed_collections.size(), names_list.size()]
+    var complete_count: int = completed_collections.size()
+    var collection_names: Array[String] = get_collection_names()
+    progress.text = "КОЛЛЕКЦИИ: %d / %d    •    УРОВЕНЬ %d" % [complete_count, collection_names.size(), player_level]
     progress.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    progress.add_theme_font_size_override("font_size", 20)
+    progress.add_theme_font_size_override("font_size", 21)
     progress.modulate = GOLD
     v.add_child(progress)
-    for cname in names_list:
-        var needed := 0
-        var got := 0
-        var toy_names: Array[String] = []
+    for cname in collection_names:
+        var needed: int = 0
+        var got: int = 0
         for toy in toys:
-            if String(toy.get("collection", "")) != cname:
-                continue
-            needed += 1
-            var toy_name := String(toy.get("name", ""))
-            if collection.has(toy_name): got += 1
-            toy_names.append(("✓ " if collection.has(toy_name) else "○ ") + toy_name)
+            if String(toy["collection"]) == cname:
+                needed += 1
+                if collection.has(String(toy["name"])): got += 1
+        var card := VBoxContainer.new()
+        card.add_theme_constant_override("separation", 3)
         var title := Label.new()
-        title.text = ("🏆 " if completed_collections.has(cname) else "▣ ") + cname + "   %d/%d" % [got, needed]
-        title.add_theme_font_size_override("font_size", 23)
+        var done: bool = completed_collections.has(cname)
+        title.text = ("🏆 " if done else "▣ ") + cname + "   •   %d / %d" % [got, needed]
+        title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
-        v.add_child(title)
+        card.add_child(title)
         var names := Label.new()
-        names.text = "   •   ".join(toy_names)
+        var parts: Array[String] = []
+        for toy in toys:
+            if String(toy["collection"]) == cname:
+                var mark: String = "✓" if collection.has(String(toy["name"])) else "○"
+                parts.append(mark + " " + String(toy["name"]) + " [" + String(toy["rarity"]) + "]")
+        names.text = "   •   ".join(parts)
         names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        names.add_theme_font_size_override("font_size", 17)
+        names.add_theme_font_size_override("font_size", 18)
         names.modulate = Color("#F0E7DC") if got == needed else Color("#9B8D80")
-        v.add_child(names)
-        var reward := Label.new()
-        var reward_rub := 50 if needed >= 4 and needed <= 4 else 100
-        reward.text = "Приз: %d ₽ за полную коллекцию" % reward_rub
-        reward.add_theme_font_size_override("font_size", 16)
-        reward.modulate = Color("#C9A96E")
-        v.add_child(reward)
+        card.add_child(names)
+        v.add_child(card)
     var close := Button.new()
     close.text = "НАЗАД К АВТОМАТУ"
-    close.custom_minimum_size = Vector2(0, 72)
+    close.custom_minimum_size = Vector2(0, 82)
     close.pressed.connect(func(): show_main_menu())
     v.add_child(close)
     return p
@@ -7208,7 +7291,7 @@ func refresh_profile_panel() -> void:
         ["Процент побед", "%.1f%%" % win_rate],
         ["Лучшая серия", str(best_win_streak)],
         ["Достижения", "%d / %d" % [unlocked_achievements.size(), achievement_specs.size()]],
-        ["Коллекции", "%d / %d" % [completed_collections.size(), get_collection_names().size()]],
+        ["Коллекции", "%d / 8" % completed_collections.size()],
         ["Клешни", "%d / %d" % [owned_claws_count, claw_specs.size()]],
         ["Уровней улучшений", str(total_upgrades)],
         ["Текущая клешня", String(claw_specs[selected_claw]["name"])],
@@ -7321,7 +7404,7 @@ func refresh_stats_panel() -> void:
         ["ПРОГРЕСС", [
             ["Уровень игрока", str(player_level)],
             ["Достижения", "%d / %d" % [unlocked_achievements.size(), achievement_specs.size()]],
-            ["Завершённые коллекции", "%d / %d" % [completed_collections.size(), get_collection_names().size()]],
+            ["Завершённые коллекции", "%d / 8" % completed_collections.size()],
             ["Открытые клешни", "%d / %d" % [count_owned_claws(), claw_specs.size()]],
             ["Уровни улучшений", str(total_upgrade_levels())]
         ]]
@@ -8691,7 +8774,6 @@ func finalize_delivered_prize() -> void:
     last_prize_collection = String(d.get("collection", ""))
     last_prize_rarity = String(d.get("rarity", ""))
     var previous_count: int = 0
-    var collection_completed_now := false
     if kind == "capsule":
         last_reward_rubles = randi_range(int(d.get("reward_min", 3)), int(d.get("reward_max", 12)))
         last_reward_rubles = maxi(last_reward_rubles, int(round(last_reward_rubles * active_event_reward_mult)))
@@ -8726,7 +8808,7 @@ func finalize_delivered_prize() -> void:
             if last_prize_xp > best_result_xp:
                 best_result_xp = last_prize_xp
                 best_result = "%s • +%d XP" % [last_prize_name, last_prize_xp]
-        collection_completed_now = check_collection_completion(last_prize_collection)
+        check_collection_completion(last_prize_collection)
         current_result = "🎉 ДОСТАЛ: %s • %s" % [last_prize_name, last_prize_rarity]
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
@@ -8746,13 +8828,6 @@ func finalize_delivered_prize() -> void:
         last_reward_rubles = maxi(0, coins - coins_before_prize)
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
-        if collection_completed_now and result_popup:
-            if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
-            popup_name_label.text = last_prize_collection
-            popup_info_label.text = "Все игрушки коллекции собраны"
-            popup_xp_label.text = current_result
-            if popup_rating_label: popup_rating_label.text = "Награда уже зачислена"
-            popup_timer = 4.0
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8887,25 +8962,22 @@ func award_toy_xp(rarity: String) -> int:
         player_xp = xp_to_next
     return gained
 
-func check_collection_completion(collection_name: String) -> bool:
+func check_collection_completion(collection_name: String) -> void:
     if completed_collections.has(collection_name):
-        return false
-    var needed := 0
-    var got := 0
+        return
+    var needed: int = 0
+    var got: int = 0
     for toy in toys:
-        if String(toy.get("collection", "")) == collection_name:
+        if String(toy["collection"]) == collection_name:
             needed += 1
-            if collection.has(String(toy.get("name", ""))):
+            if collection.has(String(toy["name"])):
                 got += 1
     if needed > 0 and got >= needed:
         completed_collections[collection_name] = true
-        # Простая награда без новых окон и тяжёлых систем.
-        var reward := 50 if needed <= 4 else 100
+        var reward: int = 60 + needed * 10
         coins += reward
         current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
         check_achievements()
-        return true
-    return false
 
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
