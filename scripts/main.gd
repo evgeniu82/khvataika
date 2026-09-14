@@ -627,6 +627,18 @@ func get_collection_names() -> Array[String]:
         "РОБОТЫ", "ФАНТАСТИКА", "СПОРТ", "МИР МОНСТРОВ"
     ]
 
+func sync_collection_from_inventory() -> void:
+    # Синхронизируем коллекцию с фактическим инвентарём игрушек.
+    # Это восстанавливает отметки даже в старом сохранении, где
+    # toy_inventory_counts уже есть, а collection ещё не заполнен.
+    for toy in toys:
+        var toy_name := String(toy.get("name", ""))
+        if toy_name == "":
+            continue
+        if int(toy_inventory_counts.get(toy_name, 0)) > 0:
+            collection[toy_name] = String(toy.get("rarity", "ОБЫЧНАЯ"))
+
+
 func add_extended_collections() -> void:
     var extra_toys: Array[Dictionary] = [
         # ДИНОЗАВРЫ
@@ -796,6 +808,7 @@ func _ready() -> void:
         for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
+    sync_collection_from_inventory()
     # ID игрока нужен и в полностью офлайн-режиме, чтобы профиль не зависал
     # на «ПОЛУЧАЕМ…». Генерируем его сразу после загрузки сохранения.
     ensure_player_id()
@@ -8999,7 +9012,9 @@ func check_collection_completion(collection_name: String) -> void:
     for toy in toys:
         if String(toy["collection"]) == collection_name:
             needed += 1
-            if collection.has(String(toy["name"])):
+            var toy_name := String(toy["name"])
+            if collection.has(toy_name) or int(toy_inventory_counts.get(toy_name, 0)) > 0:
+                collection[toy_name] = String(toy.get("rarity", "ОБЫЧНАЯ"))
                 got += 1
     if needed > 0 and got >= needed:
         completed_collections[collection_name] = true
