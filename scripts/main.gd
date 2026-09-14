@@ -1485,6 +1485,16 @@ func apply_server_game_state(data: Dictionary) -> void:
         for item_id in owned_items_remote:
             if item_id is String:
                 var sid := String(item_id)
+                # Серверный owned_items содержит точный ID купленной клешни.
+                # Переносим его в локальный журнал владения, чтобы прогресс
+                # достижений обновлялся даже если owned_claws ещё не пришёл
+                # отдельным полем в snapshot.
+                var claw_id := _canonical_claw_id(sid)
+                if claw_id != "" and not owned_claw_ids.has(claw_id):
+                    owned_claw_ids.append(claw_id)
+                    var claw_idx := int(claw_id.trim_prefix("claw_")) - 1
+                    if claw_idx >= 0 and claw_idx < owned_claws.size():
+                        owned_claws[claw_idx] = true
                 if sid.begins_with("claw_skin_"):
                     var skin_index := clampi(int(sid.trim_prefix("claw_skin_")), 0, maxi(0, owned_claw_skins.size() - 1))
                     if skin_index >= 0 and skin_index < owned_claw_skins.size():
@@ -2111,7 +2121,14 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     var bought: Variant = data.get("item", {})
                     if bought is Dictionary and String(bought.get("category", "")) == "claws":
                         var bought_effect: Dictionary = bought.get("effect", {}) if bought.get("effect", {}) is Dictionary else {}
-                        var bought_index := clampi(int(bought_effect.get("claw_index", selected_claw)), 0, claw_specs.size() - 1)
+                        var bought_id_from_server := String(bought.get("id", ""))
+                        var bought_index := -1
+                        if bought_effect.has("claw_index"):
+                            bought_index = clampi(int(bought_effect.get("claw_index", 0)), 0, claw_specs.size() - 1)
+                        elif _canonical_claw_id(bought_id_from_server) != "":
+                            bought_index = clampi(int(_canonical_claw_id(bought_id_from_server).trim_prefix("claw_")) - 1, 0, claw_specs.size() - 1)
+                        else:
+                            bought_index = clampi(selected_claw, 0, claw_specs.size() - 1)
                         selected_claw = bought_index
                         # Сервер подтвердил покупку: сразу записываем владение
                         # в оба локальных источника, чтобы прогресс достижения
@@ -5858,10 +5875,10 @@ func build_hud() -> void:
 func build_achievement_strip() -> void:
     achievement_strip = PanelContainer.new()
     achievement_strip.name = "AchievementStrip"
-    # Одна лёгкая строка строго по центру между вторыми боковыми кружками.
-    # Фиксированный размер не зависит от длины текста и не создаёт растяжения.
+    # Лёгкая строка строго по центру между вторыми боковыми кружками.
+    # Размер будет рассчитан под конкретный текст при показе.
     achievement_strip.position = Vector2(190, 286)
-    achievement_strip.size = Vector2(700, 48)
+    achievement_strip.size = Vector2(360, 52)
     achievement_strip.visible = false
     achievement_strip.z_index = 650
     style_panel(achievement_strip, Color("#241B16"), Color("#9A704B"), 14, 2)
@@ -5870,19 +5887,16 @@ func build_achievement_strip() -> void:
     achievement_strip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     achievement_strip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-    achievement_strip_label.clip_text = true
-    achievement_strip_label.add_theme_font_size_override("font_size", 14)
+    achievement_strip_label.clip_text = false
+    achievement_strip_label.add_theme_font_size_override("font_size", 16)
     achievement_strip_label.modulate = Color("#E8C58E")
     achievement_strip_label.add_theme_color_override("font_outline_color", Color("#120E0A"))
     achievement_strip_label.add_theme_constant_override("outline_size", 2)
+    achievement_strip_label.custom_minimum_size = Vector2(0, 48)
     achievement_strip.add_child(achievement_strip_label)
 
 func _achievement_strip_short_name(value: String) -> String:
-    var text := value.replace("\n", " • ").strip_edges()
-    # Длинные серверные названия не должны переноситься на вторую строку.
-    if text.length() > 28:
-        text = text.substr(0, 27).strip_edges() + "…"
-    return text
+    return value.replace("\n", " • ").strip_edges()
 
 func show_achievement_strip() -> void:
     if not achievement_strip or not achievement_strip_label:
@@ -5890,8 +5904,7 @@ func show_achievement_strip() -> void:
     if pending_new_achievements.is_empty():
         return
 
-    # Одно уведомление = одно достижение. Никаких троек, объединённых
-    # в одну строку: так окно всегда выглядит одинаково аккуратно.
+    # Одно уведомление = одно достижение. Показываем их строго по очереди.
     var total := pending_new_achievements.size()
     achievement_strip_batch_index = clampi(achievement_strip_batch_index, 0, total - 1)
     var achievement_name := _achievement_strip_short_name(
@@ -5899,10 +5912,12 @@ func show_achievement_strip() -> void:
     )
 
     achievement_strip_label.text = "🏆  " + achievement_name
-    # Небольшая фиксированная строка по центру HUD. Текст не переносится и
-    # никогда не меняет размер окна.
-    achievement_strip.position = Vector2(190, 286)
-    achievement_strip.size = Vector2(700, 48)
+    # Подгоняем ширину панели под фактическую строку. Есть разумные пределы,
+    # чтобы очень длинное название не закрыло боковые элементы HUD.
+    var text_width := achievement_strip_label.get_minimum_size().x + 34.0
+    var strip_width := clampf(text_width, 280.0, 780.0)
+    achievement_strip.size = Vector2(strip_width, 52)
+    achievement_strip.position = Vector2((1080.0 - strip_width) * 0.5, 286)
     achievement_strip_timer = 2.8
     achievement_strip.visible = true
 
