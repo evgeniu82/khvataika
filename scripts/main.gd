@@ -8035,6 +8035,30 @@ func get_referral_link() -> String:
     # Домен можно заменить перед публикацией, не меняя UI или структуру данных.
     return "https://khvataika.ru/r/" + referral_code
 
+func share_referral_link() -> void:
+    var link := get_referral_link()
+    var share_text := "🎁 Заходи в «Хватайку»!\nПолучи подарок за приглашение по моей ссылке:\n%s\n\nЕсли ссылка не сработает, введи код: %s" % [link, referral_code]
+    # Android: открываем системное меню «Поделиться», чтобы пользователь мог
+    # выбрать любой установленный мессенджер или социальную сеть.
+    if _is_android_runtime_available():
+        var runtime = Engine.get_singleton("AndroidRuntime")
+        var context = runtime.getActivity()
+        if not context:
+            context = runtime.getApplicationContext()
+        if context:
+            var Intent = JavaClassWrapper.wrap("android.content.Intent")
+            var intent = Intent.Intent()
+            intent.setAction("android.intent.action.SEND")
+            intent.setType("text/plain")
+            intent.putExtra("android.intent.extra.TEXT", share_text)
+            var chooser = Intent.createChooser(intent, "Пригласить друга")
+            context.startActivity(chooser)
+            referral_status_label.text = "Выбери приложение, через которое отправить приглашение."
+            return
+    # Без Android / в редакторе сохраняем ссылку как безопасный резервный вариант.
+    DisplayServer.clipboard_set(link)
+    referral_status_label.text = "Ссылка скопирована. Отправь её другу."
+
 func process_incoming_referral() -> void:
     if referral_used:
         return
@@ -8144,36 +8168,45 @@ func build_referral_panel() -> PanelContainer:
     )
     cv.add_child(copy_code)
 
+    # Персональная ссылка оформлена отдельной карточкой, в точности по логике
+    # карточки реферального кода: заголовок → ссылка → отдельная кнопка копирования.
+    var link_card := PanelContainer.new()
+    style_panel(link_card, Color("#1A130F"), Color("#76583F"), 16, 2)
+    v.add_child(link_card)
+    var lv := VBoxContainer.new()
+    lv.add_theme_constant_override("separation", 7)
+    link_card.add_child(lv)
+
     var link_title := Label.new()
     link_title.text = "ТВОЯ ПЕРСОНАЛЬНАЯ ССЫЛКА"
     link_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     link_title.add_theme_font_size_override("font_size", 14)
     link_title.modulate = Color("#C09A70")
-    v.add_child(link_title)
+    lv.add_child(link_title)
+
     referral_link_label = Label.new()
     referral_link_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     referral_link_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     referral_link_label.add_theme_font_size_override("font_size", 17)
     referral_link_label.modulate = Color("#E1C29A")
-    v.add_child(referral_link_label)
+    lv.add_child(referral_link_label)
 
     var copy := Button.new()
-    copy.text = "🔗  СКОПИРОВАТЬ ССЫЛКУ"
-    copy.custom_minimum_size = Vector2(0, 58)
-    style_button(copy, Color("#9A7653"))
+    copy.text = "🔗  КОПИРОВАТЬ ССЫЛКУ"
+    copy.custom_minimum_size = Vector2(0, 55)
+    style_button(copy, Color("#76583F"))
     copy.pressed.connect(func():
         DisplayServer.clipboard_set(get_referral_link())
-        referral_status_label.text = "Ссылка скопирована. Отправь её другу."
+        referral_status_label.text = "Ссылка скопирована."
     )
-    v.add_child(copy)
+    lv.add_child(copy)
 
     var share := Button.new()
     share.text = "📤  ПРИГЛАСИТЬ ДРУГА"
     share.custom_minimum_size = Vector2(0, 62)
     style_button(share, Color("#B98B5C"))
     share.pressed.connect(func():
-        DisplayServer.clipboard_set(get_referral_link())
-        referral_status_label.text = "Ссылка скопирована — отправь её другу через удобный мессенджер."
+        share_referral_link()
     )
     v.add_child(share)
 
