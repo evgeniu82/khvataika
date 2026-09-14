@@ -419,6 +419,10 @@ var seasons_panel: PanelContainer
 var vip_owned: Array[bool] = []
 var vip_selected: int = 0
 var active_season_id: String = ""
+var vip_field_offer: PanelContainer
+var vip_field_offer_pulse: float = 0.0
+var vip_effect_index: int = -1
+var vip_season_pass_owned: bool = false
 
 # Сундуки и мастерская.
 var chests_panel: PanelContainer
@@ -449,15 +453,19 @@ var workshop_calibration: int = 0
 var workshop_overclock: bool = false
 var workshop_overclock_games: int = 0
 
+# VIP-каталог. Сейчас все товары бесплатны для тестирования.
+# Поле price оставлено для будущего подключения реальных платежей RuStore.
 var vip_specs: Array[Dictionary] = [
-    {"name":"GOLDEN GRIP ELITE", "price":2500, "desc":"+8% к силе захвата", "bonus":0.08},
-    {"name":"VIP BOOST", "price":3200, "desc":"+25% к наградам", "reward":0.25},
-    {"name":"LUCKY PASS", "price":3800, "desc":"+10% к шансу редкого приза", "luck":0.10},
-    {"name":"FREE PLAY", "price":4500, "desc":"Одна бесплатная игра каждый день", "daily":1},
-    {"name":"ROYAL CLAW", "price":5500, "desc":"Эксклюзивная золотая клешня", "skin":5},
-    {"name":"VIP MACHINE", "price":7000, "desc":"Эксклюзивный корпус аппарата", "machine":9},
-    {"name":"MYTHIC TOYS", "price":8500, "desc":"Открывает мифическую серию игрушек", "toy":11},
-    {"name":"VIP MASTER", "price":12000, "desc":"+15% к силе и +15% к наградам", "bonus":0.15, "reward":0.15}
+    {"id":"vip_status", "category":"👑 VIP-СТАТУС", "name":"👑 VIP-СТАТУС", "price":0, "desc":"Золотой VIP-статус и специальный VIP-бейдж.", "kind":"status"},
+    {"id":"vip_machine_neon", "category":"🕹️ СКИНЫ АВТОМАТОВ", "name":"🌈 NEON ROYAL", "price":0, "desc":"Эксклюзивный неоновый корпус VIP.", "kind":"machine", "machine_color":Color("#5C3A91"), "machine_light":Color("#FF5CFF")},
+    {"id":"vip_machine_gold", "category":"🕹️ СКИНЫ АВТОМАТОВ", "name":"💎 DIAMOND GOLD", "price":0, "desc":"Эксклюзивный золотой корпус с холодным светом.", "kind":"machine", "machine_color":Color("#8C6A24"), "machine_light":Color("#FFF0A0")},
+    {"id":"vip_claw_royal", "category":"🦾 ЭКСКЛЮЗИВНЫЕ КЛЕШНИ", "name":"👑 ROYAL CLAW", "price":0, "desc":"Эксклюзивная золотая VIP-клешня.", "kind":"claw", "claw_color":Color("#FFD85A")},
+    {"id":"vip_claw_neon", "category":"🦾 ЭКСКЛЮЗИВНЫЕ КЛЕШНИ", "name":"⚡ NEON CLAW", "price":0, "desc":"Неоновая клешня с ярким эффектом.", "kind":"claw", "claw_color":Color("#63F6FF")},
+    {"id":"vip_pack_starter", "category":"🎁 VIP-НАБОРЫ", "name":"🎁 VIP STARTER", "price":0, "desc":"VIP-статус + Royal Claw + Neon Royal.", "kind":"bundle", "bundle":[0,3,1]},
+    {"id":"vip_pack_ultimate", "category":"🎁 VIP-НАБОРЫ", "name":"💎 VIP ULTIMATE", "price":0, "desc":"Полный VIP-набор: статус, две клешни и два автомата.", "kind":"bundle", "bundle":[0,2,3,4,1]},
+    {"id":"vip_effect_gold", "category":"✨ ЭФФЕКТЫ", "name":"✨ GOLDEN GRAB", "price":0, "desc":"Золотое свечение клешни и кабеля.", "kind":"effect", "effect":"gold"},
+    {"id":"vip_effect_neon", "category":"✨ ЭФФЕКТЫ", "name":"⚡ NEON BURST", "price":0, "desc":"Неоновая подсветка при активном VIP-эффекте.", "kind":"effect", "effect":"neon"},
+    {"id":"vip_season_pass", "category":"🎟️ VIP-ПРОПУСК СЕЗОНА", "name":"🎟️ VIP SEASON PASS", "price":0, "desc":"VIP-доступ к сезонной линии наград. Пока открыт для теста.", "kind":"season_pass"}
 ]
 
 var season_specs: Array[Dictionary] = [
@@ -1369,7 +1377,7 @@ func get_server_game_state() -> Dictionary:
         "owned_claws": owned_claws, "owned_claw_ids": owned_claw_ids, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
         "owned_machine_skins": owned_machine_skins, "selected_claw_skin": selected_claw_skin,
         "selected_toy_skin": selected_toy_skin, "selected_machine_skin": selected_machine_skin,
-        "vip_owned": vip_owned, "vip_selected": vip_selected, "collection": collection,
+        "vip_owned": vip_owned, "vip_selected": vip_selected, "vip_season_pass_owned": vip_season_pass_owned, "collection": collection,
         "toy_inventory_counts": toy_inventory_counts, "completed_collections": completed_collections,
         "upgrades": upgrade_levels, "claw": selected_claw, "promo_codes_used": promo_codes_used,
         "return_bonus_days": return_bonus_days, "return_bonus_available": return_bonus_available,
@@ -1481,7 +1489,8 @@ func apply_server_game_state(data: Dictionary) -> void:
     selected_machine_skin = clampi(int(data.get("selected_machine_skin", selected_machine_skin)), 0, maxi(0, machine_skin_specs.size() - 1))
     arr = data.get("vip_owned", vip_owned)
     vip_owned = _bool_array_from_variant(arr, vip_owned)
-    vip_selected = clampi(int(data.get("vip_selected", vip_selected)), 0, maxi(0, vip_specs.size() - 1))
+    vip_selected = clampi(int(data.get("vip_selected", vip_selected)), -1, maxi(0, vip_specs.size() - 1))
+    vip_season_pass_owned = bool(data.get("vip_season_pass_owned", vip_season_pass_owned))
     selected_claw = clampi(int(data.get("claw", selected_claw)), 0, maxi(0, claw_specs.size() - 1))
     var d: Variant = data.get("collection", collection)
     if d is Dictionary: collection = d
@@ -2461,7 +2470,7 @@ func refresh_season_pass_panel() -> void:
         progress.value = float(season_pass_xp)
     var tracks := season_pass_panel.get_node_or_null("ScrollContainer/SeasonPassContent/SeasonPassTracks") as Label
     if tracks:
-        tracks.text = "БЕСПЛАТНАЯ ЛИНИЯ  •  💰 рубли  🔑 ключи  ⚙ детали  📦 сундуки  •  🎁 бонус на каждом 5-м уровне"
+        tracks.text = ("БЕСПЛАТНАЯ ЛИНИЯ  •  ⭐ VIP ЛИНИЯ ОТКРЫТА  •  💰 рубли  🔑 ключи  ⚙ детали  📦 сундуки" if vip_season_pass_owned else "БЕСПЛАТНАЯ ЛИНИЯ  •  ⭐ VIP ЛИНИЯ ЗАКРЫТА  •  💰 рубли  🔑 ключи  ⚙ детали  📦 сундуки")
     var levels := season_pass_panel.get_node_or_null("ScrollContainer/SeasonPassContent/SeasonLevels") as GridContainer
     if levels:
         for i in range(levels.get_child_count()):
@@ -4540,6 +4549,7 @@ func build_ui() -> void:
     gameplay_modal_blocker.gui_input.connect(_on_gameplay_modal_blocker_gui_input)
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
+    build_vip_field_offer()
     build_achievement_strip()
     await get_tree().process_frame
     await set_loading_progress(83.0, "HUD ГОТОВ")
@@ -6263,6 +6273,8 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
     update_ui()
     return selected
 func buy_claw_skin(index: int) -> void:
+    vip_selected = -1
+    vip_effect_index = -1
     # Жёсткая привязка магазина: СКИН 01 = стартовая коричневая клешня,
     # СКИН 02 = бирюзовая клешня, СКИН 03+ = следующие позиции по порядку.
     # Не допускаем сдвига индексов между кнопкой магазина и реальным скином.
@@ -6281,6 +6293,7 @@ func buy_claw_skin(index: int) -> void:
         apply_shop_visuals()
         save_game()
 func buy_toy_skin(index: int) -> void:
+    vip_selected = -1
     if index < 0 or index >= toy_skin_specs.size(): return
     if index == 0:
         owned_toy_skins[0] = true
@@ -6297,6 +6310,8 @@ func buy_toy_skin(index: int) -> void:
         build_prizes()
         save_game()
 func buy_machine_skin(index: int) -> void:
+    vip_selected = -1
+    vip_effect_index = -1
     if index < 0 or index >= machine_skin_specs.size(): return
     if index == 0:
         owned_machine_skins[0] = true
@@ -6312,6 +6327,8 @@ func buy_machine_skin(index: int) -> void:
         save_game()
 
 func apply_shop_visuals() -> void:
+    if vip_effect_index < 0:
+        _clear_vip_effect_visual()
     var current_machine: Node3D = get_node_or_null("PremiumClawMachine") as Node3D
     if claw and selected_claw_skin < claw_skin_specs.size():
         var c: Color = claw_skin_specs[selected_claw_skin]["color"]
@@ -6349,50 +6366,241 @@ func apply_shop_visuals() -> void:
                     if toy_mesh:
                         var toy_mat := toy_mesh.material_override as StandardMaterial3D
                         if toy_mat: toy_mat.albedo_color = tint
+    # Если выбран VIP-эффект/эксклюзив, применяем его поверх обычного скина.
+    if vip_effect_index >= 0 and vip_effect_index < vip_specs.size():
+        _apply_vip_effect_visual()
+    if vip_selected >= 0 and vip_selected < vip_specs.size():
+        var vip_kind := String(vip_specs[vip_selected].get("kind", ""))
+        if vip_kind == "claw" or vip_kind == "machine":
+            _apply_vip_item(vip_selected)
 func build_vip_panel() -> PanelContainer:
-    var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
-    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
-    var scroll := ScrollContainer.new(); p.add_child(scroll)
+    var p := PanelContainer.new()
+    p.position = Vector2(35, 145)
+    p.size = Vector2(1010, 1580)
+    p.visible = false
+    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+    menu_layer.add_child(p)
+    var scroll := ScrollContainer.new()
+    p.add_child(scroll)
     style_scroll_container_brown(scroll)
-    var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.custom_minimum_size = Vector2(930, 0); scroll.add_child(v)
-    var title := Label.new(); title.text = "💎  VIP МАГАЗИН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 40); title.modulate = Color("#FFE58A"); v.add_child(title)
-    var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
-    var wallet := Label.new(); wallet.name = "VIPWallet"; wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; wallet.add_theme_font_size_override("font_size", 22); wallet.modulate = GOLD; v.add_child(wallet)
-    var list := VBoxContainer.new(); list.name = "VIPList"; list.add_theme_constant_override("separation", 9); v.add_child(list)
-    var close := Button.new(); close.text = "←  В МАГАЗИН"; close.custom_minimum_size = Vector2(0, 80); style_button(close, CYAN); close.pressed.connect(func(): vip_panel.visible = false; shop_panel.visible = true; refresh_shop(); update_android_navigation()); v.add_child(close)
-    refresh_vip_panel(); return p
+    var v := VBoxContainer.new()
+    v.name = "VIPContent"
+    v.add_theme_constant_override("separation", 12)
+    v.custom_minimum_size = Vector2(930, 0)
+    scroll.add_child(v)
+    var title := Label.new()
+    title.text = "💎  VIP МАГАЗИН"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.add_theme_font_size_override("font_size", 40)
+    title.modulate = Color("#FFE58A")
+    v.add_child(title)
+    var sub := Label.new()
+    sub.text = "Эксклюзивные товары, которых нет в обычном магазине"
+    sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    sub.add_theme_font_size_override("font_size", 19)
+    v.add_child(sub)
+    var test := Label.new()
+    test.text = "🧪 ТЕСТОВЫЙ РЕЖИМ • ВСЕ VIP-ТОВАРЫ БЕСПЛАТНЫ"
+    test.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    test.modulate = Color("#9FFFA8")
+    test.add_theme_font_size_override("font_size", 18)
+    v.add_child(test)
+    var note := Label.new()
+    note.text = "В будущем цены будут заменены на реальные покупки через RuStore. Сейчас можно открыть и проверить каждый предмет."
+    note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    note.modulate = Color("#DCCDBE")
+    note.add_theme_font_size_override("font_size", 16)
+    v.add_child(note)
+    var list := VBoxContainer.new()
+    list.name = "VIPList"
+    list.add_theme_constant_override("separation", 14)
+    v.add_child(list)
+    var close := Button.new()
+    close.text = "←  В МАГАЗИН"
+    close.custom_minimum_size = Vector2(0, 80)
+    style_button(close, CYAN)
+    close.pressed.connect(func(): vip_panel.visible = false; shop_panel.visible = true; refresh_shop(); update_android_navigation())
+    v.add_child(close)
+    refresh_vip_panel()
+    return p
 
 func refresh_vip_panel() -> void:
     if not vip_panel: return
-    var wallet := vip_panel.get_node_or_null("ScrollContainer/VBoxContainer/VIPWallet") as Label
-    if wallet: wallet.text = "💰 БАЛАНС: %d ₽" % coins
-    var list := vip_panel.get_node_or_null("ScrollContainer/VBoxContainer/VIPList") as VBoxContainer
+    var list := vip_panel.get_node_or_null("ScrollContainer/VIPContent/VIPList") as VBoxContainer
     if not list: return
     for c in list.get_children(): c.queue_free()
+    var last_category := ""
     for i in range(vip_specs.size()):
-        var item := vip_specs[i]
+        var item: Dictionary = vip_specs[i]
+        var category := String(item.get("category", "VIP"))
+        if category != last_category:
+            var heading := Label.new()
+            heading.text = category
+            heading.add_theme_font_size_override("font_size", 22)
+            heading.modulate = Color("#FFE58A")
+            heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+            list.add_child(heading)
+            last_category = category
         var owned := i < vip_owned.size() and vip_owned[i]
-        var b := Button.new(); b.custom_minimum_size = Vector2(0, 105); b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        b.text = ("✓  " if owned else "💎  ") + String(item["name"]) + "\n" + String(item["desc"]) + "\n" + ("ПОЛУЧЕНО" if owned else "%d ₽" % int(item["price"]))
-        style_button(b, Color("#8A684C")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
+        var b := Button.new()
+        b.custom_minimum_size = Vector2(0, 112)
+        b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        b.text = ("✓  " if owned else "💎  ") + String(item["name"]) + "\n" + String(item["desc"]) + "\n" + ("ПОЛУЧЕНО • НАЖМИТЕ ДЛЯ ПРИМЕНЕНИЯ" if owned else "БЕСПЛАТНО • ТЕСТОВАЯ ПОКУПКА")
+        style_button(b, Color("#8A684C"))
+        b.add_theme_font_size_override("font_size", 18)
+        b.pressed.connect(func(idx: int = i): buy_vip(idx))
+        list.add_child(b)
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
-    if SERVER_AUTHORITATIVE:
-        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
-        _server_action("vip_buy", {"index":index}); return
     if index >= vip_owned.size(): vip_owned.resize(vip_specs.size())
-    if vip_owned[index]:
-        vip_selected = index; current_result = "💎 VIP: %s" % String(vip_specs[index]["name"])
-    elif coins >= int(vip_specs[index]["price"]):
-        coins -= int(vip_specs[index]["price"]); vip_owned[index] = true; vip_selected = index
-        var item: Dictionary = vip_specs[index]
-        if item.has("skin"): selected_claw_skin = clampi(int(item["skin"]), 0, claw_skin_specs.size()-1); owned_claw_skins[selected_claw_skin] = true
-        if item.has("machine"): selected_machine_skin = clampi(int(item["machine"]), 0, machine_skin_specs.size()-1); owned_machine_skins[selected_machine_skin] = true
-        if item.has("toy"): selected_toy_skin = clampi(int(item["toy"]), 0, toy_skin_specs.size()-1); owned_toy_skins[selected_toy_skin] = true
-        apply_shop_visuals(); build_prizes(); current_result = "💎 VIP ПРЕДМЕТ ПОЛУЧЕН"
-    else: current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
-    save_game(); check_achievements(); update_ui(); refresh_vip_panel()
+    # В тестовом офлайн-режиме реальные деньги не используются.
+    # Каждый товар можно получить бесплатно и повторно применить.
+    vip_owned[index] = true
+    vip_selected = index
+    var item: Dictionary = vip_specs[index]
+    var kind := String(item.get("kind", ""))
+    if kind == "bundle":
+        for raw_idx in item.get("bundle", []):
+            var bi := int(raw_idx)
+            if bi >= 0 and bi < vip_owned.size(): vip_owned[bi] = true
+        # Сразу применяем наиболее заметные элементы набора.
+        for raw_idx in item.get("bundle", []):
+            _apply_vip_item(int(raw_idx))
+        var bundle_items: Array = item.get("bundle", [])
+        if not bundle_items.is_empty(): vip_selected = int(bundle_items[bundle_items.size() - 1])
+    else:
+        _apply_vip_item(index)
+    apply_shop_visuals()
+    build_prizes()
+    current_result = "💎 VIP: %s" % String(item["name"])
+    save_game()
+    check_achievements()
+    update_ui()
+    refresh_profile_panel()
+    refresh_vip_panel()
+
+func _apply_vip_item(index: int) -> void:
+    if index < 0 or index >= vip_specs.size(): return
+    var item: Dictionary = vip_specs[index]
+    var kind := String(item.get("kind", ""))
+    match kind:
+        "status":
+            pass
+        "machine":
+            var machine_color: Color = item.get("machine_color", Color("#8A684C"))
+            var machine_light: Color = item.get("machine_light", Color("#F2DCC0"))
+            for i in range(machine_skin_specs.size()):
+                if String(machine_skin_specs[i].get("name", "")) == String(item["name"]):
+                    selected_machine_skin = i
+            # VIP-скины имеют собственные цвета и применяются напрямую.
+            var current_machine := get_node_or_null("PremiumClawMachine") as Node3D
+            if current_machine:
+                for node in current_machine.get_children():
+                    if node is MeshInstance3D and not String(node.name).contains("Glass") and not String(node.name).contains("Hole") and not String(node.name).contains("Light"):
+                        var mm := node.material_override as StandardMaterial3D
+                        if mm: mm.albedo_color = machine_color
+                for light in machine_lights:
+                    if light: light.light_color = machine_light
+        "claw":
+            var cc: Color = item.get("claw_color", Color("#FFD85A"))
+            if claw:
+                for node in claw.get_children():
+                    if node is MeshInstance3D and node.name != "MotorHousing":
+                        var mat := node.material_override as StandardMaterial3D
+                        if mat: mat.albedo_color = cc
+                    elif node is Node3D:
+                        for part in node.get_children():
+                            if part is MeshInstance3D:
+                                var pm := part.material_override as StandardMaterial3D
+                                if pm: pm.albedo_color = cc
+        "effect":
+            vip_effect_index = index
+            _apply_vip_effect_visual()
+        "season_pass":
+            # VIP-пропуск открывает VIP-линию сезонного пропуска.
+            vip_season_pass_owned = true
+            refresh_season_pass_panel()
+
+func _clear_vip_effect_visual() -> void:
+    if not claw: return
+    for node in claw.get_children():
+        if node is MeshInstance3D and node.name != "MotorHousing":
+            var mat := node.material_override as StandardMaterial3D
+            if mat:
+                mat.emission_enabled = false
+                mat.emission_energy_multiplier = 0.0
+        elif node is Node3D:
+            for part in node.get_children():
+                if part is MeshInstance3D:
+                    var pm := part.material_override as StandardMaterial3D
+                    if pm:
+                        pm.emission_enabled = false
+                        pm.emission_energy_multiplier = 0.0
+
+func _apply_vip_effect_visual() -> void:
+    if not claw: return
+    var effect_color := Color("#FFD85A")
+    if vip_effect_index >= 0 and vip_effect_index < vip_specs.size():
+        var effect_name := String(vip_specs[vip_effect_index].get("effect", ""))
+        if effect_name == "neon": effect_color = Color("#63F6FF")
+    for node in claw.get_children():
+        if node is MeshInstance3D and node.name != "MotorHousing":
+            var mat := node.material_override as StandardMaterial3D
+            if mat:
+                mat.emission_enabled = true
+                mat.emission = effect_color
+                mat.emission_energy_multiplier = 1.8
+        elif node is Node3D:
+            for part in node.get_children():
+                if part is MeshInstance3D:
+                    var pm := part.material_override as StandardMaterial3D
+                    if pm:
+                        pm.emission_enabled = true
+                        pm.emission = effect_color
+                        pm.emission_energy_multiplier = 1.8
+
+func build_vip_field_offer() -> void:
+    if not hud_layer: return
+    if vip_field_offer and is_instance_valid(vip_field_offer): return
+    vip_field_offer = PanelContainer.new()
+    vip_field_offer.name = "VIPFieldOffer"
+    vip_field_offer.position = Vector2(790, 175)
+    vip_field_offer.size = Vector2(245, 112)
+    vip_field_offer.z_index = 8
+    style_panel(vip_field_offer, Color("#2A2019"), Color("#D9A83F"), 18, 2)
+    var vb := VBoxContainer.new()
+    vb.add_theme_constant_override("separation", 2)
+    vip_field_offer.add_child(vb)
+    var title := Label.new()
+    title.text = "🔥 ТОЛЬКО СЕЙЧАС"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.modulate = Color("#FFE58A")
+    title.add_theme_font_size_override("font_size", 18)
+    vb.add_child(title)
+    var desc := Label.new()
+    desc.text = "VIP-эксклюзив\nбесплатно на тест"
+    desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    desc.modulate = Color("#F1E4D5")
+    desc.add_theme_font_size_override("font_size", 14)
+    vb.add_child(desc)
+    var open := Button.new()
+    open.text = "💎 ОТКРЫТЬ VIP"
+    open.custom_minimum_size = Vector2(0, 42)
+    style_button(open, Color("#8A684C"))
+    open.add_theme_font_size_override("font_size", 15)
+    open.pressed.connect(func(): open_panel("vip"))
+    vb.add_child(open)
+    hud_layer.add_child(vip_field_offer)
+
+func update_vip_field_offer(delta: float) -> void:
+    if not vip_field_offer or not is_instance_valid(vip_field_offer): return
+    vip_field_offer.visible = game_initialized and hud_layer.visible and not (shop_panel and shop_panel.visible)
+    vip_field_offer_pulse += delta
+    var scale := 1.0 + sin(vip_field_offer_pulse * 2.2) * 0.015
+    vip_field_offer.scale = Vector2(scale, scale)
 
 func get_current_season() -> Dictionary:
     var month := int(Time.get_datetime_dict_from_system().get("month", 1))
@@ -8797,7 +9005,8 @@ func update_hud_profile_button() -> void:
     if not hud_profile_button or not is_instance_valid(hud_profile_button):
         return
     var idx := clampi(player_avatar_index, 0, AVATAR_OPTIONS.size() - 1)
-    hud_profile_button.text = "%s\n%s" % [AVATAR_OPTIONS[idx], player_name]
+    var vip_badge := "👑 " if (vip_owned.size() > 0 and vip_owned[0]) else ""
+    hud_profile_button.text = "%s%s\n%s" % [vip_badge, AVATAR_OPTIONS[idx], player_name]
     hud_profile_button.tooltip_text = "Профиль: %s" % player_name
 
 func show_main_menu() -> void:
@@ -8851,6 +9060,9 @@ func open_panel(which: String) -> void:
     set_main_menu_controls(false)
     menu_layer.visible = true
     if which == "shop": shop_panel.visible = true
+    elif which == "vip":
+        vip_panel.visible = true
+        refresh_vip_panel()
     elif which == "collection":
         refresh_collection_panel()
         collection_panel.visible = true
@@ -8949,6 +9161,7 @@ func _gameplay_simulation_active() -> bool:
 
 func _process(delta: float) -> void:
     time_alive += delta
+    update_vip_field_offer(delta)
     # Таймер не участвует в старте: после запуска проверяем его максимум раз в секунду.
     mission_timer_ui_accum += delta
     if game_initialized and mission_timer_ui_accum >= 1.0:
@@ -11002,7 +11215,8 @@ func load_save() -> void:
     for i in range(vip_owned.size()): vip_owned[i] = false
     if saved_vip is Array:
         for i in range(mini(saved_vip.size(), vip_owned.size())): vip_owned[i] = bool(saved_vip[i])
-    vip_selected = clampi(int(data.get("vip_selected", 0)), 0, maxi(0, vip_specs.size() - 1))
+    vip_selected = clampi(int(data.get("vip_selected", 0)), -1, maxi(0, vip_specs.size() - 1))
+    vip_season_pass_owned = bool(data.get("vip_season_pass_owned", vip_season_pass_owned))
     active_season_id = String(data.get("active_season_id", ""))
     var saved_chests: Variant = data.get("chest_inventory", chest_inventory)
     if saved_chests is Dictionary:
