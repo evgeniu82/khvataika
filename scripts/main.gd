@@ -129,24 +129,11 @@ var referral_invites: int = 0
 var referral_reward_per_friend: int = 100
 var referral_welcome_reward: int = 50
 var referral_used: bool = false
-# Новая реферальная система подготовлена офлайн. Сервер пока намеренно не подключается.
-const REFERRAL_SERVER_ENABLED: bool = false
-const REFERRAL_PAGE_SIZE: int = 10
-var referral_invited_players: Array = []
-var referral_page: int = 0
-var referral_total_reward: int = 0
-var referral_completed_count: int = 0
-var referral_active_count: int = 0
 var referral_panel: PanelContainer
 var referral_link_label: Label
 var referral_invites_label: Label
 var referral_status_label: Label
 var referral_code_input: LineEdit
-var referral_list_container: VBoxContainer
-var referral_list_toggle: Button
-var referral_page_label: Label
-var referral_prev_button: Button
-var referral_next_button: Button
 
 # Дополнительные игровые системы
 var daily_mission_progress: int = 0
@@ -419,10 +406,6 @@ var seasons_panel: PanelContainer
 var vip_owned: Array[bool] = []
 var vip_selected: int = 0
 var active_season_id: String = ""
-var vip_field_offer: PanelContainer
-var vip_field_offer_pulse: float = 0.0
-var vip_effect_index: int = -1
-var vip_season_pass_owned: bool = false
 
 # Сундуки и мастерская.
 var chests_panel: PanelContainer
@@ -453,19 +436,15 @@ var workshop_calibration: int = 0
 var workshop_overclock: bool = false
 var workshop_overclock_games: int = 0
 
-# VIP-каталог. Сейчас все товары бесплатны для тестирования.
-# Поле price оставлено для будущего подключения реальных платежей RuStore.
 var vip_specs: Array[Dictionary] = [
-    {"id":"vip_status", "category":"👑 VIP-СТАТУС", "name":"👑 VIP-СТАТУС", "price":0, "desc":"Золотой VIP-статус и специальный VIP-бейдж.", "kind":"status"},
-    {"id":"vip_machine_neon", "category":"🕹️ СКИНЫ АВТОМАТОВ", "name":"🌈 NEON ROYAL", "price":0, "desc":"Эксклюзивный неоновый корпус VIP.", "kind":"machine", "machine_color":Color("#5C3A91"), "machine_light":Color("#FF5CFF")},
-    {"id":"vip_machine_gold", "category":"🕹️ СКИНЫ АВТОМАТОВ", "name":"💎 DIAMOND GOLD", "price":0, "desc":"Эксклюзивный золотой корпус с холодным светом.", "kind":"machine", "machine_color":Color("#8C6A24"), "machine_light":Color("#FFF0A0")},
-    {"id":"vip_claw_royal", "category":"🦾 ЭКСКЛЮЗИВНЫЕ КЛЕШНИ", "name":"👑 ROYAL CLAW", "price":0, "desc":"Эксклюзивная золотая VIP-клешня.", "kind":"claw", "claw_color":Color("#FFD85A")},
-    {"id":"vip_claw_neon", "category":"🦾 ЭКСКЛЮЗИВНЫЕ КЛЕШНИ", "name":"⚡ NEON CLAW", "price":0, "desc":"Неоновая клешня с ярким эффектом.", "kind":"claw", "claw_color":Color("#63F6FF")},
-    {"id":"vip_pack_starter", "category":"🎁 VIP-НАБОРЫ", "name":"🎁 VIP STARTER", "price":0, "desc":"VIP-статус + Royal Claw + Neon Royal.", "kind":"bundle", "bundle":[0,3,1]},
-    {"id":"vip_pack_ultimate", "category":"🎁 VIP-НАБОРЫ", "name":"💎 VIP ULTIMATE", "price":0, "desc":"Полный VIP-набор: статус, две клешни и два автомата.", "kind":"bundle", "bundle":[0,2,3,4,1]},
-    {"id":"vip_effect_gold", "category":"✨ ЭФФЕКТЫ", "name":"✨ GOLDEN GRAB", "price":0, "desc":"Золотое свечение клешни и кабеля.", "kind":"effect", "effect":"gold"},
-    {"id":"vip_effect_neon", "category":"✨ ЭФФЕКТЫ", "name":"⚡ NEON BURST", "price":0, "desc":"Неоновая подсветка при активном VIP-эффекте.", "kind":"effect", "effect":"neon"},
-    {"id":"vip_season_pass", "category":"🎟️ VIP-ПРОПУСК СЕЗОНА", "name":"🎟️ VIP SEASON PASS", "price":0, "desc":"VIP-доступ к сезонной линии наград. Пока открыт для теста.", "kind":"season_pass"}
+    {"name":"GOLDEN GRIP ELITE", "price":2500, "desc":"+8% к силе захвата", "bonus":0.08},
+    {"name":"VIP BOOST", "price":3200, "desc":"+25% к наградам", "reward":0.25},
+    {"name":"LUCKY PASS", "price":3800, "desc":"+10% к шансу редкого приза", "luck":0.10},
+    {"name":"FREE PLAY", "price":4500, "desc":"Одна бесплатная игра каждый день", "daily":1},
+    {"name":"ROYAL CLAW", "price":5500, "desc":"Эксклюзивная золотая клешня", "skin":5},
+    {"name":"VIP MACHINE", "price":7000, "desc":"Эксклюзивный корпус аппарата", "machine":9},
+    {"name":"MYTHIC TOYS", "price":8500, "desc":"Открывает мифическую серию игрушек", "toy":11},
+    {"name":"VIP MASTER", "price":12000, "desc":"+15% к силе и +15% к наградам", "bonus":0.15, "reward":0.15}
 ]
 
 var season_specs: Array[Dictionary] = [
@@ -1377,7 +1356,7 @@ func get_server_game_state() -> Dictionary:
         "owned_claws": owned_claws, "owned_claw_ids": owned_claw_ids, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
         "owned_machine_skins": owned_machine_skins, "selected_claw_skin": selected_claw_skin,
         "selected_toy_skin": selected_toy_skin, "selected_machine_skin": selected_machine_skin,
-        "vip_owned": vip_owned, "vip_selected": vip_selected, "vip_season_pass_owned": vip_season_pass_owned, "collection": collection,
+        "vip_owned": vip_owned, "vip_selected": vip_selected, "collection": collection,
         "toy_inventory_counts": toy_inventory_counts, "completed_collections": completed_collections,
         "upgrades": upgrade_levels, "claw": selected_claw, "promo_codes_used": promo_codes_used,
         "return_bonus_days": return_bonus_days, "return_bonus_available": return_bonus_available,
@@ -1489,8 +1468,7 @@ func apply_server_game_state(data: Dictionary) -> void:
     selected_machine_skin = clampi(int(data.get("selected_machine_skin", selected_machine_skin)), 0, maxi(0, machine_skin_specs.size() - 1))
     arr = data.get("vip_owned", vip_owned)
     vip_owned = _bool_array_from_variant(arr, vip_owned)
-    vip_selected = clampi(int(data.get("vip_selected", vip_selected)), -1, maxi(0, vip_specs.size() - 1))
-    vip_season_pass_owned = bool(data.get("vip_season_pass_owned", vip_season_pass_owned))
+    vip_selected = clampi(int(data.get("vip_selected", vip_selected)), 0, maxi(0, vip_specs.size() - 1))
     selected_claw = clampi(int(data.get("claw", selected_claw)), 0, maxi(0, claw_specs.size() - 1))
     var d: Variant = data.get("collection", collection)
     if d is Dictionary: collection = d
@@ -1627,9 +1605,6 @@ func apply_server_game_state(data: Dictionary) -> void:
     workshop_parts = engineering_parts if workshop_parts == 0 and engineering_parts > 0 else workshop_parts
     if data.has("referral_code"): referral_code = String(data.get("referral_code", referral_code))
     if data.has("referral_used"): referral_used = bool(data.get("referral_used", referral_used))
-    if data.has("referral_invited_players") and data.get("referral_invited_players") is Array:
-        referral_invited_players = data.get("referral_invited_players")
-    if data.has("referral_total_reward"): referral_total_reward = int(data.get("referral_total_reward", referral_total_reward))
     if not STARTUP_CONTROL_TEST:
         apply_shop_visuals()
     update_ui()
@@ -2223,9 +2198,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         var server_player: Dictionary = data["player"]
         if server_player.has("player_id") and String(server_player.get("player_id", "")) != "":
             player_id = String(server_player.get("player_id", player_id))
-        if REFERRAL_SERVER_ENABLED and server_player.has("referral_code") and String(server_player.get("referral_code", "")) != "":
+        if server_player.has("referral_code") and String(server_player.get("referral_code", "")) != "":
             referral_code = String(server_player.get("referral_code", referral_code))
-        if REFERRAL_SERVER_ENABLED and server_player.has("referral_invites"):
+        if server_player.has("referral_invites"):
             referral_invites = maxi(0, int(server_player.get("referral_invites", referral_invites)))
         if kind == "sync" and server_player.has("coins"):
             coins = maxi(0, int(server_player.get("coins", coins)))
@@ -2470,7 +2445,7 @@ func refresh_season_pass_panel() -> void:
         progress.value = float(season_pass_xp)
     var tracks := season_pass_panel.get_node_or_null("ScrollContainer/SeasonPassContent/SeasonPassTracks") as Label
     if tracks:
-        tracks.text = ("БЕСПЛАТНАЯ ЛИНИЯ  •  ⭐ VIP ЛИНИЯ ОТКРЫТА  •  💰 рубли  🔑 ключи  ⚙ детали  📦 сундуки" if vip_season_pass_owned else "БЕСПЛАТНАЯ ЛИНИЯ  •  ⭐ VIP ЛИНИЯ ЗАКРЫТА  •  💰 рубли  🔑 ключи  ⚙ детали  📦 сундуки")
+        tracks.text = "БЕСПЛАТНАЯ ЛИНИЯ  •  💰 рубли  🔑 ключи  ⚙ детали  📦 сундуки  •  🎁 бонус на каждом 5-м уровне"
     var levels := season_pass_panel.get_node_or_null("ScrollContainer/SeasonPassContent/SeasonLevels") as GridContainer
     if levels:
         for i in range(levels.get_child_count()):
@@ -4549,7 +4524,6 @@ func build_ui() -> void:
     gameplay_modal_blocker.gui_input.connect(_on_gameplay_modal_blocker_gui_input)
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
-    build_vip_field_offer()
     build_achievement_strip()
     await get_tree().process_frame
     await set_loading_progress(83.0, "HUD ГОТОВ")
@@ -6035,11 +6009,11 @@ func build_shop_panel() -> PanelContainer:
     subtitle.modulate = Color("#D8C3AA")
     root.add_child(subtitle)
     var vip_button := Button.new()
-    vip_button.text = "💎  VIP МАГАЗИН — ЭКСКЛЮЗИВЫ"
+    vip_button.text = "💎  VIP МАГАЗИН — СКОРО..."
     vip_button.custom_minimum_size = Vector2(0, 68)
     style_button(vip_button, Color("#8A684C"))
     vip_button.add_theme_font_size_override("font_size", 20)
-    vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); update_android_navigation())
+    vip_button.disabled = true
     root.add_child(vip_button)
 
     var tabs := HBoxContainer.new()
@@ -6273,8 +6247,6 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
     update_ui()
     return selected
 func buy_claw_skin(index: int) -> void:
-    vip_selected = -1
-    vip_effect_index = -1
     # Жёсткая привязка магазина: СКИН 01 = стартовая коричневая клешня,
     # СКИН 02 = бирюзовая клешня, СКИН 03+ = следующие позиции по порядку.
     # Не допускаем сдвига индексов между кнопкой магазина и реальным скином.
@@ -6293,7 +6265,6 @@ func buy_claw_skin(index: int) -> void:
         apply_shop_visuals()
         save_game()
 func buy_toy_skin(index: int) -> void:
-    vip_selected = -1
     if index < 0 or index >= toy_skin_specs.size(): return
     if index == 0:
         owned_toy_skins[0] = true
@@ -6310,8 +6281,6 @@ func buy_toy_skin(index: int) -> void:
         build_prizes()
         save_game()
 func buy_machine_skin(index: int) -> void:
-    vip_selected = -1
-    vip_effect_index = -1
     if index < 0 or index >= machine_skin_specs.size(): return
     if index == 0:
         owned_machine_skins[0] = true
@@ -6327,8 +6296,6 @@ func buy_machine_skin(index: int) -> void:
         save_game()
 
 func apply_shop_visuals() -> void:
-    if vip_effect_index < 0:
-        _clear_vip_effect_visual()
     var current_machine: Node3D = get_node_or_null("PremiumClawMachine") as Node3D
     if claw and selected_claw_skin < claw_skin_specs.size():
         var c: Color = claw_skin_specs[selected_claw_skin]["color"]
@@ -6366,241 +6333,50 @@ func apply_shop_visuals() -> void:
                     if toy_mesh:
                         var toy_mat := toy_mesh.material_override as StandardMaterial3D
                         if toy_mat: toy_mat.albedo_color = tint
-    # Если выбран VIP-эффект/эксклюзив, применяем его поверх обычного скина.
-    if vip_effect_index >= 0 and vip_effect_index < vip_specs.size():
-        _apply_vip_effect_visual()
-    if vip_selected >= 0 and vip_selected < vip_specs.size():
-        var vip_kind := String(vip_specs[vip_selected].get("kind", ""))
-        if vip_kind == "claw" or vip_kind == "machine":
-            _apply_vip_item(vip_selected)
 func build_vip_panel() -> PanelContainer:
-    var p := PanelContainer.new()
-    p.position = Vector2(35, 145)
-    p.size = Vector2(1010, 1580)
-    p.visible = false
-    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
-    menu_layer.add_child(p)
-    var scroll := ScrollContainer.new()
-    p.add_child(scroll)
+    var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
+    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
+    var scroll := ScrollContainer.new(); p.add_child(scroll)
     style_scroll_container_brown(scroll)
-    var v := VBoxContainer.new()
-    v.name = "VIPContent"
-    v.add_theme_constant_override("separation", 12)
-    v.custom_minimum_size = Vector2(930, 0)
-    scroll.add_child(v)
-    var title := Label.new()
-    title.text = "💎  VIP МАГАЗИН"
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 40)
-    title.modulate = Color("#FFE58A")
-    v.add_child(title)
-    var sub := Label.new()
-    sub.text = "Эксклюзивные товары, которых нет в обычном магазине"
-    sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    sub.add_theme_font_size_override("font_size", 19)
-    v.add_child(sub)
-    var test := Label.new()
-    test.text = "🧪 ТЕСТОВЫЙ РЕЖИМ • ВСЕ VIP-ТОВАРЫ БЕСПЛАТНЫ"
-    test.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    test.modulate = Color("#9FFFA8")
-    test.add_theme_font_size_override("font_size", 18)
-    v.add_child(test)
-    var note := Label.new()
-    note.text = "В будущем цены будут заменены на реальные покупки через RuStore. Сейчас можно открыть и проверить каждый предмет."
-    note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    note.modulate = Color("#DCCDBE")
-    note.add_theme_font_size_override("font_size", 16)
-    v.add_child(note)
-    var list := VBoxContainer.new()
-    list.name = "VIPList"
-    list.add_theme_constant_override("separation", 14)
-    v.add_child(list)
-    var close := Button.new()
-    close.text = "←  В МАГАЗИН"
-    close.custom_minimum_size = Vector2(0, 80)
-    style_button(close, CYAN)
-    close.pressed.connect(func(): vip_panel.visible = false; shop_panel.visible = true; refresh_shop(); update_android_navigation())
-    v.add_child(close)
-    refresh_vip_panel()
-    return p
+    var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.custom_minimum_size = Vector2(930, 0); scroll.add_child(v)
+    var title := Label.new(); title.text = "💎  VIP МАГАЗИН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 40); title.modulate = Color("#FFE58A"); v.add_child(title)
+    var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
+    var wallet := Label.new(); wallet.name = "VIPWallet"; wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; wallet.add_theme_font_size_override("font_size", 22); wallet.modulate = GOLD; v.add_child(wallet)
+    var list := VBoxContainer.new(); list.name = "VIPList"; list.add_theme_constant_override("separation", 9); v.add_child(list)
+    var close := Button.new(); close.text = "←  В МАГАЗИН"; close.custom_minimum_size = Vector2(0, 80); style_button(close, CYAN); close.pressed.connect(func(): vip_panel.visible = false; shop_panel.visible = true; refresh_shop(); update_android_navigation()); v.add_child(close)
+    refresh_vip_panel(); return p
 
 func refresh_vip_panel() -> void:
     if not vip_panel: return
-    var list := vip_panel.get_node_or_null("ScrollContainer/VIPContent/VIPList") as VBoxContainer
+    var wallet := vip_panel.get_node_or_null("ScrollContainer/VBoxContainer/VIPWallet") as Label
+    if wallet: wallet.text = "💰 БАЛАНС: %d ₽" % coins
+    var list := vip_panel.get_node_or_null("ScrollContainer/VBoxContainer/VIPList") as VBoxContainer
     if not list: return
     for c in list.get_children(): c.queue_free()
-    var last_category := ""
     for i in range(vip_specs.size()):
-        var item: Dictionary = vip_specs[i]
-        var category := String(item.get("category", "VIP"))
-        if category != last_category:
-            var heading := Label.new()
-            heading.text = category
-            heading.add_theme_font_size_override("font_size", 22)
-            heading.modulate = Color("#FFE58A")
-            heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-            list.add_child(heading)
-            last_category = category
+        var item := vip_specs[i]
         var owned := i < vip_owned.size() and vip_owned[i]
-        var b := Button.new()
-        b.custom_minimum_size = Vector2(0, 112)
-        b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-        b.text = ("✓  " if owned else "💎  ") + String(item["name"]) + "\n" + String(item["desc"]) + "\n" + ("ПОЛУЧЕНО • НАЖМИТЕ ДЛЯ ПРИМЕНЕНИЯ" if owned else "БЕСПЛАТНО • ТЕСТОВАЯ ПОКУПКА")
-        style_button(b, Color("#8A684C"))
-        b.add_theme_font_size_override("font_size", 18)
-        b.pressed.connect(func(idx: int = i): buy_vip(idx))
-        list.add_child(b)
+        var b := Button.new(); b.custom_minimum_size = Vector2(0, 105); b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        b.text = ("✓  " if owned else "💎  ") + String(item["name"]) + "\n" + String(item["desc"]) + "\n" + ("ПОЛУЧЕНО" if owned else "%d ₽" % int(item["price"]))
+        style_button(b, Color("#8A684C")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
+    if SERVER_AUTHORITATIVE:
+        if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
+        _server_action("vip_buy", {"index":index}); return
     if index >= vip_owned.size(): vip_owned.resize(vip_specs.size())
-    # В тестовом офлайн-режиме реальные деньги не используются.
-    # Каждый товар можно получить бесплатно и повторно применить.
-    vip_owned[index] = true
-    vip_selected = index
-    var item: Dictionary = vip_specs[index]
-    var kind := String(item.get("kind", ""))
-    if kind == "bundle":
-        for raw_idx in item.get("bundle", []):
-            var bi := int(raw_idx)
-            if bi >= 0 and bi < vip_owned.size(): vip_owned[bi] = true
-        # Сразу применяем наиболее заметные элементы набора.
-        for raw_idx in item.get("bundle", []):
-            _apply_vip_item(int(raw_idx))
-        var bundle_items: Array = item.get("bundle", [])
-        if not bundle_items.is_empty(): vip_selected = int(bundle_items[bundle_items.size() - 1])
-    else:
-        _apply_vip_item(index)
-    apply_shop_visuals()
-    build_prizes()
-    current_result = "💎 VIP: %s" % String(item["name"])
-    save_game()
-    check_achievements()
-    update_ui()
-    refresh_profile_panel()
-    refresh_vip_panel()
-
-func _apply_vip_item(index: int) -> void:
-    if index < 0 or index >= vip_specs.size(): return
-    var item: Dictionary = vip_specs[index]
-    var kind := String(item.get("kind", ""))
-    match kind:
-        "status":
-            pass
-        "machine":
-            var machine_color: Color = item.get("machine_color", Color("#8A684C"))
-            var machine_light: Color = item.get("machine_light", Color("#F2DCC0"))
-            for i in range(machine_skin_specs.size()):
-                if String(machine_skin_specs[i].get("name", "")) == String(item["name"]):
-                    selected_machine_skin = i
-            # VIP-скины имеют собственные цвета и применяются напрямую.
-            var current_machine := get_node_or_null("PremiumClawMachine") as Node3D
-            if current_machine:
-                for node in current_machine.get_children():
-                    if node is MeshInstance3D and not String(node.name).contains("Glass") and not String(node.name).contains("Hole") and not String(node.name).contains("Light"):
-                        var mm := node.material_override as StandardMaterial3D
-                        if mm: mm.albedo_color = machine_color
-                for light in machine_lights:
-                    if light: light.light_color = machine_light
-        "claw":
-            var cc: Color = item.get("claw_color", Color("#FFD85A"))
-            if claw:
-                for node in claw.get_children():
-                    if node is MeshInstance3D and node.name != "MotorHousing":
-                        var mat := node.material_override as StandardMaterial3D
-                        if mat: mat.albedo_color = cc
-                    elif node is Node3D:
-                        for part in node.get_children():
-                            if part is MeshInstance3D:
-                                var pm := part.material_override as StandardMaterial3D
-                                if pm: pm.albedo_color = cc
-        "effect":
-            vip_effect_index = index
-            _apply_vip_effect_visual()
-        "season_pass":
-            # VIP-пропуск открывает VIP-линию сезонного пропуска.
-            vip_season_pass_owned = true
-            refresh_season_pass_panel()
-
-func _clear_vip_effect_visual() -> void:
-    if not claw: return
-    for node in claw.get_children():
-        if node is MeshInstance3D and node.name != "MotorHousing":
-            var mat := node.material_override as StandardMaterial3D
-            if mat:
-                mat.emission_enabled = false
-                mat.emission_energy_multiplier = 0.0
-        elif node is Node3D:
-            for part in node.get_children():
-                if part is MeshInstance3D:
-                    var pm := part.material_override as StandardMaterial3D
-                    if pm:
-                        pm.emission_enabled = false
-                        pm.emission_energy_multiplier = 0.0
-
-func _apply_vip_effect_visual() -> void:
-    if not claw: return
-    var effect_color := Color("#FFD85A")
-    if vip_effect_index >= 0 and vip_effect_index < vip_specs.size():
-        var effect_name := String(vip_specs[vip_effect_index].get("effect", ""))
-        if effect_name == "neon": effect_color = Color("#63F6FF")
-    for node in claw.get_children():
-        if node is MeshInstance3D and node.name != "MotorHousing":
-            var mat := node.material_override as StandardMaterial3D
-            if mat:
-                mat.emission_enabled = true
-                mat.emission = effect_color
-                mat.emission_energy_multiplier = 1.8
-        elif node is Node3D:
-            for part in node.get_children():
-                if part is MeshInstance3D:
-                    var pm := part.material_override as StandardMaterial3D
-                    if pm:
-                        pm.emission_enabled = true
-                        pm.emission = effect_color
-                        pm.emission_energy_multiplier = 1.8
-
-func build_vip_field_offer() -> void:
-    if not hud_layer: return
-    if vip_field_offer and is_instance_valid(vip_field_offer): return
-    vip_field_offer = PanelContainer.new()
-    vip_field_offer.name = "VIPFieldOffer"
-    vip_field_offer.position = Vector2(790, 175)
-    vip_field_offer.size = Vector2(245, 112)
-    vip_field_offer.z_index = 8
-    style_panel(vip_field_offer, Color("#2A2019"), Color("#D9A83F"), 18, 2)
-    var vb := VBoxContainer.new()
-    vb.add_theme_constant_override("separation", 2)
-    vip_field_offer.add_child(vb)
-    var title := Label.new()
-    title.text = "🔥 ТОЛЬКО СЕЙЧАС"
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.modulate = Color("#FFE58A")
-    title.add_theme_font_size_override("font_size", 18)
-    vb.add_child(title)
-    var desc := Label.new()
-    desc.text = "VIP-эксклюзив\nбесплатно на тест"
-    desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    desc.modulate = Color("#F1E4D5")
-    desc.add_theme_font_size_override("font_size", 14)
-    vb.add_child(desc)
-    var open := Button.new()
-    open.text = "💎 ОТКРЫТЬ VIP"
-    open.custom_minimum_size = Vector2(0, 42)
-    style_button(open, Color("#8A684C"))
-    open.add_theme_font_size_override("font_size", 15)
-    open.pressed.connect(func(): open_panel("vip"))
-    vb.add_child(open)
-    hud_layer.add_child(vip_field_offer)
-
-func update_vip_field_offer(delta: float) -> void:
-    if not vip_field_offer or not is_instance_valid(vip_field_offer): return
-    vip_field_offer.visible = game_initialized and hud_layer.visible and not (shop_panel and shop_panel.visible)
-    vip_field_offer_pulse += delta
-    var scale := 1.0 + sin(vip_field_offer_pulse * 2.2) * 0.015
-    vip_field_offer.scale = Vector2(scale, scale)
+    if vip_owned[index]:
+        vip_selected = index; current_result = "💎 VIP: %s" % String(vip_specs[index]["name"])
+    elif coins >= int(vip_specs[index]["price"]):
+        coins -= int(vip_specs[index]["price"]); vip_owned[index] = true; vip_selected = index
+        var item: Dictionary = vip_specs[index]
+        if item.has("skin"): selected_claw_skin = clampi(int(item["skin"]), 0, claw_skin_specs.size()-1); owned_claw_skins[selected_claw_skin] = true
+        if item.has("machine"): selected_machine_skin = clampi(int(item["machine"]), 0, machine_skin_specs.size()-1); owned_machine_skins[selected_machine_skin] = true
+        if item.has("toy"): selected_toy_skin = clampi(int(item["toy"]), 0, toy_skin_specs.size()-1); owned_toy_skins[selected_toy_skin] = true
+        apply_shop_visuals(); build_prizes(); current_result = "💎 VIP ПРЕДМЕТ ПОЛУЧЕН"
+    else: current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
+    save_game(); check_achievements(); update_ui(); refresh_vip_panel()
 
 func get_current_season() -> Dictionary:
     var month := int(Time.get_datetime_dict_from_system().get("month", 1))
@@ -8235,37 +8011,11 @@ func ensure_referral_code() -> void:
         return
     var seed := str(Time.get_unix_time_from_system()) + str(randi())
     var hash_value := hash(seed)
-    referral_code = ("KHVA-%08X" % (absi(hash_value) % 4294967296)).to_upper()
+    referral_code = ("CLAW%06X" % (absi(hash_value) % 16777216)).to_upper()
     save_game()
 
 func get_referral_link() -> String:
-    # Публичная HTTPS-ссылка заранее подготовлена под будущую серверную часть.
-    # Домен можно заменить перед публикацией, не меняя UI или структуру данных.
-    return "https://khvataika.ru/r/" + referral_code
-
-func share_referral_link() -> void:
-    var link := get_referral_link()
-    var share_text := "🎁 Заходи в «Хватайку»!\nПолучи подарок за приглашение по моей ссылке:\n%s\n\nЕсли ссылка не сработает, введи код: %s" % [link, referral_code]
-    # Android: открываем системное меню «Поделиться», чтобы пользователь мог
-    # выбрать любой установленный мессенджер или социальную сеть.
-    if _is_android_runtime_available():
-        var runtime = Engine.get_singleton("AndroidRuntime")
-        var context = runtime.getActivity()
-        if not context:
-            context = runtime.getApplicationContext()
-        if context:
-            var Intent = JavaClassWrapper.wrap("android.content.Intent")
-            var intent = Intent.Intent()
-            intent.setAction("android.intent.action.SEND")
-            intent.setType("text/plain")
-            intent.putExtra("android.intent.extra.TEXT", share_text)
-            var chooser = Intent.createChooser(intent, "Пригласить друга")
-            context.startActivity(chooser)
-            referral_status_label.text = "Выбери приложение, через которое отправить приглашение."
-            return
-    # Без Android / в редакторе сохраняем ссылку как безопасный резервный вариант.
-    DisplayServer.clipboard_set(link)
-    referral_status_label.text = "Ссылка скопирована. Отправь её другу."
+    return "claw://invite?ref=" + referral_code
 
 func process_incoming_referral() -> void:
     if referral_used:
@@ -8286,7 +8036,7 @@ func process_incoming_referral() -> void:
         return
     # На Android серверная привязка выполняется после загрузки конфигурации.
     # Так реферальная цепочка сохраняется между разными устройствами.
-    if REFERRAL_SERVER_ENABLED and _server_ready():
+    if _server_ready():
         pending_incoming_referral = incoming
         return
     # Офлайн-режим сохраняет прежнее поведение как резервный вариант.
@@ -8297,159 +8047,85 @@ func process_incoming_referral() -> void:
 
 func build_referral_panel() -> PanelContainer:
     var p := PanelContainer.new()
-    p.position = Vector2(55, 100)
-    p.size = Vector2(970, 1700)
+    p.position = Vector2(55, 220)
+    p.size = Vector2(970, 1380)
     p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
-
-    # Верхний растягивающийся блок: весь контент прокручивается внутри окна,
-    # а кнопка «Назад» всегда остаётся внизу самого окна.
-    var root := VBoxContainer.new()
-    root.add_theme_constant_override("separation", 8)
-    p.add_child(root)
-
     var scroll := ScrollContainer.new()
-    scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-    scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
     style_scroll_container_brown(scroll)
-    root.add_child(scroll)
-
+    p.add_child(scroll)
     var v := VBoxContainer.new()
     v.custom_minimum_size = Vector2(880, 0)
-    v.add_theme_constant_override("separation", 14)
+    v.add_theme_constant_override("separation", 16)
     scroll.add_child(v)
 
     var title := Label.new()
-    title.text = "👥  РЕФЕРАЛЬНАЯ СИСТЕМА"
+    title.text = "👥 РЕФЕРАЛЬНАЯ СИСТЕМА"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 31)
-    title.modulate = GOLD
+    title.add_theme_font_size_override("font_size", 34)
     v.add_child(title)
 
     var info := Label.new()
-    info.text = "Приглашай друзей в «Хватайку» и получай награды.\nДруг получает подарок, а ты — награду после выполнения им условия."
+    info.text = "Приглашай друзей в Хватайку.\nДруг получает подарок за первый вход по твоей ссылке, а ты получаешь приз за каждого приглашённого друга."
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    info.add_theme_font_size_override("font_size", 18)
-    info.modulate = Color("#E1D2C1")
+    info.add_theme_font_size_override("font_size", 21)
     v.add_child(info)
 
-    var reward_card := PanelContainer.new()
-    style_panel(reward_card, Color("#1A130F"), Color("#9A7653"), 16, 2)
-    reward_card.custom_minimum_size = Vector2(0, 92)
-    v.add_child(reward_card)
-    var reward_text := Label.new()
-    reward_text.text = "🎁 НОВОМУ ИГРОКУ  +50 ₽    •    🏆 ТЕБЕ ЗА ДРУГА  +100 ₽\nУсловие награды: приглашённый должен сыграть 3 игры."
-    reward_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    reward_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    reward_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    reward_text.add_theme_font_size_override("font_size", 17)
-    reward_card.add_child(reward_text)
-
-    var code_card := PanelContainer.new()
-    style_panel(code_card, Color("#1A130F"), Color("#76583F"), 16, 2)
-    v.add_child(code_card)
-    var cv := VBoxContainer.new()
-    cv.add_theme_constant_override("separation", 7)
-    code_card.add_child(cv)
-    var code_caption := Label.new()
-    code_caption.text = "ТВОЙ РЕФЕРАЛЬНЫЙ КОД"
-    code_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    code_caption.add_theme_font_size_override("font_size", 14)
-    code_caption.modulate = Color("#C09A70")
-    cv.add_child(code_caption)
-    var code_value := Label.new()
-    code_value.name = "ReferralCodeValue"
-    code_value.text = referral_code if referral_code != "" else "ПОЛУЧАЕМ…"
-    code_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    code_value.add_theme_font_size_override("font_size", 25)
-    code_value.modulate = Color("#F0D4A9")
-    cv.add_child(code_value)
-    var copy_code := Button.new()
-    copy_code.text = "📋  КОПИРОВАТЬ КОД"
-    copy_code.custom_minimum_size = Vector2(0, 55)
-    style_button(copy_code, Color("#76583F"))
-    copy_code.pressed.connect(func():
-        DisplayServer.clipboard_set(referral_code)
-        referral_status_label.text = "Код скопирован."
-    )
-    cv.add_child(copy_code)
-
-    # Персональная ссылка оформлена отдельной карточкой, в точности по логике
-    # карточки реферального кода: заголовок → ссылка → отдельная кнопка копирования.
-    var link_card := PanelContainer.new()
-    style_panel(link_card, Color("#1A130F"), Color("#76583F"), 16, 2)
-    v.add_child(link_card)
-    var lv := VBoxContainer.new()
-    lv.add_theme_constant_override("separation", 7)
-    link_card.add_child(lv)
-
-    var link_title := Label.new()
-    link_title.text = "ТВОЯ ПЕРСОНАЛЬНАЯ ССЫЛКА"
-    link_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    link_title.add_theme_font_size_override("font_size", 14)
-    link_title.modulate = Color("#C09A70")
-    lv.add_child(link_title)
+    var code_title := Label.new()
+    code_title.text = "ТВОЙ РЕФЕРАЛЬНЫЙ КОД"
+    code_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    code_title.add_theme_font_size_override("font_size", 25)
+    v.add_child(code_title)
 
     referral_link_label = Label.new()
     referral_link_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     referral_link_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    referral_link_label.add_theme_font_size_override("font_size", 17)
+    referral_link_label.add_theme_font_size_override("font_size", 22)
     referral_link_label.modulate = Color("#E1C29A")
-    lv.add_child(referral_link_label)
+    v.add_child(referral_link_label)
 
     var copy := Button.new()
-    copy.text = "🔗  КОПИРОВАТЬ ССЫЛКУ"
-    copy.custom_minimum_size = Vector2(0, 55)
-    style_button(copy, Color("#76583F"))
+    copy.text = "📋 СКОПИРОВАТЬ ССЫЛКУ"
+    copy.custom_minimum_size = Vector2(0, 82)
+    style_button(copy, Color("#9A7653"))
     copy.pressed.connect(func():
         DisplayServer.clipboard_set(get_referral_link())
-        referral_status_label.text = "Ссылка скопирована."
+        referral_status_label.text = "Ссылка скопирована. Отправь её другу."
     )
-    lv.add_child(copy)
+    v.add_child(copy)
 
-    var share := Button.new()
-    share.text = "📤  ПРИГЛАСИТЬ ДРУГА"
-    share.custom_minimum_size = Vector2(0, 62)
-    style_button(share, Color("#B98B5C"))
-    share.pressed.connect(func():
-        share_referral_link()
-    )
-    v.add_child(share)
+    referral_invites_label = Label.new()
+    referral_invites_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    referral_invites_label.add_theme_font_size_override("font_size", 26)
+    v.add_child(referral_invites_label)
 
-    # Статистический блок по просьбе пользователя убран.
-    # Количество приглашённых и их состояние будут видны непосредственно в списке.
-    referral_list_toggle = Button.new()
-    referral_list_toggle.text = "👥  МОИ ПРИГЛАШЕНИЯ  ▼"
-    referral_list_toggle.custom_minimum_size = Vector2(0, 60)
-    style_button(referral_list_toggle, Color("#76583F"))
-    referral_list_toggle.pressed.connect(func(): toggle_referral_list())
-    v.add_child(referral_list_toggle)
+    var reward := Label.new()
+    reward.text = "🎁 Приз за приглашение: +%d ₽\n🎁 Подарок новому игроку: +%d ₽" % [referral_reward_per_friend, referral_welcome_reward]
+    reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    reward.add_theme_font_size_override("font_size", 21)
+    v.add_child(reward)
 
-    referral_list_container = VBoxContainer.new()
-    referral_list_container.name = "ReferralListContainer"
-    referral_list_container.add_theme_constant_override("separation", 7)
-    referral_list_container.visible = false
-    v.add_child(referral_list_container)
+    var sep := HSeparator.new()
+    v.add_child(sep)
 
     var enter_title := Label.new()
-    enter_title.text = "🎁  ЕСТЬ КОД ДРУГА?"
+    enter_title.text = "ЕСТЬ КОД ДРУГА?"
     enter_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    enter_title.add_theme_font_size_override("font_size", 20)
-    enter_title.modulate = Color("#E1D2C1")
+    enter_title.add_theme_font_size_override("font_size", 25)
     v.add_child(enter_title)
 
     referral_code_input = LineEdit.new()
-    referral_code_input.placeholder_text = "KHVA-XXXXXXXX"
+    referral_code_input.placeholder_text = "Введите код приглашения"
     referral_code_input.alignment = HORIZONTAL_ALIGNMENT_CENTER
-    referral_code_input.custom_minimum_size = Vector2(0, 58)
-    referral_code_input.add_theme_font_size_override("font_size", 19)
+    referral_code_input.custom_minimum_size = Vector2(0, 65)
+    referral_code_input.add_theme_font_size_override("font_size", 22)
     v.add_child(referral_code_input)
 
     var claim := Button.new()
-    claim.text = "🎁  ПРИМЕНИТЬ КОД"
-    claim.custom_minimum_size = Vector2(0, 62)
+    claim.text = "🎁 ПОЛУЧИТЬ ПОДАРОК"
+    claim.custom_minimum_size = Vector2(0, 82)
     style_button(claim, Color("#C09A70"))
     claim.pressed.connect(func(): claim_referral_code(referral_code_input.text))
     v.add_child(claim)
@@ -8457,117 +8133,33 @@ func build_referral_panel() -> PanelContainer:
     referral_status_label = Label.new()
     referral_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     referral_status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    referral_status_label.add_theme_font_size_override("font_size", 16)
-    referral_status_label.modulate = Color("#D8C3AA")
+    referral_status_label.add_theme_font_size_override("font_size", 19)
     v.add_child(referral_status_label)
 
     var note := Label.new()
-    note.text = "Сейчас реферальная система работает в офлайн-режиме. Серверный учёт, RuStore-переход и автоматическая привязка после установки будут подключены отдельным этапом."
+    note.text = "Рефералы учитываются на сервере. Один игрок может активировать только один код, а приглашения и награды сохраняются между устройствами."
     note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    note.add_theme_font_size_override("font_size", 14)
-    note.modulate = Color("#9E8A76")
+    note.add_theme_font_size_override("font_size", 16)
+    note.modulate = Color("#B9A28D")
     v.add_child(note)
 
-    # Кнопка «Назад» находится вне ScrollContainer и всегда закреплена внизу окна.
     var close := Button.new()
-    close.text = "←  НАЗАД"
-    close.custom_minimum_size = Vector2(0, 68)
+    close.text = "← НАЗАД"
+    close.custom_minimum_size = Vector2(0, 82)
     style_button(close, Color("#76583F"))
     close.pressed.connect(func(): show_main_menu())
-    root.add_child(close)
-
+    v.add_child(close)
     return p
 
 func refresh_referral_panel() -> void:
     ensure_referral_code()
     if referral_link_label:
-        referral_link_label.text = get_referral_link()
+        referral_link_label.text = referral_code + "\n" + get_referral_link()
+    if referral_invites_label:
+        referral_invites_label.text = "👥 ПРИШЛО ДРУЗЕЙ: %d" % referral_invites
     if referral_status_label and referral_status_label.text == "":
         referral_status_label.text = "Приглашай друзей и получай +%d ₽ за каждого." % referral_reward_per_friend
-    refresh_referral_stats()
-
-func refresh_referral_stats() -> void:
-    # Статистика больше не занимает отдельный блок.
-    # Список приглашённых показывает актуальное состояние каждого игрока.
-    referral_invites = referral_invited_players.size()
-    if referral_list_container and referral_list_container.visible:
-        render_referral_page()
-
-func toggle_referral_list() -> void:
-    if not referral_list_container:
-        return
-    referral_list_container.visible = not referral_list_container.visible
-    referral_page = 0
-    referral_list_toggle.text = "👥  МОИ ПРИГЛАШЕНИЯ  ▲" if referral_list_container.visible else "👥  МОИ ПРИГЛАШЕНИЯ  ▼"
-    if referral_list_container.visible:
-        render_referral_page()
-
-func render_referral_page() -> void:
-    if not referral_list_container:
-        return
-    for child in referral_list_container.get_children():
-        child.queue_free()
-    var total := referral_invited_players.size()
-    if total == 0:
-        var empty := Label.new()
-        empty.text = "Пока никто не приглашён. Поделись своей ссылкой!"
-        empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-        empty.add_theme_font_size_override("font_size", 16)
-        empty.modulate = Color("#B9A28D")
-        referral_list_container.add_child(empty)
-        return
-    var pages := maxi(1, int(ceil(float(total) / float(REFERRAL_PAGE_SIZE))))
-    referral_page = clampi(referral_page, 0, pages - 1)
-    var from_idx := referral_page * REFERRAL_PAGE_SIZE
-    var to_idx := mini(from_idx + REFERRAL_PAGE_SIZE, total)
-    for i in range(from_idx, to_idx):
-        var item = referral_invited_players[i]
-        var row := PanelContainer.new()
-        style_panel(row, Color("#1A130F"), Color("#76583F"), 10, 1)
-        row.custom_minimum_size = Vector2(0, 50)
-        var label := Label.new()
-        var nick := String(item.get("name", "Игрок"))
-        var status := String(item.get("status", "pending"))
-        var status_text := "🟢 Награда получена" if status == "completed" else ("🟡 Играет — ждём условие" if status == "active" else "⚪ Приглашение принято")
-        label.text = "%d. 👤 %s
-    %s" % [i + 1, nick, status_text]
-        label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-        label.add_theme_font_size_override("font_size", 15)
-        label.modulate = Color("#E8D7C3")
-        row.add_child(label)
-        referral_list_container.add_child(row)
-    var nav := HBoxContainer.new()
-    nav.alignment = BoxContainer.ALIGNMENT_CENTER
-    nav.add_theme_constant_override("separation", 12)
-    referral_prev_button = Button.new()
-    referral_prev_button.text = "◀"
-    referral_prev_button.custom_minimum_size = Vector2(70, 46)
-    referral_prev_button.disabled = referral_page <= 0
-    style_button(referral_prev_button, Color("#76583F"))
-    referral_prev_button.pressed.connect(func():
-        referral_page = maxi(0, referral_page - 1)
-        render_referral_page()
-    )
-    nav.add_child(referral_prev_button)
-    referral_page_label = Label.new()
-    referral_page_label.text = "%d / %d" % [referral_page + 1, pages]
-    referral_page_label.custom_minimum_size = Vector2(90, 46)
-    referral_page_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    referral_page_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    referral_page_label.add_theme_font_size_override("font_size", 17)
-    nav.add_child(referral_page_label)
-    referral_next_button = Button.new()
-    referral_next_button.text = "▶"
-    referral_next_button.custom_minimum_size = Vector2(70, 46)
-    referral_next_button.disabled = referral_page >= pages - 1
-    style_button(referral_next_button, Color("#76583F"))
-    referral_next_button.pressed.connect(func():
-        referral_page = mini(pages - 1, referral_page + 1)
-        render_referral_page()
-    )
-    nav.add_child(referral_next_button)
-    referral_list_container.add_child(nav)
 
 func claim_referral_code(code: String) -> void:
     if referral_used:
@@ -8577,7 +8169,7 @@ func claim_referral_code(code: String) -> void:
     if clean == "" or clean == referral_code:
         referral_status_label.text = "Введите корректный код друга."
         return
-    if REFERRAL_SERVER_ENABLED and _server_ready():
+    if _server_ready():
         referral_status_label.text = "Проверяем код на сервере…"
         apply_referral_remote(clean)
         return
@@ -8586,7 +8178,7 @@ func claim_referral_code(code: String) -> void:
         return
     referral_used = true
     coins += referral_welcome_reward
-    referral_status_label.text = "Офлайн-режим: подарок +%d ₽ получен. Серверный учёт пока выключен." % referral_welcome_reward
+    referral_status_label.text = "Подарок получен: +%d ₽" % referral_welcome_reward
     current_result = "🎁 ПОДАРОК ЗА ПРИГЛАШЕНИЕ • +%d ₽" % referral_welcome_reward
     save_game()
     check_achievements()
@@ -9005,8 +8597,7 @@ func update_hud_profile_button() -> void:
     if not hud_profile_button or not is_instance_valid(hud_profile_button):
         return
     var idx := clampi(player_avatar_index, 0, AVATAR_OPTIONS.size() - 1)
-    var vip_badge := "👑 " if (vip_owned.size() > 0 and vip_owned[0]) else ""
-    hud_profile_button.text = "%s%s\n%s" % [vip_badge, AVATAR_OPTIONS[idx], player_name]
+    hud_profile_button.text = "%s\n%s" % [AVATAR_OPTIONS[idx], player_name]
     hud_profile_button.tooltip_text = "Профиль: %s" % player_name
 
 func show_main_menu() -> void:
@@ -9060,9 +8651,6 @@ func open_panel(which: String) -> void:
     set_main_menu_controls(false)
     menu_layer.visible = true
     if which == "shop": shop_panel.visible = true
-    elif which == "vip":
-        vip_panel.visible = true
-        refresh_vip_panel()
     elif which == "collection":
         refresh_collection_panel()
         collection_panel.visible = true
@@ -9161,7 +8749,6 @@ func _gameplay_simulation_active() -> bool:
 
 func _process(delta: float) -> void:
     time_alive += delta
-    update_vip_field_offer(delta)
     # Таймер не участвует в старте: после запуска проверяем его максимум раз в секунду.
     mission_timer_ui_accum += delta
     if game_initialized and mission_timer_ui_accum >= 1.0:
@@ -11083,8 +10670,6 @@ func save_game() -> void:
             "referral_code": referral_code,
             "referral_invites": referral_invites,
             "referral_used": referral_used,
-            "referral_invited_players": referral_invited_players,
-            "referral_total_reward": referral_total_reward,
             "best_result": best_result,
             "best_result_xp": best_result_xp,
             "current_win_streak": current_win_streak,
@@ -11215,8 +10800,7 @@ func load_save() -> void:
     for i in range(vip_owned.size()): vip_owned[i] = false
     if saved_vip is Array:
         for i in range(mini(saved_vip.size(), vip_owned.size())): vip_owned[i] = bool(saved_vip[i])
-    vip_selected = clampi(int(data.get("vip_selected", 0)), -1, maxi(0, vip_specs.size() - 1))
-    vip_season_pass_owned = bool(data.get("vip_season_pass_owned", vip_season_pass_owned))
+    vip_selected = clampi(int(data.get("vip_selected", 0)), 0, maxi(0, vip_specs.size() - 1))
     active_season_id = String(data.get("active_season_id", ""))
     var saved_chests: Variant = data.get("chest_inventory", chest_inventory)
     if saved_chests is Dictionary:
