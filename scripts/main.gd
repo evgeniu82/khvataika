@@ -2876,6 +2876,7 @@ func initialize_game_async() -> void:
     game_initialized = true
     audit_achievement_source_state()
     check_achievements()
+    save_game()
     _startup_write_phase("DONE")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
@@ -6910,7 +6911,7 @@ func refresh_achievements_panel() -> void:
         var label := Label.new()
         var unlocked := unlocked_achievements.has(String(spec["id"]))
         var target := int(spec.get("value", 1))
-        var progress_value := mini(achievement_value(spec), target)
+        var progress_value := target if unlocked else mini(achievement_value(spec), target)
         label.text = ("✓  " if unlocked else "○  ") + String(spec["name"]) + "\n     " + String(spec["desc"]) + "\n     Прогресс: %d / %d\n     🎁 %s" % [progress_value, target, achievement_reward_text(spec)]
         label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         label.add_theme_font_size_override("font_size", 18)
@@ -9248,6 +9249,24 @@ func audit_achievement_source_state() -> void:
     # Одна успешная выдача игрушки не может произойти без игры.
     total_games = maxi(total_games, total_prizes_won)
 
+    # Нормализуем владение предметами перед проверкой достижений. Это особенно
+    # важно для старых сохранений, где массивы были короче актуального списка.
+    owned_claws = migrate_bool_array(owned_claws, claw_specs.size(), owned_claws)
+    owned_claws[0] = true
+    # Выбранная клешня/скин не может быть "не открыта": сам факт выбора из
+    # сохранённого состояния подтверждает владение.
+    if selected_claw >= 0 and selected_claw < owned_claws.size():
+        owned_claws[selected_claw] = true
+    owned_claw_skins = migrate_bool_array(owned_claw_skins, claw_skin_specs.size(), owned_claw_skins)
+    owned_toy_skins = migrate_bool_array(owned_toy_skins, toy_skin_specs.size(), owned_toy_skins)
+    owned_machine_skins = migrate_bool_array(owned_machine_skins, machine_skin_specs.size(), owned_machine_skins)
+    if selected_claw_skin >= 0 and selected_claw_skin < owned_claw_skins.size():
+        owned_claw_skins[selected_claw_skin] = true
+    if selected_toy_skin >= 0 and selected_toy_skin < owned_toy_skins.size():
+        owned_toy_skins[selected_toy_skin] = true
+    if selected_machine_skin >= 0 and selected_machine_skin < owned_machine_skins.size():
+        owned_machine_skins[selected_machine_skin] = true
+
     # «Накопите X ₽» означает когда-либо достигнутый баланс, а не деньги,
     # которые игрок обязан держать после последующей покупки.
     highest_balance_rubles = maxi(highest_balance_rubles, coins)
@@ -10064,6 +10083,17 @@ func save_game() -> void:
         }))
         f.close()
 
+func migrate_bool_array(value: Variant, target_size: int, fallback: Array[bool]) -> Array[bool]:
+    var result: Array[bool] = []
+    result.resize(target_size)
+    for i in range(target_size):
+        result[i] = fallback[i] if i < fallback.size() else false
+    if value is Array:
+        var src: Array = value
+        for i in range(mini(src.size(), target_size)):
+            result[i] = bool(src[i])
+    return result
+
 func load_save() -> void:
     if not FileAccess.file_exists(SAVE_PATH): return
     var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -10128,24 +10158,17 @@ func load_save() -> void:
         for i in range(upgrade_specs.size()):
             var value: Variant = saved_upgrades[i] if i < saved_upgrades.size() else 0
             upgrade_levels.append(clampi(int(value), 0, 5))
-    var saved_owned: Variant = data.get("owned_claws", owned_claws)
-    if saved_owned is Array and saved_owned.size() == claw_specs.size():
-        owned_claws = []
-        for value in saved_owned:
-            owned_claws.append(bool(value))
+    # Миграция массивов владения: старые сохранения могли содержать только
+    # первые 3/4/6 предметов. Раньше такие массивы полностью игнорировались,
+    # из-за чего уже купленные клешни/скины возвращались в состояние "не куплено".
+    owned_claws = migrate_bool_array(data.get("owned_claws", owned_claws), claw_specs.size(), owned_claws)
     owned_claws[0] = true
     var saved_claw_skins: Variant = data.get("owned_claw_skins", owned_claw_skins)
-    if saved_claw_skins is Array and saved_claw_skins.size() == claw_skin_specs.size():
-        owned_claw_skins = []
-        for value in saved_claw_skins: owned_claw_skins.append(bool(value))
+    owned_claw_skins = migrate_bool_array(saved_claw_skins, claw_skin_specs.size(), owned_claw_skins)
     var saved_toy_skins: Variant = data.get("owned_toy_skins", owned_toy_skins)
-    if saved_toy_skins is Array and saved_toy_skins.size() == toy_skin_specs.size():
-        owned_toy_skins = []
-        for value in saved_toy_skins: owned_toy_skins.append(bool(value))
+    owned_toy_skins = migrate_bool_array(saved_toy_skins, toy_skin_specs.size(), owned_toy_skins)
     var saved_machine_skins: Variant = data.get("owned_machine_skins", owned_machine_skins)
-    if saved_machine_skins is Array and saved_machine_skins.size() == machine_skin_specs.size():
-        owned_machine_skins = []
-        for value in saved_machine_skins: owned_machine_skins.append(bool(value))
+    owned_machine_skins = migrate_bool_array(saved_machine_skins, machine_skin_specs.size(), owned_machine_skins)
     # Индекс 0 всегда означает стартовый скин. Индексы 1+ — магазинные скины
     # (уровни 2+). Это сохраняет совместимость со старыми сохранениями и серверными ID.
     if not owned_claw_skins.is_empty(): owned_claw_skins[0] = true
