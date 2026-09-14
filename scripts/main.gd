@@ -4826,9 +4826,8 @@ func setup_login_streak() -> void:
 func build_daily_login_panel() -> void:
     daily_login_panel = PanelContainer.new()
     daily_login_panel.name = "DailyLoginPanel"
-    # Карточка открывается в той же зоне, что и «Миссия дня» /
-    # «Недельное задание»: небольшой верхний отступ и такой же зазор
-    # до правого ряда круглых кнопок. Размер окна НЕ меняем.
+    # Положение такое же, как у «Миссия дня» и «Недельное задание».
+    # Размер окна не меняем.
     daily_login_panel.position = Vector2(630, 170)
     daily_login_panel.size = Vector2(300, 165)
     daily_login_panel.custom_minimum_size = Vector2(300, 165)
@@ -4951,23 +4950,17 @@ func toggle_daily_login() -> void:
     if not daily_login_panel:
         return
     if daily_login_panel.visible:
-        animate_panel_out(daily_login_panel)
         daily_login_panel.visible = false
-        daily_login_panel.scale = Vector2.ONE
-        daily_login_panel.modulate.a = 1.0
         if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
             gameplay_modal_blocker.visible = false
-        update_android_navigation()
         return
     setup_login_streak()
     close_side_panels("DailyLoginPanel")
     daily_login_panel.visible = true
     if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker):
         gameplay_modal_blocker.visible = true
-    # Открываем окно тем же универсальным способом, что и «Миссия дня»
-    # и «Недельное задание»: масштаб + прозрачность. Позиция фиксирована
-    # в общей правой зоне, с малым зазором до круглых кнопок.
-    # Размер окна НЕ меняем.
+    # Открываем тем же способом, что и остальные информационные окна.
+    # Позиция и размер окна не меняются во время открытия.
     daily_login_panel.position = Vector2(630, 170)
     update_daily_login_ui()
     animate_panel_in(daily_login_panel)
@@ -7973,7 +7966,7 @@ func build_help_panel() -> PanelContainer:
     style_button(vk, Color("#526F8E"))
     vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
-        DisplayServer.shell_open("https://vk.ru/simulator_khvataika")
+        OS.shell_open("https://vk.ru/simulator_khvataika")
     )
     social_row.add_child(vk)
 
@@ -7994,7 +7987,7 @@ func build_help_panel() -> PanelContainer:
     style_button(max_btn, Color("#7A5D91"))
     max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
-        DisplayServer.shell_open("https://max.ru/channel_simulator_khvataika")
+        OS.shell_open("https://max.ru/channel_simulator_khvataika")
     )
     social_row.add_child(max_btn)
 
