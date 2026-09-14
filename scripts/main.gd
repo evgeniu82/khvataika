@@ -720,7 +720,6 @@ func add_progressive_achievements() -> void:
         {"kind":"rarity","rarity":"РЕДКАЯ","prefix":"rare_master","name":"ОХОТНИК ЗА РЕДКИМИ","desc":"Получите %d редких игрушек.","values":[20,50,100,250,500,1000]},
         {"kind":"rarity","rarity":"ЭПИЧЕСКАЯ","prefix":"epic_master","name":"ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР","desc":"Получите %d эпических игрушек.","values":[10,25,50,100,250,500]},
         {"kind":"rarity","rarity":"ЛЕГЕНДАРНАЯ","prefix":"legend_master","name":"ЛЕГЕНДАРНЫЙ ОХОТНИК","desc":"Получите %d легендарных игрушек.","values":[2,5,10,25,50,100]},
-        {"kind":"upgrades","prefix":"upgrade_master","name":"ИНЖЕНЕР","desc":"Купите %d уровней улучшений.","values":[60,80,100,125,150,200]}
     ]
     for tier in tiers:
         var values: Array = tier["values"]
@@ -779,7 +778,6 @@ func add_diverse_achievements() -> void:
         {"id":"machine_skins_3","name":"НОВЫЙ КОРПУС","desc":"Откройте 3 скина аппарата.","kind":"machine_skins","value":3},
         {"id":"login_3","name":"ТРИ ДНЯ ПОДРЯД","desc":"Продержите серию входов 3 дня.","kind":"login_streak","value":3},
         {"id":"login_7","name":"НЕДЕЛЯ В ИГРЕ","desc":"Продержите серию входов 7 дней.","kind":"login_streak","value":7},
-        {"id":"login_30","name":"МЕСЯЦ В ИГРЕ","desc":"Продержите серию входов 30 дней.","kind":"login_streak","value":30},
         {"id":"daily_10","name":"ЕЖЕДНЕВНЫЙ ГЕРОЙ","desc":"Выполните 10 ежедневных миссий.","kind":"daily_claims","value":10},
         {"id":"weekly_10","name":"НЕДЕЛЬНЫЙ МАРАФОН","desc":"Закройте 10 недельных миссий.","kind":"weekly_claims","value":10},
         {"id":"referrals_1","name":"ДРУГ ПРИВЁЛ ДРУГА","desc":"Пригласите 1 друга.","kind":"referrals","value":1},
@@ -5488,7 +5486,9 @@ func build_hud() -> void:
 func build_achievement_strip() -> void:
     achievement_strip = PanelContainer.new()
     achievement_strip.name = "AchievementStrip"
-    achievement_strip.position = Vector2(225, 145)
+    # Центр между вторыми боковыми кружками: примерно напротив
+    # сундуков слева и недельной миссии справа.
+    achievement_strip.position = Vector2(225, 280)
     achievement_strip.size = Vector2(630, 68)
     achievement_strip.visible = false
     achievement_strip.z_index = 650
