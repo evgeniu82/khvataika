@@ -498,6 +498,9 @@ var popup_xp_label: Label
 var popup_rating_label: Label
 var popup_title_label: Label
 var popup_timer: float = 0.0
+var collection_completion_popup_name: String = ""
+var collection_completion_popup_reward: int = 0
+var collection_completion_popup_toys: String = ""
 var popup_achievement_label: Label
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
@@ -8852,6 +8855,8 @@ func finalize_delivered_prize() -> void:
         last_reward_rubles = maxi(0, coins - coins_before_prize)
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
         show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
+        if collection_completion_popup_name != "":
+            show_collection_completion_popup()
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -9011,8 +9016,32 @@ func check_collection_completion(collection_name: String) -> void:
         elif total_weight < 30.0:
             reward = 250
         coins += reward
+        collection_completion_popup_name = collection_name
+        collection_completion_popup_reward = reward
+        var toy_names: Array[String] = []
+        for toy in toys:
+            if String(toy["collection"]) == collection_name:
+                toy_names.append(String(toy["name"]))
+        collection_completion_popup_toys = " • ".join(toy_names)
         current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
         check_achievements()
+
+func show_collection_completion_popup() -> void:
+    if not result_popup or collection_completion_popup_name == "":
+        return
+    if popup_title_label:
+        popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
+    popup_name_label.text = collection_completion_popup_name
+    popup_info_label.text = "Полная коллекция • Приз зачислен"
+    popup_xp_label.text = "💰 +%d ₽" % collection_completion_popup_reward
+    if popup_rating_label:
+        popup_rating_label.text = ""
+    popup_achievement_label.text = "🧸 " + collection_completion_popup_toys
+    popup_timer = 3.8
+    result_popup.visible = true
+    collection_completion_popup_name = ""
+    collection_completion_popup_reward = 0
+    collection_completion_popup_toys = ""
 
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
