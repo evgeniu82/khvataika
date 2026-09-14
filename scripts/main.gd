@@ -508,6 +508,7 @@ var popup_achievement_label: Label
 var achievement_strip: PanelContainer
 var achievement_strip_label: Label
 var achievement_strip_timer: float = 0.0
+var achievement_check_timer: float = 0.0
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
 var machine_lights: Array[OmniLight3D] = []
@@ -564,7 +565,7 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"collections_1","name":"СОБРАНО!","desc":"Завершите 1 коллекцию.","kind":"collections","value":1},
     {"id":"collections_2","name":"ДВА НАБОРА","desc":"Завершите 2 коллекции.","kind":"collections","value":2},
     {"id":"collections_4","name":"ПОЛОВИНА ПУТИ","desc":"Завершите 4 коллекции.","kind":"collections","value":4},
-    {"id":"collections_8","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":8},
+    {"id":"collections_16","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":16},
     {"id":"level_5","name":"НОВИЧОК","desc":"Достигните 5 уровня.","kind":"level","value":5},
     {"id":"level_10","name":"УВЕРЕННЫЙ ИГРОК","desc":"Достигните 10 уровня.","kind":"level","value":10},
     {"id":"level_25","name":"ПРОДВИНУТЫЙ","desc":"Достигните 25 уровня.","kind":"level","value":25},
@@ -738,7 +739,7 @@ func add_diverse_achievements() -> void:
     # косметика, задания, ключи, XP и особые захваты. Все цели независимы.
     var extra := [
         {"id":"streak_3","name":"ПЕРВАЯ СЕРИЯ","desc":"Выиграйте 3 игры подряд.","kind":"best_streak","value":3},
-        {"id":"streak_7","name":"НЕ ОСТАНОВИТЬ","desc":"Выиграйте 7 игр подряд.","kind":"best_streak","value":7},
+        {"id":"streak_7","name":"СЕРИЯ 7 ПОБЕД","desc":"Выиграйте 7 игр подряд.","kind":"best_streak","value":7},
         {"id":"streak_15","name":"ЖЕЛЕЗНАЯ СЕРИЯ","desc":"Выиграйте 15 игр подряд.","kind":"best_streak","value":15},
         {"id":"streak_30","name":"МАШИНА ПОБЕД","desc":"Выиграйте 30 игр подряд.","kind":"best_streak","value":30},
         {"id":"streak_50","name":"НЕПОБЕДИМЫЙ","desc":"Выиграйте 50 игр подряд.","kind":"best_streak","value":50},
@@ -767,7 +768,7 @@ func add_diverse_achievements() -> void:
         {"id":"exclusive_10","name":"ОХОТНИК ЗА ЭКСКЛЮЗИВАМИ","desc":"Получите 10 эксклюзивных наград.","kind":"exclusive","value":10},
         {"id":"workshop_5","name":"ЮНЫЙ МЕХАНИК","desc":"Достигните 5 уровня мастерской.","kind":"workshop_level","value":5},
         {"id":"workshop_10","name":"ИНЖЕНЕР-МЕХАНИК","desc":"Достигните 10 уровня мастерской.","kind":"workshop_level","value":10},
-        {"id":"workshop_20","name":"ГЛАВНЫЙ ИНЖЕНЕР","desc":"Достигните 20 уровня мастерской.","kind":"workshop_level","value":20},
+        {"id":"workshop_15","name":"ГЛАВНЫЙ ИНЖЕНЕР","desc":"Достигните 15 уровня мастерской.","kind":"workshop_level","value":15},
         {"id":"parts_100","name":"ЗАПАС ДЕТАЛЕЙ","desc":"Накопите 100 деталей одновременно.","kind":"parts","value":100},
         {"id":"parts_500","name":"СКЛАД ЗАПЧАСТЕЙ","desc":"Накопите 500 деталей одновременно.","kind":"parts","value":500},
         {"id":"calibration_5","name":"ИДЕАЛЬНАЯ КАЛИБРОВКА","desc":"Прокачайте калибровку до 5 уровня.","kind":"calibration","value":5},
@@ -5509,16 +5510,15 @@ func show_achievement_strip() -> void:
     var lines: Array[String] = []
     for i in range(pending_achievement_rewards_text.size()):
         var text := String(pending_achievement_rewards_text[i]).replace("\n", " • ")
-        lines.append(text)
+        lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: " + text.trim_prefix("🏆 "))
     if lines.is_empty():
         for name in pending_new_achievements:
             lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % String(name))
-    else:
-        var cleaned: Array[String] = []
-        for line in lines:
-            cleaned.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: " + line.trim_prefix("🏆 "))
-        lines = cleaned
     achievement_strip_label.text = "\n".join(lines)
+    # Полоска остаётся между боковыми кругами и расширяется только вниз,
+    # если одновременно открыто несколько достижений.
+    var line_count := maxi(1, lines.size())
+    achievement_strip.size = Vector2(630, 68 + float(line_count - 1) * 42.0)
     achievement_strip_timer = 5.0
     achievement_strip.visible = true
 
@@ -8277,6 +8277,11 @@ func _process(delta: float) -> void:
     if game_initialized and mission_timer_ui_accum >= 1.0:
         mission_timer_ui_accum = 0.0
         update_mission_timers_light()
+    if game_initialized:
+        achievement_check_timer -= delta
+        if achievement_check_timer <= 0.0:
+            achievement_check_timer = 0.5
+            check_achievements()
     if notification_permission_waiting and OS.has_feature("android") and fmod(time_alive, 1.0) < delta:
         if _android_notification_permission_granted():
             notification_permission_waiting = false
