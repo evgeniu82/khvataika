@@ -6634,6 +6634,47 @@ func build_workshop_panel() -> PanelContainer:
     v.add_child(close)
     return p
 
+func collection_total_weight(collection_name: String) -> float:
+    var total := 0.0
+    for toy in toys:
+        if String(toy.get("collection", "")) == collection_name:
+            total += maxf(0.001, float(toy.get("weight", 1.0)))
+    return total
+
+func collection_difficulty(collection_name: String) -> String:
+    var total := collection_total_weight(collection_name)
+    # Чем меньше суммарный вес игрушек коллекции, тем реже она собирается.
+    if total >= 100.0:
+        return "ЛЁГКАЯ"
+    if total >= 70.0:
+        return "СРЕДНЯЯ"
+    if total >= 30.0:
+        return "СЛОЖНАЯ"
+    return "ОЧЕНЬ РЕДКАЯ"
+
+func collection_reward(collection_name: String) -> Dictionary:
+    match collection_difficulty(collection_name):
+        "ЛЁГКАЯ":
+            return {"rubles":50, "keys":0, "parts":0}
+        "СРЕДНЯЯ":
+            return {"rubles":75, "keys":1, "parts":0}
+        "СЛОЖНАЯ":
+            return {"rubles":100, "keys":1, "parts":5}
+        "ОЧЕНЬ РЕДКАЯ":
+            return {"rubles":250, "keys":2, "parts":10}
+    return {"rubles":50, "keys":0, "parts":0}
+
+func collection_reward_text(collection_name: String) -> String:
+    var r := collection_reward(collection_name)
+    var items: Array[String] = []
+    var rubles := int(r.get("rubles", 0))
+    var keys := int(r.get("keys", 0))
+    var parts := int(r.get("parts", 0))
+    if rubles > 0: items.append("%d ₽" % rubles)
+    if keys > 0: items.append("%d ключ%s" % [keys, "" if keys == 1 else "а"])
+    if parts > 0: items.append("%d деталей" % parts)
+    return " + ".join(items)
+
 func build_collection_panel() -> PanelContainer:
     var p := PanelContainer.new()
     p.position = Vector2(35, 150)
@@ -6672,16 +6713,25 @@ func build_collection_panel() -> PanelContainer:
         card.add_theme_constant_override("separation", 3)
         var title := Label.new()
         var done: bool = completed_collections.has(cname)
+        var difficulty := collection_difficulty(cname)
         title.text = ("🏆 " if done else "▣ ") + cname + "   •   %d / %d" % [got, needed]
         title.add_theme_font_size_override("font_size", 25)
         title.modulate = Color("#E1C29A")
         card.add_child(title)
+
+        var reward_line := Label.new()
+        reward_line.text = "Сложность: %s   •   Приз за полную коллекцию: %s" % [difficulty, collection_reward_text(cname)]
+        reward_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        reward_line.add_theme_font_size_override("font_size", 15)
+        reward_line.modulate = GOLD
+        card.add_child(reward_line)
+
         var names := Label.new()
         var parts: Array[String] = []
         for toy in toys:
             if String(toy["collection"]) == cname:
                 var mark: String = "✓" if collection.has(String(toy["name"])) else "○"
-                parts.append(mark + " " + String(toy["name"]))
+                parts.append(mark + " " + String(toy["name"]) + " • " + String(toy.get("rarity", "ОБЫЧНАЯ")))
         names.text = "   •   ".join(parts)
         names.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         names.add_theme_font_size_override("font_size", 18)
@@ -7291,7 +7341,7 @@ func refresh_profile_panel() -> void:
         ["Процент побед", "%.1f%%" % win_rate],
         ["Лучшая серия", str(best_win_streak)],
         ["Достижения", "%d / %d" % [unlocked_achievements.size(), achievement_specs.size()]],
-        ["Коллекции", "%d / 8" % completed_collections.size()],
+        ["Коллекции", "%d / %d" % [completed_collections.size(), get_collection_names().size()]],
         ["Клешни", "%d / %d" % [owned_claws_count, claw_specs.size()]],
         ["Уровней улучшений", str(total_upgrades)],
         ["Текущая клешня", String(claw_specs[selected_claw]["name"])],
@@ -7404,7 +7454,7 @@ func refresh_stats_panel() -> void:
         ["ПРОГРЕСС", [
             ["Уровень игрока", str(player_level)],
             ["Достижения", "%d / %d" % [unlocked_achievements.size(), achievement_specs.size()]],
-            ["Завершённые коллекции", "%d / 8" % completed_collections.size()],
+            ["Завершённые коллекции", "%d / %d" % [completed_collections.size(), get_collection_names().size()]],
             ["Открытые клешни", "%d / %d" % [count_owned_claws(), claw_specs.size()]],
             ["Уровни улучшений", str(total_upgrade_levels())]
         ]]
@@ -8808,7 +8858,7 @@ func finalize_delivered_prize() -> void:
             if last_prize_xp > best_result_xp:
                 best_result_xp = last_prize_xp
                 best_result = "%s • +%d XP" % [last_prize_name, last_prize_xp]
-        check_collection_completion(last_prize_collection)
+        var collection_completed_now := check_collection_completion(last_prize_collection)
         current_result = "🎉 ДОСТАЛ: %s • %s" % [last_prize_name, last_prize_rarity]
         rarity_flash_timer = 1.6
         rarity_flash_color = rarity_color(last_prize_rarity)
@@ -8827,7 +8877,10 @@ func finalize_delivered_prize() -> void:
     if kind == "toy":
         last_reward_rubles = maxi(0, coins - coins_before_prize)
         var rating_gain := maxi(0, get_player_rating_score() - rating_before_prize)
-        show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
+        if collection_completed_now:
+            show_collection_completion_popup(last_prize_collection)
+        else:
+            show_prize_popup(last_prize_name, last_prize_collection, last_prize_rarity, last_prize_xp, last_reward_rubles, rating_gain)
     pending_prize_data.clear()
     save_game()
     update_ui()
@@ -8962,9 +9015,9 @@ func award_toy_xp(rarity: String) -> int:
         player_xp = xp_to_next
     return gained
 
-func check_collection_completion(collection_name: String) -> void:
-    if completed_collections.has(collection_name):
-        return
+func check_collection_completion(collection_name: String) -> bool:
+    if collection_name == "" or completed_collections.has(collection_name):
+        return false
     var needed: int = 0
     var got: int = 0
     for toy in toys:
@@ -8972,12 +9025,21 @@ func check_collection_completion(collection_name: String) -> void:
             needed += 1
             if collection.has(String(toy["name"])):
                 got += 1
-    if needed > 0 and got >= needed:
-        completed_collections[collection_name] = true
-        var reward: int = 60 + needed * 10
-        coins += reward
-        current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
-        check_achievements()
+    if needed <= 0 or got < needed:
+        return false
+
+    completed_collections[collection_name] = true
+    var reward := collection_reward(collection_name)
+    var rubles := int(reward.get("rubles", 0))
+    var keys := int(reward.get("keys", 0))
+    var parts := int(reward.get("parts", 0))
+    coins += rubles
+    chest_keys += keys
+    total_keys_earned += keys
+    workshop_parts += parts
+    current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • %s" % [collection_name, collection_reward_text(collection_name)]
+    check_achievements()
+    return true
 
 func achievement_value(spec: Dictionary) -> int:
     match String(spec.get("kind", "")):
@@ -9103,6 +9165,30 @@ func check_achievements() -> void:
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         if pending_prize_data.is_empty():
             show_achievement_popup()
+
+func show_collection_completion_popup(collection_name: String) -> void:
+    if not result_popup: return
+    if popup_title_label: popup_title_label.text = "🏆 КОЛЛЕКЦИЯ СОБРАНА!"
+    popup_name_label.text = collection_name
+
+    var toy_lines: Array[String] = []
+    for toy in toys:
+        if String(toy.get("collection", "")) == collection_name:
+            toy_lines.append("• %s — %s" % [String(toy.get("name", "Игрушка")), String(toy.get("rarity", "ОБЫЧНАЯ"))])
+    popup_info_label.text = "\n".join(toy_lines)
+    popup_info_label.add_theme_font_size_override("font_size", 15)
+    popup_xp_label.text = "🎁 ПРИЗ ЗА СБОР: %s" % collection_reward_text(collection_name)
+    popup_xp_label.add_theme_font_size_override("font_size", 27)
+    if popup_rating_label:
+        popup_rating_label.text = "Сложность: %s • Приз уже зачислен" % collection_difficulty(collection_name)
+        popup_rating_label.add_theme_font_size_override("font_size", 18)
+    if popup_achievement_label:
+        popup_achievement_label.text = "Коллекция полностью собрана! Все указанные игрушки входят в неё."
+        popup_achievement_label.add_theme_font_size_override("font_size", 15)
+    popup_timer = 5.0
+    result_popup.visible = true
+    pending_new_achievements.clear()
+    pending_achievement_rewards_text.clear()
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
