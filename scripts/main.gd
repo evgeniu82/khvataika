@@ -9121,7 +9121,7 @@ func build_collection_completion_popup() -> void:
     collection_completion_popup = PanelContainer.new()
     collection_completion_popup.name = "CollectionCompletionPopup"
     collection_completion_popup.position = Vector2(145, 290)
-    collection_completion_popup.size = Vector2(790, 730)
+    collection_completion_popup.size = Vector2(790, 450)
     collection_completion_popup.visible = false
     collection_completion_popup.z_index = 700
     style_panel(collection_completion_popup, Color("#241B16"), Color("#76583F"), 26, 3)
