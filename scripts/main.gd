@@ -6688,7 +6688,14 @@ func build_collection_panel() -> PanelContainer:
             difficulty_text = "СРЕДНЯЯ"
         elif total_weight >= 30.0:
             difficulty_text = "СЛОЖНАЯ"
-        difficulty.text = "Сложность: " + difficulty_text + "   •   Приз: +%d ₽" % (60 + needed * 10)
+        var reward_preview: int = 50
+        if difficulty_text == "СРЕДНЯЯ":
+            reward_preview = 75
+        elif difficulty_text == "СЛОЖНАЯ":
+            reward_preview = 100
+        elif difficulty_text == "ОЧЕНЬ РЕДКАЯ":
+            reward_preview = 250
+        difficulty.text = "Сложность: " + difficulty_text + "   •   Приз: +%d ₽" % reward_preview
         difficulty.add_theme_font_size_override("font_size", 17)
         difficulty.modulate = Color("#C7B4A0")
         card.add_child(difficulty)
