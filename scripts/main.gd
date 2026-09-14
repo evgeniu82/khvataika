@@ -502,11 +502,6 @@ var collection_completion_popup_name: String = ""
 var collection_completion_popup_reward: int = 0
 var collection_completion_popup_toys: String = ""
 var collection_completion_popup: PanelContainer
-var collection_popup_title_label: Label
-var collection_popup_name_label: Label
-var collection_popup_info_label: Label
-var collection_popup_toys_label: Label
-var collection_popup_reward_label: Label
 var collection_completion_popup_timer: float = 0.0
 var collection_completion_popup_pending: bool = false
 var popup_achievement_label: Label
@@ -9118,92 +9113,80 @@ func check_collection_completion(collection_name: String) -> void:
         for toy in toys:
             if String(toy["collection"]) == collection_name:
                 toy_names.append(String(toy["name"]))
-        collection_completion_popup_toys = "\n".join(["• " + n for n in toy_names])
+        collection_completion_popup_toys = " • ".join(toy_names)
         current_result = "🏆 КОЛЛЕКЦИЯ «%s» ПОЛНА • +%d ₽" % [collection_name, reward]
         check_achievements()
 
 func build_collection_completion_popup() -> void:
-    # Простое обычное окно, без дополнительных тяжёлых элементов.
     collection_completion_popup = PanelContainer.new()
     collection_completion_popup.name = "CollectionCompletionPopup"
-    collection_completion_popup.position = Vector2(165, 330)
-    collection_completion_popup.size = Vector2(750, 430)
+    collection_completion_popup.position = Vector2(145, 290)
+    collection_completion_popup.size = Vector2(790, 730)
     collection_completion_popup.visible = false
     collection_completion_popup.z_index = 700
-    style_panel(collection_completion_popup, Color("#241B16"), Color("#76583F"), 22, 3)
+    style_panel(collection_completion_popup, Color("#241B16"), Color("#76583F"), 26, 3)
     hud_layer.add_child(collection_completion_popup)
-
     var v := VBoxContainer.new()
-    v.name = "CollectionPopupContent"
     v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 7)
+    v.add_theme_constant_override("separation", 12)
     collection_completion_popup.add_child(v)
-
-    collection_popup_title_label = Label.new()
-    collection_popup_title_label.name = "Title"
-    collection_popup_title_label.text = "🏆  КОЛЛЕКЦИЯ СОБРАНА!"
-    collection_popup_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    collection_popup_title_label.add_theme_font_size_override("font_size", 25)
-    collection_popup_title_label.modulate = Color("#DDB47A")
-    v.add_child(collection_popup_title_label)
-
-    collection_popup_name_label = Label.new()
-    collection_popup_name_label.name = "CollectionName"
-    collection_popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    collection_popup_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    collection_popup_name_label.add_theme_font_size_override("font_size", 28)
-    collection_popup_name_label.modulate = Color("#F39C32")
-    v.add_child(collection_popup_name_label)
-
-    collection_popup_info_label = Label.new()
-    collection_popup_info_label.name = "Info"
-    collection_popup_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    collection_popup_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    collection_popup_info_label.add_theme_font_size_override("font_size", 17)
-    collection_popup_info_label.modulate = Color("#C7B4A0")
-    v.add_child(collection_popup_info_label)
-
-    collection_popup_toys_label = Label.new()
-    collection_popup_toys_label.name = "Toys"
-    collection_popup_toys_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    collection_popup_toys_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    collection_popup_toys_label.add_theme_font_size_override("font_size", 16)
-    collection_popup_toys_label.modulate = Color("#D8C3AA")
-    v.add_child(collection_popup_toys_label)
-
-    collection_popup_reward_label = Label.new()
-    collection_popup_reward_label.name = "Reward"
-    collection_popup_reward_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    collection_popup_reward_label.add_theme_font_size_override("font_size", 22)
-    collection_popup_reward_label.modulate = Color("#DDB47A")
-    v.add_child(collection_popup_reward_label)
-
+    var title := Label.new()
+    title.name = "Title"
+    title.text = "🏆  НОВАЯ КОЛЛЕКЦИЯ ОТКРЫТА!"
+    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    title.add_theme_font_size_override("font_size", 30)
+    title.modulate = Color("#DDB47A")
+    v.add_child(title)
+    var name := Label.new()
+    name.name = "CollectionName"
+    name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    name.add_theme_font_size_override("font_size", 38)
+    name.modulate = Color("#F39C32")
+    v.add_child(name)
+    var info := Label.new()
+    info.name = "Info"
+    info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    info.add_theme_font_size_override("font_size", 20)
+    info.modulate = Color("#C7B4A0")
+    v.add_child(info)
+    var toys_label := Label.new()
+    toys_label.name = "Toys"
+    toys_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    toys_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    toys_label.add_theme_font_size_override("font_size", 18)
+    toys_label.modulate = Color("#D8C3AA")
+    v.add_child(toys_label)
+    var reward := Label.new()
+    reward.name = "Reward"
+    reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    reward.add_theme_font_size_override("font_size", 28)
+    reward.modulate = Color("#DDB47A")
+    v.add_child(reward)
     var cont := Button.new()
     cont.name = "ContinueButton"
     cont.text = "▶  ПРОДОЛЖИТЬ СБОР КОЛЛЕКЦИЙ"
-    cont.custom_minimum_size = Vector2(0, 56)
+    cont.custom_minimum_size = Vector2(0, 74)
     cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
     style_button(cont, Color("#76583F"))
-    cont.add_theme_font_size_override("font_size", 17)
+    cont.add_theme_font_size_override("font_size", 20)
     cont.pressed.connect(hide_collection_completion_popup)
     v.add_child(cont)
 
 func show_collection_completion_popup() -> void:
     if not collection_completion_popup or collection_completion_popup_name == "":
         return
-    if collection_popup_title_label:
-        collection_popup_title_label.text = "🏆  КОЛЛЕКЦИЯ СОБРАНА!"
-    if collection_popup_name_label:
-        collection_popup_name_label.text = "Коллекция: " + collection_completion_popup_name
-    if collection_popup_info_label:
-        collection_popup_info_label.text = "Все игрушки коллекции собраны"
-    if collection_popup_toys_label:
-        collection_popup_toys_label.text = "🧸 Игрушки:\n" + collection_completion_popup_toys
-    if collection_popup_reward_label:
-        collection_popup_reward_label.text = "💰 ПРИЗ: +%d ₽" % collection_completion_popup_reward
+    # Используем уже созданные элементы окна по их порядку. Никаких новых
+    # узлов, переменных или действий при запуске игры здесь не добавляется.
+    var v := collection_completion_popup.get_child(0) as VBoxContainer
+    if v and v.get_child_count() >= 5:
+        (v.get_child(0) as Label).text = "🏆  КОЛЛЕКЦИЯ СОБРАНА!"
+        (v.get_child(1) as Label).text = collection_completion_popup_name
+        (v.get_child(2) as Label).text = "Все игрушки коллекции собраны!\nНаграда уже зачислена на баланс."
+        (v.get_child(3) as Label).text = "🧸 " + collection_completion_popup_toys
+        (v.get_child(4) as Label).text = "💰 ПОЛУЧЕНО: +%d ₽" % collection_completion_popup_reward
     collection_completion_popup_timer = 8.0
     collection_completion_popup.visible = true
-    # Очищаем данные после показа, чтобы одно завершение не повторялось.
     collection_completion_popup_name = ""
     collection_completion_popup_reward = 0
     collection_completion_popup_toys = ""
