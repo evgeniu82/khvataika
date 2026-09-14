@@ -783,7 +783,6 @@ func _ready() -> void:
         return
 
     if not STARTUP_CONTROL_TEST:
-        add_extended_collections()
         add_progressive_achievements()
         add_diverse_achievements()
         owned_claw_skins.resize(claw_skin_specs.size())
