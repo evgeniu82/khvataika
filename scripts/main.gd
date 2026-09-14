@@ -505,6 +505,9 @@ var collection_completion_popup: PanelContainer
 var collection_completion_popup_timer: float = 0.0
 var collection_completion_popup_pending: bool = false
 var popup_achievement_label: Label
+var achievement_strip: PanelContainer
+var achievement_strip_label: Label
+var achievement_strip_timer: float = 0.0
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
 var machine_lights: Array[OmniLight3D] = []
@@ -1996,6 +1999,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     pending_new_achievements.append(ach_name)
             if not pending_new_achievements.is_empty():
                 current_result = "🏆 НОВЫЕ ДОСТИЖЕНИЯ: " + " • ".join(pending_new_achievements)
+                show_achievement_strip()
         if not bool(data.get("ok", false)):
             if kind == "action:game_start":
                 server_attempt_ready = false
@@ -4180,6 +4184,7 @@ func build_ui() -> void:
     gameplay_modal_blocker.gui_input.connect(_on_gameplay_modal_blocker_gui_input)
     hud_layer.add_child(gameplay_modal_blocker)
     build_hud()
+    build_achievement_strip()
     await get_tree().process_frame
     await set_loading_progress(83.0, "HUD ГОТОВ")
 
@@ -5204,7 +5209,7 @@ func build_event_panel() -> void:
     var title := Label.new()
     title.name = "EventTitle"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 18)
+    title.add_theme_font_size_override("font_size", 22)
     v.add_child(title)
     var text := Label.new()
     text.name = "EventText"
@@ -5479,6 +5484,49 @@ func build_hud() -> void:
     hud_layer.add_child(grab)
 
 
+func build_achievement_strip() -> void:
+    achievement_strip = PanelContainer.new()
+    achievement_strip.name = "AchievementStrip"
+    achievement_strip.position = Vector2(225, 145)
+    achievement_strip.size = Vector2(630, 68)
+    achievement_strip.visible = false
+    achievement_strip.z_index = 650
+    style_panel(achievement_strip, Color("#241B16"), Color("#8A684C"), 18, 2)
+    hud_layer.add_child(achievement_strip)
+    achievement_strip_label = Label.new()
+    achievement_strip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    achievement_strip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    achievement_strip_label.add_theme_font_size_override("font_size", 17)
+    achievement_strip_label.modulate = Color("#E1C29A")
+    achievement_strip.add_child(achievement_strip_label)
+
+func show_achievement_strip() -> void:
+    if not achievement_strip or not achievement_strip_label:
+        return
+    if pending_achievement_rewards_text.is_empty() and pending_new_achievements.is_empty():
+        return
+    var lines: Array[String] = []
+    for i in range(pending_achievement_rewards_text.size()):
+        var text := String(pending_achievement_rewards_text[i]).replace("\n", " • ")
+        lines.append(text)
+    if lines.is_empty():
+        for name in pending_new_achievements:
+            lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % String(name))
+    else:
+        var cleaned: Array[String] = []
+        for line in lines:
+            cleaned.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: " + line.trim_prefix("🏆 "))
+        lines = cleaned
+    achievement_strip_label.text = "\n".join(lines)
+    achievement_strip_timer = 5.0
+    achievement_strip.visible = true
+
+func hide_achievement_strip() -> void:
+    achievement_strip_timer = 0.0
+    if achievement_strip and is_instance_valid(achievement_strip):
+        achievement_strip.visible = false
+
 func make_control_button(text_value: String, pos: Vector2) -> Button:
     var b := Button.new()
     b.text = text_value
@@ -5493,17 +5541,17 @@ func build_result_popup() -> void:
     result_popup.position = Vector2(90, 520)
     result_popup.size = Vector2(900, 430)
     result_popup.visible = false
-    style_panel(result_popup, Color("#A3754D"))
+    style_panel(result_popup, Color("#241B16"), Color("#76583F"), 26, 3)
     hud_layer.add_child(result_popup)
     var v := VBoxContainer.new()
     v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 6)
+    v.add_theme_constant_override("separation", 12)
     result_popup.add_child(v)
     popup_title_label = Label.new()
     popup_title_label.text = "ПРИЗ ПОЛУЧЕН!"
     popup_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_title_label.add_theme_font_size_override("font_size", 24)
-    popup_title_label.modulate = Color("#C6A27A")
+    popup_title_label.modulate = Color("#E1C29A")
     v.add_child(popup_title_label)
     popup_name_label = Label.new()
     popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5513,23 +5561,23 @@ func build_result_popup() -> void:
     popup_info_label = Label.new()
     popup_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_info_label.add_theme_font_size_override("font_size", 19)
-    popup_info_label.modulate = Color("#D8C3AA")
+    popup_info_label.modulate = Color("#C7B4A0")
     v.add_child(popup_info_label)
     popup_xp_label = Label.new()
     popup_xp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_xp_label.add_theme_font_size_override("font_size", 32)
-    popup_xp_label.modulate = Color("#E1C29A")
+    popup_xp_label.modulate = Color("#DDB47A")
     v.add_child(popup_xp_label)
     popup_rating_label = Label.new()
     popup_rating_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_rating_label.add_theme_font_size_override("font_size", 24)
-    popup_rating_label.modulate = Color("#F0D4A9")
+    popup_rating_label.modulate = Color("#DDB47A")
     v.add_child(popup_rating_label)
     popup_achievement_label = Label.new()
     popup_achievement_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_achievement_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     popup_achievement_label.add_theme_font_size_override("font_size", 17)
-    popup_achievement_label.modulate = Color("#F0D4A9")
+    popup_achievement_label.modulate = Color("#C7B4A0")
     v.add_child(popup_achievement_label)
 
 func build_shop_panel() -> PanelContainer:
@@ -5624,7 +5672,7 @@ func show_shop_insufficient_popup() -> void:
     shop_insufficient_popup.position = Vector2(235, 790)
     shop_insufficient_popup.size = Vector2(610, 150)
     shop_insufficient_popup.z_index = 500
-    style_panel(shop_insufficient_popup, Color("#3A241B"), Color("#C09A70"), 24, 3)
+    style_panel(shop_insufficient_popup, Color("#241B16"), Color("#76583F"), 24, 3)
     menu_layer.add_child(shop_insufficient_popup)
     var label := Label.new()
     label.text = "💰  НЕДОСТАТОЧНО СРЕДСТВ\nНужно больше рублей для этой покупки."
@@ -5877,7 +5925,7 @@ func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
     var scroll := ScrollContainer.new(); p.add_child(scroll)
-    var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 6); v.custom_minimum_size = Vector2(930, 0); scroll.add_child(v)
+    var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.custom_minimum_size = Vector2(930, 0); scroll.add_child(v)
     var title := Label.new(); title.text = "💎  VIP МАГАЗИН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 40); title.modulate = Color("#FFE58A"); v.add_child(title)
     var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
     var wallet := Label.new(); wallet.name = "VIPWallet"; wallet.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; wallet.add_theme_font_size_override("font_size", 22); wallet.modulate = GOLD; v.add_child(wallet)
@@ -5968,7 +6016,7 @@ func build_seasons_panel() -> PanelContainer:
     title.text = "🌎  СЕЗОНЫ И ПРАЗДНИКИ"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    title.add_theme_font_size_override("font_size", 18)
+    title.add_theme_font_size_override("font_size", 30)
     title.modulate = GOLD
     v.add_child(title)
 
@@ -6304,7 +6352,7 @@ func build_chests_panel() -> PanelContainer:
     var v := VBoxContainer.new()
     v.name = "ChestContent"
     v.custom_minimum_size = Vector2(930, 0)
-    v.add_theme_constant_override("separation", 6)
+    v.add_theme_constant_override("separation", 12)
     scroll.add_child(v)
 
     var title := Label.new()
@@ -6318,7 +6366,7 @@ func build_chests_panel() -> PanelContainer:
     info.name = "ChestInfo"
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    info.add_theme_font_size_override("font_size", 13)
+    info.add_theme_font_size_override("font_size", 20)
     v.add_child(info)
 
     var help := Label.new()
@@ -6644,7 +6692,7 @@ func build_workshop_panel() -> PanelContainer:
     info.name = "WorkshopInfo"
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    info.add_theme_font_size_override("font_size", 13)
+    info.add_theme_font_size_override("font_size", 16)
     info.modulate = Color("#E8D8C8")
     v.add_child(info)
 
@@ -6675,7 +6723,7 @@ func build_collection_panel() -> PanelContainer:
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 6)
+    v.add_theme_constant_override("separation", 12)
     v.custom_minimum_size = Vector2(940, 0)
     scroll.add_child(v)
     var h := Label.new()
@@ -7402,7 +7450,7 @@ func build_stats_panel() -> PanelContainer:
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
-    v.add_theme_constant_override("separation", 6)
+    v.add_theme_constant_override("separation", 12)
     v.custom_minimum_size = Vector2(930, 0)
     scroll.add_child(v)
     var h := Label.new()
@@ -7466,7 +7514,7 @@ func refresh_stats_panel() -> void:
     for section in sections:
         var title := Label.new()
         title.text = String(section[0])
-        title.add_theme_font_size_override("font_size", 18)
+        title.add_theme_font_size_override("font_size", 22)
         title.modulate = Color("#E1C29A")
         list.add_child(title)
         for item in section[1]:
@@ -8368,6 +8416,10 @@ func _process(delta: float) -> void:
             current_result = "ГОТОВ К ИГРЕ"
             save_game()
             update_ui()
+    if achievement_strip_timer > 0.0:
+        achievement_strip_timer -= delta
+        if achievement_strip_timer <= 0.0:
+            hide_achievement_strip()
     if popup_timer > 0.0:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
@@ -9068,56 +9120,56 @@ func check_collection_completion(collection_name: String) -> void:
 func build_collection_completion_popup() -> void:
     collection_completion_popup = PanelContainer.new()
     collection_completion_popup.name = "CollectionCompletionPopup"
-    collection_completion_popup.position = Vector2(310, 540)
-    collection_completion_popup.size = Vector2(460, 340)
+    collection_completion_popup.position = Vector2(145, 290)
+    collection_completion_popup.size = Vector2(790, 730)
     collection_completion_popup.visible = false
     collection_completion_popup.z_index = 700
-    style_panel(collection_completion_popup, Color("#241B16"), Color("#A3754D"), 26, 3)
+    style_panel(collection_completion_popup, Color("#241B16"), Color("#76583F"), 26, 3)
     hud_layer.add_child(collection_completion_popup)
     var v := VBoxContainer.new()
     v.alignment = BoxContainer.ALIGNMENT_CENTER
-    v.add_theme_constant_override("separation", 6)
+    v.add_theme_constant_override("separation", 12)
     collection_completion_popup.add_child(v)
     var title := Label.new()
     title.name = "Title"
     title.text = "🏆  НОВАЯ КОЛЛЕКЦИЯ ОТКРЫТА!"
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 18)
-    title.modulate = Color("#C6A27A")
+    title.add_theme_font_size_override("font_size", 30)
+    title.modulate = Color("#DDB47A")
     v.add_child(title)
     var name := Label.new()
     name.name = "CollectionName"
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    name.add_theme_font_size_override("font_size", 22)
+    name.add_theme_font_size_override("font_size", 38)
     name.modulate = Color("#F39C32")
     v.add_child(name)
     var info := Label.new()
     info.name = "Info"
     info.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    info.add_theme_font_size_override("font_size", 13)
-    info.modulate = Color("#D8C3AA")
+    info.add_theme_font_size_override("font_size", 20)
+    info.modulate = Color("#C7B4A0")
     v.add_child(info)
     var toys_label := Label.new()
     toys_label.name = "Toys"
     toys_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     toys_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    toys_label.add_theme_font_size_override("font_size", 12)
-    toys_label.modulate = Color("#F0E7DC")
+    toys_label.add_theme_font_size_override("font_size", 18)
+    toys_label.modulate = Color("#D8C3AA")
     v.add_child(toys_label)
     var reward := Label.new()
     reward.name = "Reward"
     reward.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    reward.add_theme_font_size_override("font_size", 18)
-    reward.modulate = Color("#E1C29A")
+    reward.add_theme_font_size_override("font_size", 28)
+    reward.modulate = Color("#DDB47A")
     v.add_child(reward)
     var cont := Button.new()
     cont.name = "ContinueButton"
     cont.text = "▶  ПРОДОЛЖИТЬ СБОР КОЛЛЕКЦИЙ"
-    cont.custom_minimum_size = Vector2(0, 44)
+    cont.custom_minimum_size = Vector2(0, 74)
     cont.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-    style_button(cont, Color("#9A7653"))
-    cont.add_theme_font_size_override("font_size", 13)
+    style_button(cont, Color("#76583F"))
+    cont.add_theme_font_size_override("font_size", 20)
     cont.pressed.connect(hide_collection_completion_popup)
     v.add_child(cont)
 
@@ -9129,10 +9181,10 @@ func show_collection_completion_popup() -> void:
     var info := collection_completion_popup.get_node_or_null("VBoxContainer/Info") as Label
     var toys_label := collection_completion_popup.get_node_or_null("VBoxContainer/Toys") as Label
     var reward := collection_completion_popup.get_node_or_null("VBoxContainer/Reward") as Label
-    if title: title.text = "🏆  НОВАЯ КОЛЛЕКЦИЯ ОТКРЫТА!"
-    if info: info.text = "Коллекция полностью собрана!"
-    if name: name.text = "📦 " + collection_completion_popup_name
-    if toys_label: toys_label.text = "🧸 Игрушки: " + collection_completion_popup_toys
+    if title: title.text = "🏆  КОЛЛЕКЦИЯ СОБРАНА!"
+    if name: name.text = collection_completion_popup_name
+    if info: info.text = "Все игрушки коллекции собраны!\nНаграда уже зачислена на баланс."
+    if toys_label: toys_label.text = "🧸 " + collection_completion_popup_toys
     if reward: reward.text = "💰 ПОЛУЧЕНО: +%d ₽" % collection_completion_popup_reward
     collection_completion_popup_timer = 8.0
     collection_completion_popup.visible = true
@@ -9267,8 +9319,7 @@ func check_achievements() -> void:
             pending_achievement_rewards_text.append("🏆 %s\n   %s" % [String(spec["name"]), achievement_reward_text(spec)])
     if not unlocked_now.is_empty():
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
-        if pending_prize_data.is_empty():
-            show_achievement_popup()
+        show_achievement_strip()
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
@@ -9278,10 +9329,8 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
     popup_xp_label.text = "💰 +%d ₽   •   ✨ +%d XP" % [reward_rubles, xp]
     if popup_rating_label:
         popup_rating_label.text = "🏆 РЕЙТИНГ: +%d" % maxi(0, rating_gain)
-    if pending_achievement_rewards_text.is_empty():
-        popup_achievement_label.text = ""
-    else:
-        popup_achievement_label.text = "\n".join(pending_achievement_rewards_text)
+    # Достижения больше не показываем в окне получения игрушки.
+    popup_achievement_label.text = ""
     # Дубль игрушки: окно выбора должно оставаться до явного решения игрока.
     popup_timer = 0.0 if sale_available and sale_name == toy_name else 3.2
     if sale_available and sale_name == toy_name:
@@ -9293,17 +9342,9 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
     pending_achievement_rewards_text.clear()
 
 func show_achievement_popup() -> void:
-    if not result_popup or pending_achievement_rewards_text.is_empty(): return
-    if popup_title_label: popup_title_label.text = "🏆 ДОСТИЖЕНИЕ ВЫПОЛНЕНО!"
-    popup_name_label.text = ""
-    popup_info_label.text = ""
-    popup_xp_label.text = ""
-    if popup_rating_label: popup_rating_label.text = ""
-    popup_achievement_label.text = "\n".join(pending_achievement_rewards_text)
-    popup_timer = 3.5
-    result_popup.visible = true
-    pending_new_achievements.clear()
-    pending_achievement_rewards_text.clear()
+    # Старое отдельное окно достижений больше не используется:
+    # уведомление показывается компактной полоской в верхней части HUD.
+    show_achievement_strip()
 
 func rarity_reward(rarity: String) -> int:
     match rarity:
@@ -9455,7 +9496,7 @@ func show_sale_offer() -> void:
         sale_panel = PanelContainer.new()
         sale_panel.position = Vector2(90, 900)
         sale_panel.size = Vector2(900, 130)
-        style_panel(sale_panel, Color("#9A7653"))
+        style_panel(sale_panel, Color("#241B16"), Color("#76583F"), 18, 2)
         hud_layer.add_child(sale_panel)
         var h := HBoxContainer.new()
         h.alignment = BoxContainer.ALIGNMENT_CENTER
