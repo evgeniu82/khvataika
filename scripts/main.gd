@@ -673,10 +673,12 @@ func refresh_collection_panel() -> void:
 
     # Перестраиваем окно только когда действительно изменился состав коллекции.
     # При обычном повторном открытии не создаём/удаляем сотни Control-узлов.
+    # ВАЖНО: здесь нельзя повторно вызывать refresh_collection_panel() —
+    # предыдущая оптимизация создавала бесконечную рекурсию и приводила к
+    # аварийному завершению запуска уже на этапе BUILD_UI.
     if collection_panel.has_meta("collection_ui_built"):
         collection_panel.queue_free()
         collection_panel = build_collection_panel()
-    refresh_collection_panel()
     collection_panel.set_meta("collection_ui_built", true)
 
 func add_extended_collections() -> void:
@@ -844,8 +846,10 @@ func _ready() -> void:
     await get_tree().process_frame
 
     if startup_diagnostic_previous != "" and startup_diagnostic_previous != "DONE":
-        _startup_diag_halt(startup_diagnostic_previous)
-        return
+        # Не блокируем запуск из-за диагностического маркера старой версии.
+        # Если предыдущий запуск аварийно завершился, после исправления игры
+        # новая попытка должна пройти и перезаписать маркер текущими этапами.
+        print("Recovered from previous startup interruption at: ", startup_diagnostic_previous)
 
     if not STARTUP_CONTROL_TEST:
         add_extended_collections()
