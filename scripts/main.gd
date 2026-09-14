@@ -2287,7 +2287,7 @@ func build_season_pass_panel() -> PanelContainer:
     style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 14)
+    scroll.add_theme_constant_override("scroll_bar_width", 10)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -4150,16 +4150,22 @@ func style_slider_brown(slider: HSlider) -> void:
     slider.add_theme_icon_override("grabber_highlighted", load("res://assets/ui_slider_grabber_highlighted.svg"))
 
 func style_scroll_container_brown(scroll: ScrollContainer) -> void:
+    # Один и тот же аккуратный коричневый стиль для вертикальных и
+    # горизонтальных полос прокрутки.
+    scroll.add_theme_constant_override("scroll_bar_width", 10)
+    scroll.add_theme_constant_override("scroll_bar_h_separation", 2)
     var vs := scroll.get_v_scroll_bar()
     var hs := scroll.get_h_scroll_bar()
     if vs:
-        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-        vs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
-        vs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
+        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 5, 1))
+        vs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 5, 1))
+        vs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 5, 1))
+        vs.mouse_filter = Control.MOUSE_FILTER_PASS
     if hs:
-        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-        hs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
-        hs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
+        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 5, 1))
+        hs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 5, 1))
+        hs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 5, 1))
+        hs.mouse_filter = Control.MOUSE_FILTER_PASS
 
 func show_brown_modal(title_text: String, message_text: String, action: Callable, ok_text: String = "OK", cancel_text: String = "ОТМЕНА", large: bool = false) -> void:
     # Не используем ConfirmationDialog/AcceptDialog: на Android их Window
@@ -4581,17 +4587,30 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
     if scroll.has_meta("android_scroll_configured"):
         return
     scroll.set_meta("android_scroll_configured", true)
+    # Более узкая полоса освобождает место контенту, но сам бегунок остаётся
+    # достаточно заметным и удобным для пальца.
+    scroll.add_theme_constant_override("scroll_bar_width", 10)
+    scroll.add_theme_constant_override("scroll_bar_h_separation", 2)
     scroll.follow_focus = true
-    scroll.scroll_deadzone = 1
-    scroll.add_theme_constant_override("scroll_bar_width", 20)
-    scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
+    # Минимальная мёртвая зона делает начало свайпа более отзывчивым.
+    scroll.scroll_deadzone = 0
+    scroll.process_mode = Node.PROCESS_MODE_ALWAYS
+    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
     if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
         scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+        var vs := scroll.get_v_scroll_bar()
+        if vs:
+            vs.mouse_filter = Control.MOUSE_FILTER_PASS
+            vs.process_mode = Node.PROCESS_MODE_ALWAYS
     else:
-        # Горизонтальные категории листаются влево/вправо отдельно.
+        # Горизонтальные категории листаются влево/вправо тем же самым
+        # коричневым бегунком, что и вертикальные окна.
         scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-    scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+        var hs := scroll.get_h_scroll_bar()
+        if hs:
+            hs.mouse_filter = Control.MOUSE_FILTER_PASS
+            hs.process_mode = Node.PROCESS_MODE_ALWAYS
 
 func setup_android_ui_navigation() -> void:
     # Отдельные верхние кнопки «НАЗАД» больше не создаём.
@@ -6274,7 +6293,7 @@ func build_seasons_panel() -> PanelContainer:
     style_scroll_container_brown(scroll)
     scroll.name = "SeasonsScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 12)
+    scroll.add_theme_constant_override("scroll_bar_width", 10)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -6621,7 +6640,7 @@ func build_chests_panel() -> PanelContainer:
     style_scroll_container_brown(scroll)
     scroll.name = "ChestScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 12)
+    scroll.add_theme_constant_override("scroll_bar_width", 10)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
