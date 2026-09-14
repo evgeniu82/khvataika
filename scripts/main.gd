@@ -34,6 +34,17 @@ const DARK := Color("#050A17")
 const NAVY := Color("#081630")
 const STEEL := Color("#34435B")
 
+# Единая палитра UI: тёплая бронза/медь/латунь вместо случайных цветных обводок.
+# Используется только для интерфейса; цвета игровых игрушек, скинов и 3D-материалов не трогаются.
+const UI_BROWN_DEEP := Color("#6E4B33")
+const UI_BROWN := Color("#8A684C")
+const UI_COPPER := Color("#9A7653")
+const UI_BRASS := Color("#B08A57")
+const UI_GOLD := Color("#C09A70")
+const UI_GOLD_LIGHT := Color("#E1C29A")
+const UI_TEXT := Color("#F1E5D6")
+const UI_TEXT_MUTED := Color("#B9A28D")
+
 var coins: int = 120
 var highest_balance_rubles: int = 120
 var selected_claw: int = 0
@@ -810,6 +821,7 @@ func sanitize_unlocked_achievements() -> void:
             unlocked_achievements.erase(id)
 
 func _ready() -> void:
+    apply_global_brown_ui_theme()
     startup_diagnostic_previous = _startup_read_phase()
     _startup_write_phase("READY")
     # Показываем собственный загрузочный экран как можно раньше.
@@ -2272,6 +2284,7 @@ func add_panel_title(parent: VBoxContainer, title_text: String) -> void:
 func build_season_pass_panel() -> PanelContainer:
     var p := build_info_menu_panel("SeasonPassPanel", Vector2(970, 1120))
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.add_theme_constant_override("scroll_bar_width", 14)
@@ -2415,7 +2428,7 @@ func refresh_season_pass_panel() -> void:
             if state_label:
                 if lvl < season_pass_level:
                     state_label.text = "✓ ПОЛУЧЕНО"
-                    state_label.modulate = Color("#86C98A")
+                    state_label.modulate = Color("#C09A70")
                 elif lvl == season_pass_level:
                     state_label.text = "★ ТЕКУЩИЙ УРОВЕНЬ"
                     state_label.modulate = Color("#DDB47A")
@@ -2443,6 +2456,7 @@ func refresh_promo_panel() -> void:
 func build_news_panel() -> PanelContainer:
     var p:=build_info_menu_panel("NewsPanel",Vector2(970,900))
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
+    style_scroll_container_brown(scroll)
     var v:=VBoxContainer.new(); v.name="NewsContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",12); scroll.add_child(v)
     add_panel_title(v,"📰  НОВОСТИ")
     var intro:=Label.new(); intro.text="Здесь будут появляться новости игры, события, новые функции, игрушки и новые промокоды."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
@@ -2470,6 +2484,7 @@ func refresh_news_panel(panel: PanelContainer = null) -> void:
 func build_rating_panel() -> PanelContainer:
     var p:=build_info_menu_panel("RatingPanel",Vector2(970,900))
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
+    style_scroll_container_brown(scroll)
     var v:=VBoxContainer.new(); v.name="RatingContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",9); scroll.add_child(v)
     add_panel_title(v,"🏆  РЕЙТИНГ")
     var note:=Label.new(); note.name="RatingNote"; note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; note.add_theme_font_size_override("font_size",16); note.modulate=Color("#BCA996"); v.add_child(note)
@@ -2521,6 +2536,7 @@ func build_live_systems_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     p.add_child(scroll)
@@ -2533,7 +2549,7 @@ func build_live_systems_panel() -> PanelContainer:
     var info := Label.new(); info.name="SystemsInfo"; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
     var ntitle := Label.new(); ntitle.text="🔔 УМНЫЕ УВЕДОМЛЕНИЯ"; ntitle.add_theme_font_size_override("font_size",21); ntitle.modulate=GOLD; v.add_child(ntitle)
     for item in [["notify_rewards_on","🎁 Награды"],["notify_streak_on","🔥 Серия входов"],["notify_events_on","🎪 События и сезон"],["notify_workshop_on","🔧 Мастерская"],["notify_chests_on","📦 Сундуки"]]:
-        var cb := CheckButton.new(); cb.text=String(item[1]); cb.button_pressed=bool(get(String(item[0]))); cb.add_theme_font_size_override("font_size",18); cb.toggled.connect(func(on: bool, key: String=String(item[0])): set(key,on); save_game(); cancel_background_notifications(); schedule_background_notifications(); refresh_live_systems_panel()); v.add_child(cb)
+        var cb := CheckButton.new(); cb.text=String(item[1]); cb.button_pressed=bool(get(String(item[0]))); cb.add_theme_font_size_override("font_size",18); style_check_button_brown(cb); cb.toggled.connect(func(on: bool, key: String=String(item[0])): set(key,on); save_game(); cancel_background_notifications(); schedule_background_notifications(); refresh_live_systems_panel()); v.add_child(cb)
     var return_title := Label.new(); return_title.text="🎁 БОНУС ЗА ВОЗВРАЩЕНИЕ"; return_title.add_theme_font_size_override("font_size",21); return_title.modulate=GOLD; v.add_child(return_title)
     var return_btn := Button.new(); return_btn.name="ReturnBonusButton"; return_btn.custom_minimum_size=Vector2(0,70); style_button(return_btn,Color("#76583F")); return_btn.add_theme_font_size_override("font_size",18); return_btn.pressed.connect(claim_return_bonus); v.add_child(return_btn)
     var job_title := Label.new(); job_title.text="🔧 ФОНОВАЯ РАБОТА МАСТЕРСКОЙ"; job_title.add_theme_font_size_override("font_size",21); job_title.modulate=GOLD; v.add_child(job_title)
@@ -4031,6 +4047,107 @@ func build_particles() -> void:
     # Неоновые частицы отключены: стиль автомата — дерево, металл и стекло.
     sparkle_particles = null
 
+func apply_global_brown_ui_theme() -> void:
+    # Единая коричневая тема для стандартных Godot-контролов.
+    # Не меняет игровую механику — только внешний вид системных меню/окон.
+    # Стандартные контролы оформляются точечно через helpers ниже,
+    # потому что главный скрипт является Node3D, а не Control.
+
+func style_option_button_brown(o: OptionButton) -> void:
+    o.add_theme_color_override("font_color", Color("#F1E5D6"))
+    o.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+    o.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+    o.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+    o.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
+    o.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
+    o.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 18, 3))
+    o.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
+    o.add_theme_font_size_override("font_size", 20)
+    var pop := o.get_popup()
+    if pop:
+        pop.add_theme_color_override("font_color", Color("#F1E5D6"))
+        pop.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
+        pop.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+        pop.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
+        pop.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#76583F"), 14, 2))
+        pop.add_theme_stylebox_override("hover", make_style(Color("#4A3022"), Color("#A3754D"), 10, 2))
+        pop.add_theme_stylebox_override("separator", make_style(Color("#6E4B33"), Color("#6E4B33"), 0, 1))
+        pop.add_theme_font_size_override("font_size", 19)
+
+func style_check_button_brown(c: CheckButton) -> void:
+    c.add_theme_color_override("font_color", Color("#F1E5D6"))
+    c.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+    c.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+    c.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+    c.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
+    c.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 14, 1))
+    c.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 14, 2))
+    c.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 14, 2))
+    c.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 14, 1))
+    c.add_theme_font_size_override("font_size", 21)
+    var off := load("res://assets/ui_toggle_off.svg") as Texture2D
+    var on := load("res://assets/ui_toggle_on.svg") as Texture2D
+    if off:
+        c.add_theme_icon_override("unchecked", off)
+        c.add_theme_icon_override("unchecked_disabled", off)
+    if on:
+        c.add_theme_icon_override("checked", on)
+        c.add_theme_icon_override("checked_disabled", on)
+
+func style_slider_brown(slider: HSlider) -> void:
+    slider.add_theme_stylebox_override("slider", make_style(Color("#17120F"), Color("#6E4B33"), 8, 1))
+    slider.add_theme_stylebox_override("grabber_area", make_style(Color("#6E4B33"), Color("#6E4B33"), 8, 1))
+    slider.add_theme_stylebox_override("grabber_area_highlighted", make_style(Color("#8A684C"), Color("#8A684C"), 8, 1))
+    slider.add_theme_icon_override("grabber", load("res://assets/ui_slider_grabber.svg"))
+    slider.add_theme_icon_override("grabber_highlighted", load("res://assets/ui_slider_grabber_highlighted.svg"))
+
+func style_scroll_container_brown(scroll: ScrollContainer) -> void:
+    var vs := scroll.get_v_scroll_bar()
+    var hs := scroll.get_h_scroll_bar()
+    if vs:
+        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+        vs.add_theme_stylebox_override("grabber", make_style(Color("#76583F"), Color("#A3754D"), 6, 1))
+        vs.add_theme_stylebox_override("grabber_highlighted", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+    if hs:
+        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+        hs.add_theme_stylebox_override("grabber", make_style(Color("#76583F"), Color("#A3754D"), 6, 1))
+        hs.add_theme_stylebox_override("grabber_highlighted", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+
+func style_standard_dialog(dialog: Window, large: bool = false) -> void:
+    # Убираем серое системное окно Godot и делаем обычную компактную панель
+    # в той же коричневой гамме, что и остальные окна игры.
+    dialog.borderless = true
+    dialog.transparent_bg = true
+    dialog.min_size = Vector2(620, 300 if not large else 360)
+    var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
+    panel_style.content_margin_left = 28.0
+    panel_style.content_margin_right = 28.0
+    panel_style.content_margin_top = 24.0
+    panel_style.content_margin_bottom = 24.0
+    dialog.add_theme_stylebox_override("panel", panel_style)
+    dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
+    dialog.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+    dialog.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+    dialog.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+    dialog.add_theme_font_size_override("font_size", 21 if not large else 24)
+    var label := dialog.get_label()
+    if label:
+        label.add_theme_color_override("font_color", Color("#F1E5D6"))
+        label.add_theme_font_size_override("font_size", 21 if not large else 24)
+        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+        label.custom_minimum_size = Vector2(520, 110 if not large else 150)
+    var ok := dialog.get_ok_button()
+    var cancel := dialog.get_cancel_button()
+    if ok:
+        style_button(ok, Color("#A8754A"))
+        ok.custom_minimum_size = Vector2(190, 58)
+        ok.add_theme_font_size_override("font_size", 18)
+    if cancel:
+        style_button(cancel, Color("#6E4B33"))
+        cancel.custom_minimum_size = Vector2(190, 58)
+        cancel.add_theme_font_size_override("font_size", 18)
+
 func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 2) -> StyleBoxFlat:
     var st := StyleBoxFlat.new()
     st.bg_color = bg
@@ -4043,19 +4160,35 @@ func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 
     st.content_margin_bottom = 14.0
     return st
 
-func style_button(b: Button, accent: Color = Color("#A8754A"), large: bool = false) -> void:
+func ui_accent(source: Color) -> Color:
+    # Любой внешний accent из старых меню нормализуем в нашу коричневую UI-палитру.
+    # Так цветные скины/события не могут случайно перекрасить обводку интерфейса.
+    var v := (source.r * 0.2126) + (source.g * 0.7152) + (source.b * 0.0722)
+    if v < 0.28:
+        return UI_BROWN_DEEP
+    if v < 0.48:
+        return UI_BROWN
+    if v < 0.68:
+        return UI_COPPER
+    if v < 0.84:
+        return UI_BRASS
+    return UI_GOLD
+
+func style_button(b: Button, accent: Color = UI_COPPER, large: bool = false) -> void:
     if not b.has_meta("ui_sfx_bound"):
         b.set_meta("ui_sfx_bound", true)
         b.pressed.connect(func(): play_ui_sound("button"))
-    b.add_theme_color_override("font_color", Color.WHITE)
-    b.add_theme_color_override("font_hover_color", Color.WHITE)
+    var ring := ui_accent(accent)
+    b.add_theme_color_override("font_color", UI_TEXT)
+    b.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
     b.add_theme_color_override("font_pressed_color", Color.WHITE)
-    b.add_theme_color_override("font_focus_color", Color.WHITE)
-    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
-    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
-    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 18, 3))
-    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
+    b.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 18, 2))
+    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.16), 18, 3))
+    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 18, 3))
+    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.08), 18, 2))
     b.add_theme_font_size_override("font_size", 30 if large else 22)
+
 func style_panel(p: PanelContainer, bg: Color = Color("#1D1612"), border: Color = Color("#76583F"), radius: int = 26, border_width: int = 3) -> void:
     p.add_theme_stylebox_override("panel", make_style(bg, border, radius, border_width))
 
@@ -4090,7 +4223,7 @@ func add_neon_header(parent: Control, title_text: String, subtitle_text: String 
         sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         sub.add_theme_font_size_override("font_size", 17)
-        sub.modulate = Color("#9FB8D9")
+        sub.modulate = Color("#B9A28D")
         parent.add_child(sub)
 
 func build_ui() -> void:
@@ -4184,7 +4317,7 @@ func build_ui() -> void:
     news_menu_button.pressed.connect(func(): open_panel("news"))
     menu_layer.add_child(news_menu_button); main_menu_controls.append(news_menu_button); decorate_main_menu_button(news_menu_button)
 
-    var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#5E554D"))
+    var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#76583F"))
     settings.pressed.connect(func(): open_panel("settings"))
     menu_layer.add_child(settings); main_menu_controls.append(settings); decorate_main_menu_button(settings)
 
@@ -4597,18 +4730,18 @@ func build_extra_hud() -> void:
     # ЛЕВАЯ ВЕРТИКАЛЬ: сезоны/праздники + сундуки + мастерская.
     # Эти кнопки находятся только на игровом экране и НЕ добавляются в главное меню.
     var season_icon := get_current_season_icon()
-    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), Color("#4D8068"))
+    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), UI_COPPER)
     seasons_btn.name = "SeasonsCircleButton"
     seasons_btn.pressed.connect(func(): open_panel("seasons"))
     hud_layer.add_child(seasons_btn)
 
     # Возвращаем сундуки и мастерскую на главный экран: это НЕ пункты меню.
-    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), Color("#7A5A42"))
+    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), UI_BRASS)
     chests_btn.name = "ChestsCircleButton"
     chests_btn.pressed.connect(func(): open_panel("chests"))
     hud_layer.add_child(chests_btn)
 
-    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), Color("#536B82"))
+    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), UI_BROWN)
     workshop_btn.name = "WorkshopCircleButton"
     workshop_btn.pressed.connect(func(): open_panel("workshop"))
     hud_layer.add_child(workshop_btn)
@@ -4618,9 +4751,9 @@ func build_extra_hud() -> void:
     daily_btn.position = Vector2(948, 185)
     daily_btn.size = Vector2(82, 82)
     style_button(daily_btn, Color("#9A7653"))
-    daily_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#9A7653"), 41, 3))
-    daily_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#C09A70"), 41, 4))
-    daily_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
+    daily_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_BRASS, 41, 3))
+    daily_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_GOLD, 41, 4))
+    daily_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
     daily_btn.add_theme_font_size_override("font_size", 28)
     daily_btn.tooltip_text = "Миссия дня"
     daily_btn.pressed.connect(toggle_daily_mission)
@@ -4631,9 +4764,9 @@ func build_extra_hud() -> void:
     weekly_btn.position = Vector2(948, 280)
     weekly_btn.size = Vector2(82, 82)
     style_button(weekly_btn, Color("#76583F"))
-    weekly_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#76583F"), 41, 3))
-    weekly_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 41, 4))
-    weekly_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
+    weekly_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_BROWN, 41, 3))
+    weekly_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_COPPER, 41, 4))
+    weekly_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
     weekly_btn.add_theme_font_size_override("font_size", 28)
     weekly_btn.tooltip_text = "Недельная миссия"
     weekly_btn.pressed.connect(toggle_weekly_mission)
@@ -4644,7 +4777,7 @@ func build_extra_hud() -> void:
     daily_claim_button.position = Vector2(948, 375)
     daily_claim_button.size = Vector2(82, 82)
     style_button(daily_claim_button, Color("#C09A70"))
-    daily_claim_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#C09A70"), 41, 3))
+    daily_claim_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_GOLD, 41, 3))
     daily_claim_button.add_theme_font_size_override("font_size", 28)
     daily_claim_button.tooltip_text = "Ежедневная серия"
     daily_claim_button.pressed.connect(toggle_daily_login)
@@ -4656,9 +4789,9 @@ func build_extra_hud() -> void:
     event_button.position = Vector2(948, 470)
     event_button.size = Vector2(82, 82)
     style_button(event_button, Color("#8A684C"))
-    event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#8A684C"), 41, 3))
-    event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#C09A70"), 41, 4))
-    event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
+    event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_COPPER, 41, 3))
+    event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_GOLD, 41, 4))
+    event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
     event_button.add_theme_font_size_override("font_size", 28)
     event_button.tooltip_text = "НЕДЕЛЬНЫЕ СОБЫТИЯ"
     event_button.pressed.connect(toggle_event_panel)
@@ -4992,14 +5125,14 @@ func update_daily_login_ui() -> void:
             if claimed:
                 btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ\nПОЛУЧЕН" % day
                 btn.tooltip_text = "Приз за этот день уже получен"
-                style_button(btn, Color("#5FBF72"))
+                style_button(btn, Color("#76583F"))
             elif available:
                 btn.text = "🎁 ДЕНЬ %d\n+%d ₽\nЗАБРАТЬ" % [day, 20 + day * 5]
                 btn.tooltip_text = "Забрать приз за сегодняшний день"
                 style_button(btn, Color("#C09A70"))
             else:
                 btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
-                style_button(btn, Color("#5B5B66"))
+                style_button(btn, Color("#4A3022"))
 
 func toggle_daily_login() -> void:
     if not daily_login_panel:
@@ -5139,7 +5272,7 @@ func activate_calendar_event() -> void:
         update_event_panel()
     if event_button:
         event_button.tooltip_text = "НЕДЕЛЬНЫЕ СОБЫТИЯ"
-        event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#8A684C"), 41, 3))
+        event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_COPPER, 41, 3))
     save_game()
     if notifications_on:
         schedule_background_notifications()
@@ -5319,15 +5452,17 @@ func make_menu_circle_button(icon_text: String, tooltip_text: String, pos: Vecto
     b.position = pos
     b.size = Vector2(78, 78)
     b.tooltip_text = tooltip_text
-    b.add_theme_color_override("font_color", Color.WHITE)
+    b.add_theme_color_override("font_color", UI_TEXT)
     b.add_theme_color_override("font_hover_color", Color.WHITE)
     b.add_theme_color_override("font_pressed_color", Color.WHITE)
     b.add_theme_color_override("font_focus_color", Color.WHITE)
     b.add_theme_font_size_override("font_size", 30)
-    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), accent, 39, 3))
-    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), accent.lightened(0.18), 39, 4))
-    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color.WHITE, 39, 4))
-    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), accent, 39, 3))
+    # Важные круглые пункты получают разные, но близкие тёплые оттенки.
+    var ring := ui_accent(accent)
+    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 39, 3))
+    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.16), 39, 4))
+    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 39, 4))
+    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.08), 39, 3))
     return b
 
 func make_menu_button(text_value: String, pos: Vector2, size_value: Vector2, accent: Color = CYAN, large: bool = false) -> Button:
@@ -5575,7 +5710,7 @@ func build_result_popup() -> void:
     popup_name_label = Label.new()
     popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_name_label.add_theme_font_size_override("font_size", 42)
-    popup_name_label.modulate = Color("#F39C32")
+    popup_name_label.modulate = Color("#DDB47A")
     v.add_child(popup_name_label)
     popup_info_label = Label.new()
     popup_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -5623,12 +5758,12 @@ func build_shop_panel() -> PanelContainer:
     subtitle.text = "КЛЕШНЯ • МОДУЛИ • СКИНЫ • АППАРАТ"
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     subtitle.add_theme_font_size_override("font_size", 16)
-    subtitle.modulate = Color("#D7C9E8")
+    subtitle.modulate = Color("#D8C3AA")
     root.add_child(subtitle)
     var vip_button := Button.new()
     vip_button.text = "💎  VIP МАГАЗИН — ЭКСКЛЮЗИВЫ"
     vip_button.custom_minimum_size = Vector2(0, 68)
-    style_button(vip_button, Color("#C69A35"))
+    style_button(vip_button, Color("#8A684C"))
     vip_button.add_theme_font_size_override("font_size", 20)
     vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); update_android_navigation())
     root.add_child(vip_button)
@@ -5667,6 +5802,7 @@ func build_shop_panel() -> PanelContainer:
     root.add_child(shop_feedback_label)
 
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     root.add_child(scroll)
     shop_content = VBoxContainer.new()
@@ -5739,7 +5875,7 @@ func shop_section(title: String, desc: String) -> void:
     d.text = desc
     d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     d.add_theme_font_size_override("font_size", 16)
-    d.modulate = Color("#D7C9E8")
+    d.modulate = Color("#D8C3AA")
     shop_content.add_child(d)
 
 func shop_item_button(title: String, desc: String, state: String, accent: Color, action: Callable) -> void:
@@ -5948,6 +6084,7 @@ func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
     var scroll := ScrollContainer.new(); p.add_child(scroll)
+    style_scroll_container_brown(scroll)
     var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.custom_minimum_size = Vector2(930, 0); scroll.add_child(v)
     var title := Label.new(); title.text = "💎  VIP МАГАЗИН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 40); title.modulate = Color("#FFE58A"); v.add_child(title)
     var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
@@ -5968,7 +6105,7 @@ func refresh_vip_panel() -> void:
         var owned := i < vip_owned.size() and vip_owned[i]
         var b := Button.new(); b.custom_minimum_size = Vector2(0, 105); b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         b.text = ("✓  " if owned else "💎  ") + String(item["name"]) + "\n" + String(item["desc"]) + "\n" + ("ПОЛУЧЕНО" if owned else "%d ₽" % int(item["price"]))
-        style_button(b, Color("#C69A35")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
+        style_button(b, Color("#8A684C")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
@@ -6013,6 +6150,7 @@ func build_seasons_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.name = "SeasonsScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.add_theme_constant_override("scroll_bar_width", 12)
@@ -6095,7 +6233,7 @@ func build_seasons_panel() -> PanelContainer:
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     note.add_theme_font_size_override("font_size", 15)
-    note.modulate = Color("#C9D9D0")
+    note.modulate = Color("#BCA996")
     v.add_child(note)
 
     var close := Button.new()
@@ -6359,6 +6497,7 @@ func build_chests_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.name = "ChestScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.add_theme_constant_override("scroll_bar_width", 12)
@@ -6682,6 +6821,7 @@ func build_workshop_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.offset_left = 8
@@ -6737,6 +6877,7 @@ func build_collection_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -6822,6 +6963,7 @@ func build_achievements_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -7001,6 +7143,7 @@ func build_profile_panel() -> PanelContainer:
     hud_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.name = "ProfileScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.offset_left = 10
@@ -7464,6 +7607,7 @@ func build_stats_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -7607,6 +7751,7 @@ func build_referral_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     p.add_child(scroll)
     var v := VBoxContainer.new()
     v.custom_minimum_size = Vector2(880, 0)
@@ -7746,6 +7891,7 @@ func build_settings_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
+    style_scroll_container_brown(scroll)
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -7758,8 +7904,10 @@ func build_settings_panel() -> PanelContainer:
 
     var sep1 := Label.new(); sep1.text = "ЗВУК"; sep1.add_theme_font_size_override("font_size", 22); sep1.modulate = GOLD; v.add_child(sep1)
     var music := CheckButton.new(); music.text = "Фоновая музыка"; music.button_pressed = music_on; music.add_theme_font_size_override("font_size", 21)
+    style_check_button_brown(music)
     music.toggled.connect(func(on: bool): music_on = on; apply_music_settings(); save_game()); v.add_child(music)
     var music_vol := HSlider.new(); music_vol.min_value = -30; music_vol.max_value = 3; music_vol.step = 1; music_vol.value = music_volume_db; music_vol.custom_minimum_size = Vector2(0, 42)
+    style_slider_brown(music_vol)
     music_vol.value_changed.connect(func(value: float): music_volume_db = value; apply_music_settings(); save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
     var music_track := OptionButton.new()
     music_track.name = "MusicTrackOption"
@@ -7767,41 +7915,54 @@ func build_settings_panel() -> PanelContainer:
     for name in music_names: music_track.add_item(name)
     music_track.selected = clampi(music_track_index, 0, music_names.size() - 1)
     music_track.custom_minimum_size = Vector2(0, 54)
+    style_option_button_brown(music_track)
     music_track.item_selected.connect(func(idx:int): select_music_track(idx))
     v.add_child(make_labeled_control("Фоновая мелодия", music_track))
     var sfx := CheckButton.new(); sfx.text = "Звуки игры и интерфейса"; sfx.button_pressed = sfx_on; sfx.add_theme_font_size_override("font_size", 21)
+    style_check_button_brown(sfx)
     sfx.toggled.connect(func(on: bool): sfx_on = on; apply_sfx_volume_settings(); save_game()); v.add_child(sfx)
     var volume := HSlider.new(); volume.min_value = -24; volume.max_value = 3; volume.step = 1; volume.value = sfx_volume_db; volume.custom_minimum_size = Vector2(0, 42)
+    style_slider_brown(volume)
     volume.value_changed.connect(func(value: float): sfx_volume_db = value; apply_sfx_volume_settings(); save_game()); v.add_child(make_labeled_control("Громкость эффектов", volume))
 
     var sep2 := Label.new(); sep2.text = "ГРАФИКА"; sep2.add_theme_font_size_override("font_size", 22); sep2.modulate = GOLD; v.add_child(sep2)
     quality_option = OptionButton.new(); ["ПЛОХО","НИЗКО","СРЕДНЕ","ВЫСОКО","УЛЬТРА"].map(func(x): quality_option.add_item(x))
     quality_option.selected = clampi(quality_level,0,4); quality_option.custom_minimum_size = Vector2(0, 54)
+    style_option_button_brown(quality_option)
     quality_option.item_selected.connect(func(idx: int): quality_level = clampi(idx,0,4); apply_quality_settings(); save_game(); update_quality_info()); v.add_child(make_labeled_control("Качество", quality_option))
     var fps := OptionButton.new(); [30,60,90,120].map(func(x): fps.add_item("%d FPS" % x))
     fps.selected = 1 if fps_limit == 60 else (0 if fps_limit == 30 else (2 if fps_limit == 90 else 3)); fps.custom_minimum_size = Vector2(0,54)
+    style_option_button_brown(fps)
     fps.item_selected.connect(func(idx:int): fps_limit = [30,60,90,120][idx]; Engine.max_fps = fps_limit; save_game()); v.add_child(make_labeled_control("Ограничение кадров", fps))
     var energy := CheckButton.new(); energy.text = "Энергосбережение"; energy.button_pressed = energy_saving_on; energy.add_theme_font_size_override("font_size",21)
+    style_check_button_brown(energy)
     energy.toggled.connect(func(on:bool): energy_saving_on = on; Engine.max_fps = 30 if on else fps_limit; save_game()); v.add_child(energy)
 
     var sep3 := Label.new(); sep3.text = "УПРАВЛЕНИЕ"; sep3.add_theme_font_size_override("font_size",22); sep3.modulate = GOLD; v.add_child(sep3)
     var sens := HSlider.new(); sens.min_value=0.5; sens.max_value=1.5; sens.step=0.05; sens.value=joystick_sensitivity; sens.custom_minimum_size=Vector2(0,42)
+    style_slider_brown(sens)
     sens.value_changed.connect(func(x:float): joystick_sensitivity=clampf(x, 0.5, 1.5); save_game()); v.add_child(make_labeled_control("Чувствительность управления", sens))
     var grab := HSlider.new(); grab.min_value=0.8; grab.max_value=1.3; grab.step=0.05; grab.value=grab_button_scale; grab.custom_minimum_size=Vector2(0,42)
+    style_slider_brown(grab)
     grab.value_changed.connect(func(x:float): grab_button_scale=x; save_game(); apply_grab_button_scale()); v.add_child(make_labeled_control("Размер кнопки «ЗАХВАТ»", grab))
     var vibration := CheckButton.new(); vibration.text="Вибрация при захвате"; vibration.button_pressed=vibration_on; vibration.add_theme_font_size_override("font_size",21)
+    style_check_button_brown(vibration)
     vibration.toggled.connect(func(on:bool): vibration_on=on; save_game()); v.add_child(vibration)
 
     var sep4 := Label.new(); sep4.text="ИГРА"; sep4.add_theme_font_size_override("font_size",22); sep4.modulate=GOLD; v.add_child(sep4)
     var tips := CheckButton.new(); tips.text="Автоматические подсказки"; tips.button_pressed=auto_tips_on; tips.add_theme_font_size_override("font_size",21)
+    style_check_button_brown(tips)
     tips.toggled.connect(func(on:bool): auto_tips_on=on; if not on and waiting_overlay: waiting_overlay.visible=false; save_game()); v.add_child(tips)
     var purchases := CheckButton.new(); purchases.text="Подтверждать покупки"; purchases.button_pressed=confirm_purchases_on; purchases.add_theme_font_size_override("font_size",21)
+    style_check_button_brown(purchases)
     purchases.toggled.connect(func(on:bool): confirm_purchases_on=on; save_game()); v.add_child(purchases)
     var rare := CheckButton.new(); rare.text="Подтверждать открытие редких сундуков"; rare.button_pressed=confirm_rare_chests_on; rare.add_theme_font_size_override("font_size",21)
+    style_check_button_brown(rare)
     rare.toggled.connect(func(on:bool): confirm_rare_chests_on=on; save_game()); v.add_child(rare)
 
     var sep_notifications := Label.new(); sep_notifications.text="УВЕДОМЛЕНИЯ"; sep_notifications.add_theme_font_size_override("font_size",22); sep_notifications.modulate=GOLD; v.add_child(sep_notifications)
     var notifications := CheckButton.new(); notifications.text="Уведомления игры"; notifications.button_pressed=notifications_on; notifications.add_theme_font_size_override("font_size",21)
+    style_check_button_brown(notifications)
     notifications.toggled.connect(func(on:bool): notifications_on=on; save_game(); cancel_background_notifications(); if on: schedule_background_notifications(); update_ui()); v.add_child(notifications)
     var notify_items := [["notify_rewards_on","🎁 Награды"],["notify_streak_on","🔥 Серия входов"],["notify_events_on","🎪 События и сезон"],["notify_workshop_on","🔧 Мастерская"],["notify_chests_on","📦 Сундуки"]]
     for item in notify_items:
@@ -7809,6 +7970,7 @@ func build_settings_panel() -> PanelContainer:
         ncb.text = String(item[1])
         ncb.button_pressed = bool(get(String(item[0])))
         ncb.add_theme_font_size_override("font_size", 18)
+        style_check_button_brown(ncb)
         ncb.toggled.connect(func(on: bool, key: String=String(item[0])): set(key, on); save_game(); cancel_background_notifications(); schedule_background_notifications())
         v.add_child(ncb)
     var test_notification := Button.new(); test_notification.text="🔔  ОТПРАВИТЬ ТЕСТОВОЕ УВЕДОМЛЕНИЕ"; test_notification.custom_minimum_size=Vector2(0,64); style_button(test_notification,Color("#76583F")); test_notification.add_theme_font_size_override("font_size",18); test_notification.pressed.connect(func(): test_game_notification()); v.add_child(test_notification)
@@ -7816,6 +7978,7 @@ func build_settings_panel() -> PanelContainer:
 
     var sep5 := Label.new(); sep5.text="ЯЗЫК"; sep5.add_theme_font_size_override("font_size",22); sep5.modulate=GOLD; v.add_child(sep5)
     language_option=OptionButton.new(); language_option.add_item("Русский"); language_option.add_item("English"); language_option.selected=0 if language=="ru" else 1; language_option.custom_minimum_size=Vector2(0,54)
+    style_option_button_brown(language_option)
     language_option.item_selected.connect(func(idx:int): language="ru" if idx==0 else "en"; apply_language(); save_game()); v.add_child(language_option)
 
     var info := Label.new(); info.name="SettingsInfo"; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
@@ -7876,6 +8039,7 @@ func confirm_reset_settings() -> void:
     dialog.dialog_text = "Вернуть звук, графику и управление к исходным значениям? Прогресс игры не будет затронут."
     dialog.ok_button_text = "ВОССТАНОВИТЬ"
     dialog.cancel_button_text = "ОТМЕНА"
+    style_standard_dialog(dialog)
     menu_layer.add_child(dialog)
     dialog.confirmed.connect(func(): reset_settings_defaults(); dialog.queue_free())
     dialog.canceled.connect(func(): dialog.queue_free())
@@ -7887,6 +8051,7 @@ func confirm_reset_progress() -> void:
     dialog.dialog_text = "Весь прогресс, покупки и коллекция будут удалены. Продолжить?"
     dialog.ok_button_text = "СБРОСИТЬ"
     dialog.cancel_button_text = "ОТМЕНА"
+    style_standard_dialog(dialog, true)
     menu_layer.add_child(dialog)
     dialog.confirmed.connect(func(): reset_progress(); dialog.queue_free())
     dialog.canceled.connect(func(): dialog.queue_free())
@@ -8089,7 +8254,7 @@ func build_help_panel() -> PanelContainer:
     var vk := Button.new()
     vk.text = "◉  VK  ВКонтакте"
     vk.custom_minimum_size = Vector2(300, 62)
-    style_button(vk, Color("#526F8E"))
+    style_button(vk, Color("#76583F"))
     vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
         OS.shell_open("https://vk.ru/simulator_khvataika")
@@ -8110,7 +8275,7 @@ func build_help_panel() -> PanelContainer:
     var max_btn := Button.new()
     max_btn.text = "◆  MAX"
     max_btn.custom_minimum_size = Vector2(300, 62)
-    style_button(max_btn, Color("#7A5D91"))
+    style_button(max_btn, Color("#76583F"))
     max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
         OS.shell_open("https://max.ru/channel_simulator_khvataika")
@@ -8136,6 +8301,7 @@ func start_game() -> void:
         var dialog := AcceptDialog.new()
         dialog.title = "Технические работы"
         dialog.dialog_text = online_announcement if online_announcement != "" else "Игра временно недоступна. Попробуйте позже."
+        style_standard_dialog(dialog)
         menu_layer.add_child(dialog)
         dialog.popup_centered()
         return
@@ -9167,7 +9333,7 @@ func build_collection_completion_popup() -> void:
     name.name = "CollectionName"
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     name.add_theme_font_size_override("font_size", 38)
-    name.modulate = Color("#F39C32")
+    name.modulate = Color("#DDB47A")
     v.add_child(name)
     var info := Label.new()
     info.name = "Info"
@@ -9627,39 +9793,7 @@ func confirm_purchase(title_text: String, message_text: String, action: Callable
     dialog.ok_button_text = ok_text
     dialog.cancel_button_text = "ОТМЕНА"
 
-    # Для сундуков оставляем штатный надёжный ConfirmationDialog,
-    # но убираем серую системную рамку/заголовок и оформляем содержимое
-    # полностью в фирменной коричневой гамме игры.
-    if chest_style:
-        dialog.borderless = true
-        dialog.transparent_bg = true
-        var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
-        panel_style.content_margin_left = 28.0
-        panel_style.content_margin_right = 28.0
-        panel_style.content_margin_top = 22.0
-        panel_style.content_margin_bottom = 22.0
-        dialog.add_theme_stylebox_override("panel", panel_style)
-        dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
-        dialog.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
-        dialog.add_theme_font_size_override("font_size", 27)
-
-        var chest_label := dialog.get_label()
-        if chest_label:
-            chest_label.add_theme_color_override("font_color", Color("#F1E5D6"))
-            chest_label.add_theme_font_size_override("font_size", 27)
-            chest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            chest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-            chest_label.custom_minimum_size = Vector2(620, 210)
-
-        var ok := dialog.get_ok_button()
-        var cancel := dialog.get_cancel_button()
-        style_button(ok, Color("#A8754A"))
-        style_button(cancel, Color("#6E4B33"))
-        ok.custom_minimum_size = Vector2(220, 62)
-        cancel.custom_minimum_size = Vector2(220, 62)
-        ok.add_theme_font_size_override("font_size", 20)
-        cancel.add_theme_font_size_override("font_size", 20)
-
+    style_standard_dialog(dialog, chest_style)
     menu_layer.add_child(dialog)
     dialog.confirmed.connect(action)
     dialog.confirmed.connect(func(): dialog.queue_free())
