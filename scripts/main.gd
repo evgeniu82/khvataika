@@ -250,6 +250,8 @@ var remote_news_items: Array[Dictionary] = []
 var remote_leaderboard: Array[Dictionary] = []
 var remote_sync_status: String = "СЕРВЕР НЕ НАСТРОЕН"
 var remote_sync_timer: float = 5.0
+var remote_config_timer: float = 15.0
+var server_sync_version: int = 0
 var remote_notification_timer: float = 12.0
 var remote_notification_cursor: int = 0
 var remote_device_registered: bool = false
@@ -1359,6 +1361,7 @@ func _local_progress_exists() -> bool:
 func get_server_game_state() -> Dictionary:
     return {
         "save_schema": SAVE_SCHEMA_VERSION,
+        "sync_version": server_sync_version,
             "offline_mode": OFFLINE_MODE,
             "coins": coins, "player_name": player_name, "player_avatar_index": player_avatar_index,
         "bonus_keys": bonus_keys, "engineering_parts": engineering_parts, "chest_inventory": chest_inventory,
@@ -1373,6 +1376,7 @@ func get_server_game_state() -> Dictionary:
         "workshop_overclock_games": workshop_overclock_games, "workshop_job_end_unix": workshop_job_end_unix,
         "workshop_job_active": workshop_job_active, "workshop_job_name": workshop_job_name, "workshop_job_reward": workshop_job_reward,
         "level": player_level, "xp": player_xp, "xp_to_next": xp_to_next, "games": total_games,
+        "highest_balance_rubles": highest_balance_rubles, "total_daily_claims": total_daily_claims, "total_weekly_claims": total_weekly_claims,
         "total_prizes_won": total_prizes_won, "rarity_wins": rarity_wins, "achievements": unlocked_achievements,
             "achievement_historical_values": achievement_historical_values,
         "last_daily_bonus_date": last_daily_bonus_date, "login_streak": login_streak, "last_login_claim_date": last_login_claim_date,
@@ -1416,10 +1420,48 @@ func _int_array_from_variant(value: Variant, fallback: Array[int]) -> Array[int]
 func apply_server_game_state(data: Dictionary) -> void:
     if data.is_empty():
         return
+    if data.has("sync_version"):
+        server_sync_version = maxi(0, int(data.get("sync_version", server_sync_version)))
     coins = maxi(0, int(data.get("coins", coins)))
     player_name = String(data.get("player_name", player_name)).substr(0, 20)
     player_avatar_index = clampi(int(data.get("player_avatar_index", player_avatar_index)), 0, AVATAR_OPTIONS.size() - 1)
     bonus_keys = maxi(0, int(data.get("bonus_keys", bonus_keys)))
+    # Сервер хранит инвентарь в канонической форме. Переводим его в старую
+    # локальную форму без изменения игровой механики.
+    var remote_inventory: Variant = data.get("inventory", null)
+    if remote_inventory is Dictionary:
+        var ri: Dictionary = remote_inventory
+        var remote_toys: Variant = ri.get("toys", {})
+        if remote_toys is Dictionary:
+            toy_inventory_counts.clear()
+            collection.clear()
+            for raw_id in remote_toys.keys():
+                var tid := String(raw_id)
+                var count := maxi(0, int(remote_toys.get(raw_id, 0)))
+                if count <= 0:
+                    continue
+                var toy_name := tid
+                var toy_rarity := "ОБЫЧНАЯ"
+                for t in toys:
+                    if String(t.get("id", "")) == tid:
+                        toy_name = String(t.get("name", tid))
+                        toy_rarity = String(t.get("rarity", "ОБЫЧНАЯ"))
+                        break
+                toy_inventory_counts[toy_name] = count
+                collection[toy_name] = toy_rarity
+        var inv_upgrades: Variant = ri.get("upgrade_levels", null)
+        if inv_upgrades is Array:
+            upgrade_levels = _int_array_from_variant(inv_upgrades, upgrade_levels)
+        chest_keys = maxi(0, int(ri.get("chest_keys", chest_keys)))
+        engineering_parts = maxi(0, int(ri.get("parts", engineering_parts)))
+        workshop_parts = maxi(0, int(ri.get("parts", workshop_parts)))
+        total_chests_opened = maxi(0, int(ri.get("chests_opened", total_chests_opened)))
+        total_keys_earned = maxi(0, int(ri.get("total_keys_earned", total_keys_earned)))
+    if data.has("banned"):
+        if bool(data.get("banned", false)):
+            show_server_blocked(String(data.get("ban_reason", "")), int(data.get("ban_until", 0)))
+        elif blocked_overlay and is_instance_valid(blocked_overlay):
+            blocked_overlay.visible = false
     engineering_parts = maxi(0, int(data.get("engineering_parts", engineering_parts)))
     var ci: Variant = data.get("chest_inventory", chest_inventory)
     if ci is Dictionary:
@@ -1460,6 +1502,9 @@ func apply_server_game_state(data: Dictionary) -> void:
     xp_to_next = maxi(xp_needed_for_level(player_level), int(data.get("xp_to_next", xp_to_next)))
     total_games = maxi(0, int(data.get("games", total_games)))
     total_prizes_won = maxi(0, int(data.get("total_prizes_won", total_prizes_won)))
+    total_daily_claims = maxi(0, int(data.get("total_daily_claims", total_daily_claims)))
+    total_weekly_claims = maxi(0, int(data.get("total_weekly_claims", total_weekly_claims)))
+    highest_balance_rubles = maxi(coins, int(data.get("highest_balance_rubles", highest_balance_rubles)))
     var rw: Variant = data.get("rarity_wins", rarity_wins)
     if rw is Dictionary: rarity_wins = rw
     var ach: Variant = data.get("achievements", null)
@@ -1563,7 +1608,21 @@ func apply_server_game_state(data: Dictionary) -> void:
                 chest_inventory[ck] = maxi(0, int(server_chests.get(ck, chest_inventory.get(ck, 0))))
         var server_toys: Variant = inv.get("toys", {})
         if server_toys is Dictionary:
-            toy_inventory_counts = server_toys.duplicate(true)
+            toy_inventory_counts.clear()
+            collection.clear()
+            for raw_toy_id in server_toys.keys():
+                var toy_id := String(raw_toy_id)
+                var toy_count := maxi(0, int(server_toys.get(raw_toy_id, 0)))
+                if toy_count <= 0: continue
+                var toy_name := toy_id
+                var toy_rarity := "ОБЫЧНАЯ"
+                for t in toys:
+                    if String(t.get("id", "")) == toy_id:
+                        toy_name = String(t.get("name", toy_id))
+                        toy_rarity = String(t.get("rarity", "ОБЫЧНАЯ"))
+                        break
+                toy_inventory_counts[toy_name] = toy_count
+                collection[toy_name] = toy_rarity
     var missions: Variant = data.get("missions", {})
     if missions is Dictionary:
         daily_mission_progress = maxi(0, int(missions.get("daily_progress", daily_mission_progress)))
@@ -1653,9 +1712,11 @@ func apply_server_game_state(data: Dictionary) -> void:
     update_daily_login_ui()
     save_game()
 
-func show_server_blocked(reason: String = "") -> void:
+func show_server_blocked(reason: String = "", ban_until: int = 0) -> void:
     if blocked_overlay and is_instance_valid(blocked_overlay):
         blocked_overlay.visible = true
+        blocked_overlay.set_meta("ban_until", ban_until)
+        blocked_overlay.set_meta("ban_reason", reason)
         return
     blocked_overlay = PanelContainer.new()
     blocked_overlay.name = "ServerBlockedOverlay"
@@ -1667,9 +1728,15 @@ func show_server_blocked(reason: String = "") -> void:
     box.custom_minimum_size = Vector2(860, 520)
     box.alignment = BoxContainer.ALIGNMENT_CENTER
     blocked_overlay.add_child(box)
+    blocked_overlay.set_meta("ban_until", ban_until)
+    blocked_overlay.set_meta("ban_reason", reason)
     var title := Label.new(); title.text = "🔒  АККАУНТ ЗАБЛОКИРОВАН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 38); box.add_child(title)
-    var msg := Label.new(); msg.text = "Доступ к игре ограничен сервером.
-" + (reason if reason != "" else ""); msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; msg.add_theme_font_size_override("font_size", 24); box.add_child(msg)
+    var remaining := ""
+    if ban_until > 0:
+        remaining = "\nСрок блокировки: " + Time.get_datetime_string_from_unix_time(ban_until)
+    else:
+        remaining = "\nСрок блокировки: бессрочно"
+    var msg := Label.new(); msg.name = "BanMessage"; msg.text = "Доступ к игре ограничен сервером." + remaining + "\n" + (reason if reason != "" else "Причина не указана."); msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; msg.add_theme_font_size_override("font_size", 24); box.add_child(msg)
     var contact := Label.new(); contact.text = "Для разблокировки напишите на:
 evgeniu.tsepaev19@gmail.com"; contact.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; contact.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; contact.add_theme_font_size_override("font_size", 22); box.add_child(contact)
     if hud_layer:
@@ -1854,6 +1921,7 @@ func sync_player_to_server() -> void:
     var payload := {
         "player_id": player_id,
         "name": player_name,
+        "known_server_version": server_sync_version,
         "game_state": get_server_game_state()
     }
     remote_request_kind = "sync"
@@ -1974,7 +2042,7 @@ func _apply_remote_catalog(catalog: Dictionary) -> void:
         for raw_achievement in remote_ach:
             if raw_achievement is Dictionary and bool(raw_achievement.get("enabled", true)):
                 var achievement: Dictionary = raw_achievement
-                aa.append({"id":String(achievement.get("id", "")), "name":String(achievement.get("name", "Достижение")), "desc":String(achievement.get("description", achievement.get("desc", ""))), "kind":String(achievement.get("kind", "level")), "value":int(achievement.get("value", 1)), "rarity":String(achievement.get("rarity", ""))})
+                aa.append({"id":String(achievement.get("id", "")), "name":String(achievement.get("name", "Достижение")), "desc":String(achievement.get("description", achievement.get("desc", ""))), "kind":String(achievement.get("kind", "level")), "value":int(achievement.get("value", 1)), "rarity":String(achievement.get("rarity", "")), "difficulty":String(achievement.get("difficulty", "Обычное")), "reward":achievement.get("reward", {"type":"coins","amount":0})})
         if not aa.is_empty():
             achievement_specs = aa
 
@@ -2071,6 +2139,13 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             call_deferred("register_player_remote")
             update_ui()
             return
+        if response_code == 423:
+            var ban_data: Variant = JSON.parse_string(body_text) if body_text != "" else {}
+            if ban_data is Dictionary:
+                show_server_blocked(String(ban_data.get("ban_reason", "")), int(ban_data.get("ban_until", 0)))
+            remote_sync_status = "АККАУНТ ЗАБЛОКИРОВАН"
+            remote_action_name = ""
+            return
         remote_sync_retry_count = mini(remote_sync_retry_count + 1, 10)
         remote_sync_status = "ОШИБКА СЕРВЕРА • HTTP %d" % response_code
         if kind.begins_with("action:"):
@@ -2109,6 +2184,10 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
     if data.has("token") and String(data.get("token", "")) != "":
         player_token = String(data.get("token"))
         save_game()
+    # Конфигурация/каталог применяется до состояния игрока, чтобы новые
+    # названия игрушек и характеристики использовались при разборе инвентаря.
+    if data.has("config") and data["config"] is Dictionary:
+        _apply_remote_config(data["config"])
     if kind.begins_with("action:"):
         remote_action_name = ""
         if kind == "action:settings_update": server_settings_dirty = false
@@ -2118,7 +2197,10 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             # response is an acknowledgement, not an instruction to roll back
             # the player. A fresh install with no local progress may bootstrap
             # from the server normally.
-            if not LOCAL_FIRST_MODE or not _local_progress_exists():
+            if kind == "sync" and String(data.get("conflict", "")) == "server_newer":
+                apply_server_game_state(data["game_state"])
+                update_ui()
+            elif not LOCAL_FIRST_MODE or not _local_progress_exists():
                 apply_server_game_state(data["game_state"])
         if bool(data.get("ok", false)) and data.has("achievements") and data["achievements"] is Array:
             pending_new_achievements.clear()
@@ -2250,6 +2332,11 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     apply_quality_settings()
                     apply_language()
                     update_quality_info()
+            if data.has("leaderboard") and data["leaderboard"] is Array:
+                remote_leaderboard.clear()
+                for row in data["leaderboard"]:
+                    if row is Dictionary: remote_leaderboard.append(row)
+                refresh_rating_panel()
             update_ui()
             # Если во время текущего серверного действия была поставлена
             # завершающая операция игрового раунда, отправляем её сразу после
@@ -2280,17 +2367,19 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             referral_code = String(server_player.get("referral_code", referral_code))
         if server_player.has("referral_invites"):
             referral_invites = maxi(0, int(server_player.get("referral_invites", referral_invites)))
-        if kind == "sync" and server_player.has("coins"):
+        if server_player.has("sync_version"):
+            server_sync_version = maxi(0, int(server_player.get("sync_version", server_sync_version)))
+        if kind == "sync" and server_player.has("coins") and String(data.get("conflict", "")) != "server_newer":
             coins = maxi(0, int(server_player.get("coins", coins)))
         save_game()
-    if data.has("config") and data["config"] is Dictionary:
-        _apply_remote_config(data["config"])
     if data.has("leaderboard") and data["leaderboard"] is Array:
         remote_leaderboard.clear()
         for row in data["leaderboard"]:
             if row is Dictionary:
                 remote_leaderboard.append(row)
         refresh_rating_panel()
+    if kind == "config":
+        remote_config_timer = 15.0
     if kind == "register" or kind == "sync" or kind == "config" or kind == "rating":
         remote_sync_status = "АККАУНТ ЗАРЕГИСТРИРОВАН • СЕРВЕР ПОДКЛЮЧЕН"
         remote_sync_retry_count = 0
@@ -5864,10 +5953,10 @@ func build_hud() -> void:
 
     hud_profile_button = Button.new()
     hud_profile_button.position = Vector2(15, 15)
-    hud_profile_button.size = Vector2(165, 108)
+    hud_profile_button.size = Vector2(175, 108)
     hud_profile_button.tooltip_text = "Открыть профиль игрока"
     style_button(hud_profile_button, Color("#76583F"))
-    hud_profile_button.add_theme_font_size_override("font_size", 21)
+    hud_profile_button.add_theme_font_size_override("font_size", 24)
     hud_profile_button.pressed.connect(func(): open_panel("profile"))
     hud_layer.add_child(hud_profile_button)
     update_hud_profile_button()
@@ -8881,6 +8970,19 @@ func _process(delta: float) -> void:
     if game_initialized and mission_timer_ui_accum >= 1.0:
         mission_timer_ui_accum = 0.0
         update_mission_timers_light()
+    if blocked_overlay and is_instance_valid(blocked_overlay) and blocked_overlay.visible:
+        var ban_until_now := int(blocked_overlay.get_meta("ban_until", 0))
+        if ban_until_now > 0 and int(Time.get_unix_time_from_system()) >= ban_until_now:
+            blocked_overlay.visible = false
+        else:
+            var ban_msg := blocked_overlay.get_node_or_null("BanMessage") as Label
+            if ban_msg:
+                var left_text := "Срок блокировки: бессрочно"
+                if ban_until_now > 0:
+                    var left := maxi(0, ban_until_now - int(Time.get_unix_time_from_system()))
+                    var days := int(left / 86400); var hours := int((left % 86400) / 3600); var mins := int((left % 3600) / 60)
+                    left_text = "Срок блокировки: %dд %02dч %02dм" % [days, hours, mins]
+                ban_msg.text = "Доступ к игре ограничен сервером.\n" + left_text + "\n" + String(blocked_overlay.get_meta("ban_reason", "Причина не указана."))
     if game_initialized:
         achievement_check_timer -= delta
         if achievement_check_timer <= 0.0:
@@ -8919,6 +9021,10 @@ func _process(delta: float) -> void:
         if remote_auth_retry_timer <= 0.0:
             remote_auth_retry_timer = 10.0
             register_player_remote()
+    remote_config_timer -= delta
+    if game_initialized and remote_config_timer <= 0.0 and _server_ready() and remote_request_kind == "":
+        remote_config_timer = 15.0
+        sync_remote_config()
     remote_sync_timer -= delta
     if game_initialized and remote_sync_timer <= 0.0 and _server_persistence_ready():
         remote_sync_timer = clampf(float(ProjectSettings.get_setting("application/config/online_sync_interval", 20.0)), 10.0, 120.0)
@@ -10677,6 +10783,7 @@ func save_game() -> void:
             "server_url": server_url,
             "player_id": player_id,
             "player_token": player_token,
+            "server_sync_version": server_sync_version,
             "bonus_keys": bonus_keys,
             "engineering_parts": engineering_parts,
             "claw": selected_claw,
@@ -10783,6 +10890,7 @@ func load_save() -> void:
     if typeof(parsed) != TYPE_DICTIONARY: return
     var data: Dictionary = parsed
     player_token = String(data.get("player_token", player_token))
+    server_sync_version = maxi(0, int(data.get("server_sync_version", server_sync_version)))
     player_name = String(data.get("player_name", "ИГРОК")).strip_edges()
     if player_name == "":
         player_name = "ИГРОК"
