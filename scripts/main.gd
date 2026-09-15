@@ -898,22 +898,11 @@ func _ready() -> void:
     var network_manager := get_node_or_null("/root/NetworkManager")
     if network_manager != null and network_manager.has_method("configure_player"):
         network_manager.configure_player(player_id, player_name)
+    # Сетевой слой намеренно НЕ создаём во время _ready/тяжёлого старта.
+    # HTTPRequest и Android API поднимаются только после первого полноценного
+    # игрового кадра, чтобы сервер/интернет никогда не мог задержать запуск.
     if not STARTUP_CONTROL_TEST and SERVER_AUTHORITATIVE:
         ensure_player_id()
-        remote_http = HTTPRequest.new()
-        remote_http.name = "RemoteGameHTTP"
-        remote_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
-        add_child(remote_http)
-        remote_http.request_completed.connect(_on_remote_http_completed)
-        _ensure_connection_http()
-        if get_tree().has_signal("on_request_permissions_result"):
-            var permission_callable := Callable(self, "_on_notification_permission_result")
-            if not get_tree().is_connected("on_request_permissions_result", permission_callable):
-                get_tree().connect("on_request_permissions_result", permission_callable)
-        # Онлайн-слой НЕ запускаем во время тяжёлого старта.
-        # Регистрация, конфиг и уведомления подключаются только после того,
-        # как первый игровой кадр уже показан и игрок получил управление.
-        update_return_bonus_state()
     call_deferred("initialize_game_async")
     if not STARTUP_CONTROL_TEST:
         call_deferred("build_upgrade_sound_system")
@@ -3215,8 +3204,8 @@ func activate_extra_features_after_startup() -> void:
     # не должен конкурировать с созданием мира и игрушек на старте.
     if ONLINE_ENABLED and not OFFLINE_MODE and SERVER_AUTHORITATIVE:
         await get_tree().process_frame
-        setup_android_notifications()
-        await get_tree().process_frame
+        # Уведомления не являются частью критического пути синхронизации.
+        # Подключаем их после регистрации, чтобы Android API не мог задержать запуск.
         register_player_remote()
         await get_tree().process_frame
         sync_remote_config()
