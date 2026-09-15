@@ -1,0 +1,5 @@
+ID достижений в исходнике: 84
+Типы достижений: best_streak, calibration, chests_opened, claw_skins, claws, collections, daily_claims, exclusive, games, heavy, keys_earned, level, login_streak, lucky, machine_skins, max_reward, overclock, parts, perfect, rarity, referrals, rubles, toy_skins, toys, upgrades, weekly_claims, workshop_level, xp
+Типы без обработчика achievement_value: НЕТ
+Клешни: восстановление из owned_claws + owned_items + purchase_history/purchases/shop_purchases
+Исторические значения: включены для накопительных типов

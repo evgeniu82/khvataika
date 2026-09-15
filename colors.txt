@@ -1,0 +1,540 @@
+/mnt/data/audit_ui44/scripts/main.gd:28:const CYAN := Color("#28E8FF")
+/mnt/data/audit_ui44/scripts/main.gd:29:const BLUE := Color("#146BFF")
+/mnt/data/audit_ui44/scripts/main.gd:30:const PURPLE := Color("#8A4DFF")
+/mnt/data/audit_ui44/scripts/main.gd:31:const PINK := Color("#FF4FCB")
+/mnt/data/audit_ui44/scripts/main.gd:32:const GOLD := Color("#FFD65A")
+/mnt/data/audit_ui44/scripts/main.gd:33:const DARK := Color("#050A17")
+/mnt/data/audit_ui44/scripts/main.gd:34:const NAVY := Color("#081630")
+/mnt/data/audit_ui44/scripts/main.gd:35:const STEEL := Color("#34435B")
+/mnt/data/audit_ui44/scripts/main.gd:356:var active_event_accent: Color = Color("#8A684C")
+/mnt/data/audit_ui44/scripts/main.gd:357:var active_event_glow: Color = Color("#F2DCC0")
+/mnt/data/audit_ui44/scripts/main.gd:452:    {"name":"КЛАССИК", "price":0, "color":Color("#8B765E")},
+/mnt/data/audit_ui44/scripts/main.gd:453:    {"name":"ЛАЗУРЬ", "price":180, "color":Color("#22C8FF")},
+/mnt/data/audit_ui44/scripts/main.gd:454:    {"name":"НЕОН", "price":320, "color":Color("#A64DFF")},
+/mnt/data/audit_ui44/scripts/main.gd:455:    {"name":"РОЗОВЫЙ КРИСТАЛЛ", "price":450, "color":Color("#FF4FCB")},
+/mnt/data/audit_ui44/scripts/main.gd:456:    {"name":"РУБИН", "price":650, "color":Color("#FF405F")},
+/mnt/data/audit_ui44/scripts/main.gd:457:    {"name":"ЗОЛОТО", "price":900, "color":Color("#FFD65A")},
+/mnt/data/audit_ui44/scripts/main.gd:458:    {"name":"МЯТНЫЙ", "price":1100, "color":Color("#35E0B0")},
+/mnt/data/audit_ui44/scripts/main.gd:459:    {"name":"ЛЕД", "price":1350, "color":Color("#72F5FF")},
+/mnt/data/audit_ui44/scripts/main.gd:460:    {"name":"КИБЕР", "price":1650, "color":Color("#4DFF7A")},
+/mnt/data/audit_ui44/scripts/main.gd:461:    {"name":"КОСМОС", "price":2100, "color":Color("#6B5CFF")},
+/mnt/data/audit_ui44/scripts/main.gd:462:    {"name":"ВУЛКАН", "price":2600, "color":Color("#FF762E")},
+/mnt/data/audit_ui44/scripts/main.gd:463:    {"name":"LEGEND", "price":3500, "color":Color("#F4D06F")}
+/mnt/data/audit_ui44/scripts/main.gd:466:    {"name":"ОРИГИНАЛ", "price":0, "tint":Color("#FFFFFF")},
+/mnt/data/audit_ui44/scripts/main.gd:467:    {"name":"ПАСТЕЛЬ", "price":220, "tint":Color("#FFD6EA")},
+/mnt/data/audit_ui44/scripts/main.gd:468:    {"name":"НЕОН", "price":380, "tint":Color("#7CFFEA")},
+/mnt/data/audit_ui44/scripts/main.gd:469:    {"name":"ЗОЛОТОЙ", "price":650, "tint":Color("#FFD85A")},
+/mnt/data/audit_ui44/scripts/main.gd:470:    {"name":"СЕРЕБРО", "price":800, "tint":Color("#DDE8F2")},
+/mnt/data/audit_ui44/scripts/main.gd:471:    {"name":"КОСМОС", "price":1050, "tint":Color("#8B6CFF")},
+/mnt/data/audit_ui44/scripts/main.gd:472:    {"name":"ОГОНЬ", "price":1300, "tint":Color("#FF6945")},
+/mnt/data/audit_ui44/scripts/main.gd:473:    {"name":"ЛЕДЯНОЙ", "price":1500, "tint":Color("#62DFFF")},
+/mnt/data/audit_ui44/scripts/main.gd:474:    {"name":"РАДУГА", "price":1900, "tint":Color("#FF6FCF")},
+/mnt/data/audit_ui44/scripts/main.gd:475:    {"name":"КИБЕР", "price":2300, "tint":Color("#45F0A0")},
+/mnt/data/audit_ui44/scripts/main.gd:476:    {"name":"ТЁМНАЯ СЕРИЯ", "price":2800, "tint":Color("#7C7890")},
+/mnt/data/audit_ui44/scripts/main.gd:477:    {"name":"МИФИЧЕСКАЯ", "price":3800, "tint":Color("#FFB84D")}
+/mnt/data/audit_ui44/scripts/main.gd:480:    {"name":"КЛАССИКА", "price":0, "frame":Color("#8A6A4A"), "light":Color("#F2DCC0")},
+/mnt/data/audit_ui44/scripts/main.gd:481:    {"name":"НЕОН СИТИ", "price":500, "frame":Color("#243A78"), "light":Color("#39D9FF")},
+/mnt/data/audit_ui44/scripts/main.gd:482:    {"name":"РОЗОВЫЙ CLUB", "price":750, "frame":Color("#7B315D"), "light":Color("#FF5EDB")},
+/mnt/data/audit_ui44/scripts/main.gd:483:    {"name":"ICE MACHINE", "price":1000, "frame":Color("#3B6D8A"), "light":Color("#8DEBFF")},
+/mnt/data/audit_ui44/scripts/main.gd:484:    {"name":"GOLD MACHINE", "price":1400, "frame":Color("#8B6B28"), "light":Color("#FFD95A")},
+/mnt/data/audit_ui44/scripts/main.gd:485:    {"name":"CYBER GRID", "price":1750, "frame":Color("#174B4A"), "light":Color("#52FFB0")},
+/mnt/data/audit_ui44/scripts/main.gd:486:    {"name":"SPACE PORT", "price":2100, "frame":Color("#322D65"), "light":Color("#9C7CFF")},
+/mnt/data/audit_ui44/scripts/main.gd:487:    {"name":"FIRE BOX", "price":2450, "frame":Color("#71351F"), "light":Color("#FF7547")},
+/mnt/data/audit_ui44/scripts/main.gd:488:    {"name":"MIDNIGHT", "price":2800, "frame":Color("#1D2533"), "light":Color("#8A9DFF")},
+/mnt/data/audit_ui44/scripts/main.gd:489:    {"name":"LEGENDARY", "price":3600, "frame":Color("#6E5220"), "light":Color("#FFE58A")}
+/mnt/data/audit_ui44/scripts/main.gd:528:    {"name":"STEEL GRIP", "price":120, "bonus":0.05, "color":Color("#9FB4D2")},
+/mnt/data/audit_ui44/scripts/main.gd:530:    {"name":"ICE GRIP", "price":420, "bonus":0.15, "color":Color("#72F5FF")},
+/mnt/data/audit_ui44/scripts/main.gd:531:    {"name":"RUBY CLAW", "price":650, "bonus":0.20, "color":Color("#FF496F")},
+/mnt/data/audit_ui44/scripts/main.gd:533:    {"name":"PLASMA", "price":1250, "bonus":0.30, "color":Color("#65B8FF")},
+/mnt/data/audit_ui44/scripts/main.gd:534:    {"name":"CYBER TITAN", "price":1700, "bonus":0.35, "color":Color("#28C9A0")},
+/mnt/data/audit_ui44/scripts/main.gd:535:    {"name":"VOID HUNTER", "price":2400, "bonus":0.42, "color":Color("#A23BFF")},
+/mnt/data/audit_ui44/scripts/main.gd:536:    {"name":"LEGEND X", "price":3500, "bonus":0.50, "color":Color("#FF8A24")}
+/mnt/data/audit_ui44/scripts/main.gd:595:    {"name":"Мишка Байт", "collection":"ЛЕСНЫЕ ДРУЗЬЯ", "rarity":"ОБЫЧНАЯ", "weight":42.0, "color":Color("#B86F3E")},
+/mnt/data/audit_ui44/scripts/main.gd:596:    {"name":"Лисёнок Флэш", "collection":"ЛЕСНЫЕ ДРУЗЬЯ", "rarity":"ОБЫЧНАЯ", "weight":38.0, "color":Color("#FF5A2F")},
+/mnt/data/audit_ui44/scripts/main.gd:597:    {"name":"Заяц Сноу", "collection":"ЛЕСНЫЕ ДРУЗЬЯ", "rarity":"ОБЫЧНАЯ", "weight":36.0, "color":Color("#8C63E8")},
+/mnt/data/audit_ui44/scripts/main.gd:598:    {"name":"Панда Пульс", "collection":"ЛЕСНЫЕ ДРУЗЬЯ", "rarity":"РЕДКАЯ", "weight":14.0, "color":Color("#3E526B")},
+/mnt/data/audit_ui44/scripts/main.gd:599:    {"name":"Утёнок Дак", "collection":"МИЛЫЕ МАЛЫШИ", "rarity":"ОБЫЧНАЯ", "weight":41.0, "color":Color("#F4B72D")},
+/mnt/data/audit_ui44/scripts/main.gd:600:    {"name":"Кот Пиксель", "collection":"МИЛЫЕ МАЛЫШИ", "rarity":"ОБЫЧНАЯ", "weight":37.0, "color":Color("#D96A9A")},
+/mnt/data/audit_ui44/scripts/main.gd:601:    {"name":"Щенок Бруно", "collection":"МИЛЫЕ МАЛЫШИ", "rarity":"ОБЫЧНАЯ", "weight":35.0, "color":Color("#6FAF6A")},
+/mnt/data/audit_ui44/scripts/main.gd:602:    {"name":"Коала Коди", "collection":"МИЛЫЕ МАЛЫШИ", "rarity":"РЕДКАЯ", "weight":12.0, "color":Color("#6D7FA8")},
+/mnt/data/audit_ui44/scripts/main.gd:603:    {"name":"Лягушка Блип", "collection":"ДЖУНГЛИ", "rarity":"ОБЫЧНАЯ", "weight":34.0, "color":Color("#38B86B")},
+/mnt/data/audit_ui44/scripts/main.gd:604:    {"name":"Черепашка Тото", "collection":"ДЖУНГЛИ", "rarity":"ОБЫЧНАЯ", "weight":31.0, "color":Color("#4C9B69")},
+/mnt/data/audit_ui44/scripts/main.gd:605:    {"name":"Обезьянка Джо", "collection":"ДЖУНГЛИ", "rarity":"РЕДКАЯ", "weight":13.0, "color":Color("#B86B4F")},
+/mnt/data/audit_ui44/scripts/main.gd:606:    {"name":"Тигр Неон", "collection":"ДЖУНГЛИ", "rarity":"ЭПИЧЕСКАЯ", "weight":2.8, "color":Color("#FF7A2F")},
+/mnt/data/audit_ui44/scripts/main.gd:607:    {"name":"Акула Спарк", "collection":"ОКЕАН", "rarity":"РЕДКАЯ", "weight":11.0, "color":Color("#287BD4")},
+/mnt/data/audit_ui44/scripts/main.gd:608:    {"name":"Пингвин Айс", "collection":"ОКЕАН", "rarity":"РЕДКАЯ", "weight":10.0, "color":Color("#48B9E8")},
+/mnt/data/audit_ui44/scripts/main.gd:609:    {"name":"Морской Кот", "collection":"ОКЕАН", "rarity":"ОБЫЧНАЯ", "weight":29.0, "color":Color("#4E9FC8")},
+/mnt/data/audit_ui44/scripts/main.gd:610:    {"name":"Кит Блу", "collection":"ОКЕАН", "rarity":"ЭПИЧЕСКАЯ", "weight":2.5, "color":Color("#5168E8")},
+/mnt/data/audit_ui44/scripts/main.gd:611:    {"name":"Космо-Акула", "collection":"КОСМОС", "rarity":"ЭПИЧЕСКАЯ", "weight":3.0, "color":Color("#5C4BEA")},
+/mnt/data/audit_ui44/scripts/main.gd:612:    {"name":"Галакси-Кот", "collection":"КОСМОС", "rarity":"ЭПИЧЕСКАЯ", "weight":2.1, "color":Color("#B14FE0")},
+/mnt/data/audit_ui44/scripts/main.gd:613:    {"name":"Астро-Кот", "collection":"КОСМОС", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.12, "color":Color("#7545D8")},
+/mnt/data/audit_ui44/scripts/main.gd:614:    {"name":"Звёздный Панда", "collection":"КОСМОС", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.06, "color":Color("#FF8A24")},
+/mnt/data/audit_ui44/scripts/main.gd:615:    {"name":"Дракон Вольт", "collection":"ДРАКОНЫ", "rarity":"ЭПИЧЕСКАЯ", "weight":3.5, "color":Color("#21C879")},
+/mnt/data/audit_ui44/scripts/main.gd:616:    {"name":"Золотой Дракон", "collection":"ДРАКОНЫ", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.28, "color":Color("#FFC42E")},
+/mnt/data/audit_ui44/scripts/main.gd:617:    {"name":"Радужный Дракон", "collection":"ДРАКОНЫ", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.10, "color":Color("#FF3FAF")},
+/mnt/data/audit_ui44/scripts/main.gd:618:    {"name":"Неон-Мантикора", "collection":"ДРАКОНЫ", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.08, "color":Color("#28C9A0")},
+/mnt/data/audit_ui44/scripts/main.gd:619:    {"name":"Единорог Луна", "collection":"ВОЛШЕБСТВО", "rarity":"ЭПИЧЕСКАЯ", "weight":4.0, "color":Color("#D86BFF")},
+/mnt/data/audit_ui44/scripts/main.gd:620:    {"name":"Король Единорог", "collection":"ВОЛШЕБСТВО", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.20, "color":Color("#FF4FAE")},
+/mnt/data/audit_ui44/scripts/main.gd:621:    {"name":"Фея Старлайт", "collection":"ВОЛШЕБСТВО", "rarity":"РЕДКАЯ", "weight":7.0, "color":Color("#9A5BE8")},
+/mnt/data/audit_ui44/scripts/main.gd:622:    {"name":"Розовый Грифон", "collection":"ВОЛШЕБСТВО", "rarity":"ЭПИЧЕСКАЯ", "weight":1.8, "color":Color("#FF5D9E")},
+/mnt/data/audit_ui44/scripts/main.gd:623:    {"name":"Робо-Панда", "collection":"КИБЕР", "rarity":"ЭПИЧЕСКАЯ", "weight":2.4, "color":Color("#248BAA")},
+/mnt/data/audit_ui44/scripts/main.gd:625:    {"name":"Меха-Мишка", "collection":"КИБЕР", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.16, "color":Color("#6BE7FF")},
+/mnt/data/audit_ui44/scripts/main.gd:626:    {"name":"CLAW MASTER", "collection":"КИБЕР", "rarity":"ЛЕГЕНДАРНАЯ", "weight":0.025, "color":Color("#F39C32")}
+/mnt/data/audit_ui44/scripts/main.gd:667:        {"name":"Рекс Рокки","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#6FA45A")},
+/mnt/data/audit_ui44/scripts/main.gd:668:        {"name":"Трицератопс Три","collection":"ДИНОЗАВРЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#8C6A4A")},
+/mnt/data/audit_ui44/scripts/main.gd:669:        {"name":"Раптор Рэй","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":15.0,"color":Color("#E27A42")},
+/mnt/data/audit_ui44/scripts/main.gd:670:        {"name":"Бронто Бум","collection":"ДИНОЗАВРЫ","rarity":"РЕДКАЯ","weight":11.0,"color":Color("#4D9A87")},
+/mnt/data/audit_ui44/scripts/main.gd:671:        {"name":"Мега-Тиран","collection":"ДИНОЗАВРЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.2,"color":Color("#B53D58")},
+/mnt/data/audit_ui44/scripts/main.gd:673:        {"name":"Капитан Плюш","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":29.0,"color":Color("#356DDB")},
+/mnt/data/audit_ui44/scripts/main.gd:674:        {"name":"Молния Макс","collection":"СУПЕРГЕРОИ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#F2C23E")},
+/mnt/data/audit_ui44/scripts/main.gd:675:        {"name":"Ночной Ниндзя","collection":"СУПЕРГЕРОИ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#4B4D70")},
+/mnt/data/audit_ui44/scripts/main.gd:676:        {"name":"Робо-Герой","collection":"СУПЕРГЕРОИ","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#45B7C8")},
+/mnt/data/audit_ui44/scripts/main.gd:677:        {"name":"Золотой Герой","collection":"СУПЕРГЕРОИ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.22,"color":Color("#F5B93D")},
+/mnt/data/audit_ui44/scripts/main.gd:679:        {"name":"Пончик Пинки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":32.0,"color":Color("#F38DB4")},
+/mnt/data/audit_ui44/scripts/main.gd:680:        {"name":"Маршмеллоу Мими","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#F2E5D5")},
+/mnt/data/audit_ui44/scripts/main.gd:681:        {"name":"Кекс Куки","collection":"СЛАДКИЙ МИР","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#B97852")},
+/mnt/data/audit_ui44/scripts/main.gd:682:        {"name":"Леденец Лаки","collection":"СЛАДКИЙ МИР","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#68C9E8")},
+/mnt/data/audit_ui44/scripts/main.gd:683:        {"name":"Шоколадный Король","collection":"СЛАДКИЙ МИР","rarity":"ЭПИЧЕСКАЯ","weight":2.0,"color":Color("#6E3F32")},
+/mnt/data/audit_ui44/scripts/main.gd:685:        {"name":"Капитан Бакс","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#8B6548")},
+/mnt/data/audit_ui44/scripts/main.gd:686:        {"name":"Попугай Пират","collection":"ПИРАТЫ","rarity":"ОБЫЧНАЯ","weight":27.0,"color":Color("#E44C55")},
+/mnt/data/audit_ui44/scripts/main.gd:687:        {"name":"Кракен Крош","collection":"ПИРАТЫ","rarity":"РЕДКАЯ","weight":14.0,"color":Color("#7557B5")},
+/mnt/data/audit_ui44/scripts/main.gd:688:        {"name":"Призрак Палубы","collection":"ПИРАТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.5,"color":Color("#B9D9D1")},
+/mnt/data/audit_ui44/scripts/main.gd:689:        {"name":"Золотой Капитан","collection":"ПИРАТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.18,"color":Color("#E8B93D")},
+/mnt/data/audit_ui44/scripts/main.gd:691:        {"name":"Бот Биби","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#6D8299")},
+/mnt/data/audit_ui44/scripts/main.gd:692:        {"name":"Дроид Дэн","collection":"РОБОТЫ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#4FA5B7")},
+/mnt/data/audit_ui44/scripts/main.gd:693:        {"name":"Меха-Лис","collection":"РОБОТЫ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#D46D45")},
+/mnt/data/audit_ui44/scripts/main.gd:694:        {"name":"Кибер-Гигант","collection":"РОБОТЫ","rarity":"ЭПИЧЕСКАЯ","weight":2.7,"color":Color("#4C5DE7")},
+/mnt/data/audit_ui44/scripts/main.gd:695:        {"name":"Омега-9000","collection":"РОБОТЫ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.14,"color":Color("#B7C8D8")},
+/mnt/data/audit_ui44/scripts/main.gd:697:        {"name":"Дракончик Эмбер","collection":"ФАНТАСТИКА","rarity":"ОБЫЧНАЯ","weight":25.0,"color":Color("#E36A43")},
+/mnt/data/audit_ui44/scripts/main.gd:698:        {"name":"Грифон Грей","collection":"ФАНТАСТИКА","rarity":"РЕДКАЯ","weight":12.0,"color":Color("#8B78C9")},
+/mnt/data/audit_ui44/scripts/main.gd:699:        {"name":"Феникс Файр","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":3.0,"color":Color("#EF6B38")},
+/mnt/data/audit_ui44/scripts/main.gd:700:        {"name":"Лунный Дух","collection":"ФАНТАСТИКА","rarity":"ЭПИЧЕСКАЯ","weight":1.8,"color":Color("#8AB5F2")},
+/mnt/data/audit_ui44/scripts/main.gd:701:        {"name":"Древний Дракон","collection":"ФАНТАСТИКА","rarity":"ЛЕГЕНДАРНАЯ","weight":0.08,"color":Color("#D7A93D")},
+/mnt/data/audit_ui44/scripts/main.gd:703:        {"name":"Футбольный Боб","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":33.0,"color":Color("#F4F4F0")},
+/mnt/data/audit_ui44/scripts/main.gd:704:        {"name":"Баскет-Би","collection":"СПОРТ","rarity":"ОБЫЧНАЯ","weight":31.0,"color":Color("#E98537")},
+/mnt/data/audit_ui44/scripts/main.gd:705:        {"name":"Хоккейный Хаски","collection":"СПОРТ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#6A89C8")},
+/mnt/data/audit_ui44/scripts/main.gd:706:        {"name":"Чемпион","collection":"СПОРТ","rarity":"ЭПИЧЕСКАЯ","weight":2.4,"color":Color("#D3A33C")},
+/mnt/data/audit_ui44/scripts/main.gd:707:        {"name":"Олимпийский Легендар","collection":"СПОРТ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.10,"color":Color("#7BC6A8")},
+/mnt/data/audit_ui44/scripts/main.gd:709:        {"name":"Монстрик Мио","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":30.0,"color":Color("#63B76D")},
+/mnt/data/audit_ui44/scripts/main.gd:710:        {"name":"Пухлый Буба","collection":"МИР МОНСТРОВ","rarity":"ОБЫЧНАЯ","weight":28.0,"color":Color("#7D63B8")},
+/mnt/data/audit_ui44/scripts/main.gd:711:        {"name":"Зубастик Зик","collection":"МИР МОНСТРОВ","rarity":"РЕДКАЯ","weight":13.0,"color":Color("#B84F62")},
+/mnt/data/audit_ui44/scripts/main.gd:712:        {"name":"Теневой Монстр","collection":"МИР МОНСТРОВ","rarity":"ЭПИЧЕСКАЯ","weight":2.3,"color":Color("#4B4A67")},
+/mnt/data/audit_ui44/scripts/main.gd:713:        {"name":"Король Монстров","collection":"МИР МОНСТРОВ","rarity":"ЛЕГЕНДАРНАЯ","weight":0.07,"color":Color("#B7A143")}
+/mnt/data/audit_ui44/scripts/main.gd:1593:    style_panel(blocked_overlay, Color("#140B0B"), Color("#A53A3A"), 0, 0)
+/mnt/data/audit_ui44/scripts/main.gd:2242:            row.modulate = GOLD if String(rows[i]["name"]) == player_name else Color("#E0D4C6")
+/mnt/data/audit_ui44/scripts/main.gd:2260:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:2270:    h.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:2293:    info.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:2302:    intro.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:2309:    progress.add_theme_stylebox_override("background", make_style(Color("#17110D"), Color("#4B392B"), 10, 1))
+/mnt/data/audit_ui44/scripts/main.gd:2310:    progress.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#D2A875"), 10, 1))
+/mnt/data/audit_ui44/scripts/main.gd:2318:    tracks.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:2333:        card_style.bg_color = Color("#241B16")
+/mnt/data/audit_ui44/scripts/main.gd:2334:        card_style.border_color = Color("#5D4634")
+/mnt/data/audit_ui44/scripts/main.gd:2349:        level_label.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:2358:        reward_label.modulate = Color("#F0D9BB")
+/mnt/data/audit_ui44/scripts/main.gd:2373:    note.modulate = Color("#BCA996")
+/mnt/data/audit_ui44/scripts/main.gd:2379:    style_button(close, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:2420:                    state_label.modulate = Color("#86C98A")
+/mnt/data/audit_ui44/scripts/main.gd:2423:                    state_label.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:2426:                    state_label.modulate = Color("#A99682")
+/mnt/data/audit_ui44/scripts/main.gd:2432:    var info:=Label.new(); info.text="Введите специальный код и получите игровую награду."; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
+/mnt/data/audit_ui44/scripts/main.gd:2434:    var redeem:=Button.new(); redeem.text="АКТИВИРОВАТЬ КОД"; redeem.custom_minimum_size=Vector2(0,70); style_button(redeem,Color("#76583F")); redeem.add_theme_font_size_override("font_size",20); redeem.pressed.connect(func(): redeem_promo_code(code.text)); v.add_child(redeem)
+/mnt/data/audit_ui44/scripts/main.gd:2435:    var status:=Label.new(); status.name="PromoStatus"; status.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; status.add_theme_font_size_override("font_size",18); status.modulate=Color("#D8C3AA"); v.add_child(status)
+/mnt/data/audit_ui44/scripts/main.gd:2436:    var hint:=Label.new(); hint.text="Доступные коды выдаются в новостях и событиях игры."; hint.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; hint.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; hint.add_theme_font_size_override("font_size",15); hint.modulate=Color("#BCA996"); v.add_child(hint)
+/mnt/data/audit_ui44/scripts/main.gd:2437:    var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,72); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
+/mnt/data/audit_ui44/scripts/main.gd:2451:    var intro:=Label.new(); intro.text="Здесь будут появляться новости игры, события, новые функции, игрушки и новые промокоды."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
+/mnt/data/audit_ui44/scripts/main.gd:2453:    var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,74); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
+/mnt/data/audit_ui44/scripts/main.gd:2469:    empty.modulate = Color("#BCA996")
+/mnt/data/audit_ui44/scripts/main.gd:2479:    var note:=Label.new(); note.name="RatingNote"; note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; note.add_theme_font_size_override("font_size",16); note.modulate=Color("#BCA996"); v.add_child(note)
+/mnt/data/audit_ui44/scripts/main.gd:2481:    var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,74); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
+/mnt/data/audit_ui44/scripts/main.gd:2496:        var row:=Label.new(); row.text="%d.  %s   •   %d" % [i+1,String(rows[i]["name"]),int(rows[i]["score"])] ; row.add_theme_font_size_override("font_size",20); row.modulate=GOLD if String(rows[i]["name"])==player_name else Color("#E0D4C6"); list.add_child(row)
+/mnt/data/audit_ui44/scripts/main.gd:2502:    var info:=Label.new(); info.name="ReturnBonusInfo"; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",20); info.modulate=Color("#D8C3AA"); v.add_child(info)
+/mnt/data/audit_ui44/scripts/main.gd:2503:    var claim:=Button.new(); claim.name="ClaimButton"; claim.custom_minimum_size=Vector2(0,78); style_button(claim,Color("#76583F")); claim.add_theme_font_size_override("font_size",20); claim.pressed.connect(claim_return_bonus); v.add_child(claim)
+/mnt/data/audit_ui44/scripts/main.gd:2504:    var close:=Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,72); style_button(close,Color("#9A7653")); close.pressed.connect(show_main_menu); v.add_child(close)
+/mnt/data/audit_ui44/scripts/main.gd:2525:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:2537:    var title := Label.new(); title.text = "🚀  ЦЕНТР ИГРОВЫХ СИСТЕМ"; title.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size",30); title.modulate=Color("#E1C29A"); v.add_child(title)
+/mnt/data/audit_ui44/scripts/main.gd:2538:    var info := Label.new(); info.name="SystemsInfo"; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
+/mnt/data/audit_ui44/scripts/main.gd:2543:    var return_btn := Button.new(); return_btn.name="ReturnBonusButton"; return_btn.custom_minimum_size=Vector2(0,70); style_button(return_btn,Color("#76583F")); return_btn.add_theme_font_size_override("font_size",18); return_btn.pressed.connect(claim_return_bonus); v.add_child(return_btn)
+/mnt/data/audit_ui44/scripts/main.gd:2545:    var job_btn := Button.new(); job_btn.name="WorkshopJobButton"; job_btn.custom_minimum_size=Vector2(0,70); style_button(job_btn,Color("#76583F")); job_btn.add_theme_font_size_override("font_size",18); job_btn.pressed.connect(start_workshop_job); v.add_child(job_btn)
+/mnt/data/audit_ui44/scripts/main.gd:2546:    var season_pass_info := Label.new(); season_pass_info.name="SeasonPassInfo"; season_pass_info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; season_pass_info.add_theme_font_size_override("font_size",18); season_pass_info.modulate=Color("#E0D4C6"); v.add_child(season_pass_info)
+/mnt/data/audit_ui44/scripts/main.gd:2549:    var redeem := Button.new(); redeem.text="АКТИВИРОВАТЬ КОД"; redeem.custom_minimum_size=Vector2(0,64); style_button(redeem,Color("#76583F")); redeem.add_theme_font_size_override("font_size",18); redeem.pressed.connect(func(): redeem_promo_code(code.text)); v.add_child(redeem)
+/mnt/data/audit_ui44/scripts/main.gd:2550:    var ps := Label.new(); ps.name="PromoStatus"; ps.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; ps.add_theme_font_size_override("font_size",16); ps.modulate=Color("#D8C3AA"); v.add_child(ps)
+/mnt/data/audit_ui44/scripts/main.gd:2552:    var lb_note := Label.new(); lb_note.text="Локальный предпросмотр. Для настоящего общего рейтинга всех игроков нужен сервер."; lb_note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; lb_note.add_theme_font_size_override("font_size",14); lb_note.modulate=Color("#BCA996"); v.add_child(lb_note)
+/mnt/data/audit_ui44/scripts/main.gd:2554:    var cloud := Label.new(); cloud.text="☁ ОБЛАЧНОЕ СОХРАНЕНИЕ\nАрхитектура сохранения готова к подключению серверного API. Сейчас прогресс хранится локально, чтобы не создавать фиктивную синхронизацию."; cloud.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; cloud.add_theme_font_size_override("font_size",16); cloud.modulate=Color("#D8C3AA"); v.add_child(cloud)
+/mnt/data/audit_ui44/scripts/main.gd:2555:    var close := Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,74); style_button(close,Color("#9A7653")); close.pressed.connect(close_gameplay_overlay); v.add_child(close)
+/mnt/data/audit_ui44/scripts/main.gd:2570:    bg.color = Color("#160F0B")
+/mnt/data/audit_ui44/scripts/main.gd:2575:    top.color = Color("#3B2618")
+/mnt/data/audit_ui44/scripts/main.gd:2581:    bottom.color = Color("#21140D")
+/mnt/data/audit_ui44/scripts/main.gd:2590:        line.color = Color("#76583F")
+/mnt/data/audit_ui44/scripts/main.gd:2599:    card_style.bg_color = Color(0.09, 0.055, 0.035, 0.98)
+/mnt/data/audit_ui44/scripts/main.gd:2600:    card_style.border_color = Color("#76583F")
+/mnt/data/audit_ui44/scripts/main.gd:2612:    top_label.modulate = Color("#C9A982")
+/mnt/data/audit_ui44/scripts/main.gd:2622:    title.add_theme_color_override("font_color", Color("#E5C69D"))
+/mnt/data/audit_ui44/scripts/main.gd:2623:    title.add_theme_color_override("font_shadow_color", Color("#3A2417"))
+/mnt/data/audit_ui44/scripts/main.gd:2634:    subtitle.modulate = Color("#BCA996")
+/mnt/data/audit_ui44/scripts/main.gd:2638:    divider.color = Color("#9A7653")
+/mnt/data/audit_ui44/scripts/main.gd:2649:    loading_status.modulate = Color("#E0C6A2")
+/mnt/data/audit_ui44/scripts/main.gd:2660:    progress_bg.bg_color = Color("#241710")
+/mnt/data/audit_ui44/scripts/main.gd:2665:    progress_bg.border_color = Color("#4B392B")
+/mnt/data/audit_ui44/scripts/main.gd:2668:    progress_fill.bg_color = Color("#A3754D")
+/mnt/data/audit_ui44/scripts/main.gd:2683:    loading_percent.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:2696:    info.modulate = Color("#A98E76")
+/mnt/data/audit_ui44/scripts/main.gd:2705:    tips_title.modulate = Color("#C9A982")
+/mnt/data/audit_ui44/scripts/main.gd:2714:    loading_stage.modulate = Color("#9E8975")
+/mnt/data/audit_ui44/scripts/main.gd:2725:    loading_tip.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:2734:    hint.modulate = Color("#9A7653")
+/mnt/data/audit_ui44/scripts/main.gd:2743:    ready.modulate = Color("#C9A982")
+/mnt/data/audit_ui44/scripts/main.gd:2752:    footer.modulate = Color("#9E8975")
+/mnt/data/audit_ui44/scripts/main.gd:2761:    version.modulate = Color("#5D493A")
+/mnt/data/audit_ui44/scripts/main.gd:3090:    env.background_color = Color("#17110D")
+/mnt/data/audit_ui44/scripts/main.gd:3092:    env.ambient_light_color = Color("#C7B39A")
+/mnt/data/audit_ui44/scripts/main.gd:3114:    var floor_mat := make_mat(Color("#2A211B"), 0.55, 0.30)
+/mnt/data/audit_ui44/scripts/main.gd:3116:    make_box(self, Vector3(24, 9, 0.2), Vector3(0, 4.2, -7.8), make_mat(Color("#24211E"), 0.05, 0.72), "BackWall")
+/mnt/data/audit_ui44/scripts/main.gd:3117:    make_box(self, Vector3(0.12, 9, 22), Vector3(-11.8, 4.2, 0), make_mat(Color("#302B27"), 0.12, 0.62), "LeftWall")
+/mnt/data/audit_ui44/scripts/main.gd:3118:    make_box(self, Vector3(0.12, 9, 22), Vector3(11.8, 4.2, 0), make_mat(Color("#302B27"), 0.12, 0.62), "RightWall")
+/mnt/data/audit_ui44/scripts/main.gd:3121:        make_box(self, Vector3(21.0, 0.025, 0.035), Vector3(0, -0.13, z), make_mat(Color("#4B3525"), 0.10, 0.45), "FloorInlay")
+/mnt/data/audit_ui44/scripts/main.gd:3127:    key.light_color = Color("#FFE9CE")
+/mnt/data/audit_ui44/scripts/main.gd:3135:    fill.light_color = Color("#E7D2B7")
+/mnt/data/audit_ui44/scripts/main.gd:3143:    fill2.light_color = Color("#F2E4D0")
+/mnt/data/audit_ui44/scripts/main.gd:3153:    var base_mat := make_mat(Color("#4A3022"), 0.18, 0.38)
+/mnt/data/audit_ui44/scripts/main.gd:3154:    var dark_mat := make_mat(Color("#241B16"), 0.45, 0.34)
+/mnt/data/audit_ui44/scripts/main.gd:3155:    var chrome := make_mat(Color("#7C817F"), 0.92, 0.20)
+/mnt/data/audit_ui44/scripts/main.gd:3156:    var chrome_dark := make_mat(Color("#414744"), 0.88, 0.26)
+/mnt/data/audit_ui44/scripts/main.gd:3157:    var wood_dark := make_mat(Color("#352116"), 0.05, 0.50)
+/mnt/data/audit_ui44/scripts/main.gd:3158:    var wood_mid := make_mat(Color("#74482C"), 0.03, 0.48)
+/mnt/data/audit_ui44/scripts/main.gd:3159:    var wood_light := make_mat(Color("#A36A3D"), 0.02, 0.50)
+/mnt/data/audit_ui44/scripts/main.gd:3176:    glass.albedo_color = Color(0.82, 0.90, 0.95, 0.10)
+/mnt/data/audit_ui44/scripts/main.gd:3202:    make_box(machine, Vector3(6.65, 0.30, 0.12), Vector3(0, 10.09, 2.78), make_mat(Color("#0B1631"), 0.7, 0.14), "MarqueeFace")
+/mnt/data/audit_ui44/scripts/main.gd:3214:        make_box(machine, Vector3(0.07, 0.05, 4.4), Vector3(x, 9.60, 0), make_mat(Color("#E6D7C2"), 0.0, 0.55), "CeilingLight")
+/mnt/data/audit_ui44/scripts/main.gd:3217:    var prize_floor_mat := make_mat(Color("#3B3027"), 0.35, 0.42)
+/mnt/data/audit_ui44/scripts/main.gd:3233:    make_box(machine, Vector3(1.18, 0.16, 0.96), Vector3(PRIZE_HOLE.x, 3.06, PRIZE_HOLE.z), make_mat(Color("#010205"), 0.25, 0.12), "PrizeHole")
+/mnt/data/audit_ui44/scripts/main.gd:3234:    make_box(machine, Vector3(0.96, 0.55, 0.78), Vector3(PRIZE_HOLE.x, 2.76, PRIZE_HOLE.z), make_mat(Color("#0B0907"), 0.15, 0.22), "PrizeHoleDepth")
+/mnt/data/audit_ui44/scripts/main.gd:3242:    hole_guard_mat.albedo_color = Color(0.78, 0.86, 0.90, 0.30)
+/mnt/data/audit_ui44/scripts/main.gd:3263:    make_box(machine, Vector3(1.55, 0.42, 1.05), Vector3(PRIZE_HOLE.x, 2.55, PRIZE_HOLE.z), make_mat(Color("#17120E"), 0.75, 0.20), "PrizeChute")
+/mnt/data/audit_ui44/scripts/main.gd:3264:    make_box(machine, Vector3(1.18, 0.09, 0.07), Vector3(PRIZE_HOLE.x, 2.80, PRIZE_HOLE.z + 0.54), make_mat(Color("#E8E0D6"), 0.55, 0.22), "ChuteTrim")
+/mnt/data/audit_ui44/scripts/main.gd:3271:    make_sphere(machine, 0.22, Vector3(-2.0, 3.32, 3.30), make_mat(Color("#8A5A36"), 0.15, 0.32), "JoystickBall")
+/mnt/data/audit_ui44/scripts/main.gd:3273:    var grab_mat := make_mat(Color("#8E3A2E"), 0.20, 0.28, 0.55)
+/mnt/data/audit_ui44/scripts/main.gd:3279:    grab_light.light_color = Color("#D85A45")
+/mnt/data/audit_ui44/scripts/main.gd:3304:        corner_light.light_color = Color("#F2DCC0")
+/mnt/data/audit_ui44/scripts/main.gd:3313:    var rail_mat := make_mat(Color("#70716D"), 0.95, 0.20)
+/mnt/data/audit_ui44/scripts/main.gd:3314:    var dark_rail := make_mat(Color("#3E403D"), 0.92, 0.24)
+/mnt/data/audit_ui44/scripts/main.gd:3334:    var metal := make_mat(Color("#666A66"), 0.95, 0.16)
+/mnt/data/audit_ui44/scripts/main.gd:3335:    var dark := make_mat(Color("#2D2925"), 0.9, 0.22)
+/mnt/data/audit_ui44/scripts/main.gd:3336:    var claw_color: Color = Color("#8B765E")
+/mnt/data/audit_ui44/scripts/main.gd:3343:    cable = make_cylinder(claw, 0.035, 2.0, Vector3(0, 1.45, 0), make_mat(Color("#3B3C39"), 0.9, 0.22), "Cable")
+/mnt/data/audit_ui44/scripts/main.gd:3376:    aim_marker.material_override = make_mat(Color(0.95, 0.72, 0.30, 0.38), 0.0, 0.35, 1.2)
+/mnt/data/audit_ui44/scripts/main.gd:3657:    capsule_mat.albedo_color = Color(0.86, 0.94, 0.98, 0.28)
+/mnt/data/audit_ui44/scripts/main.gd:3663:    var coin_mat := make_mat(Color("#C69B55"), 0.75, 0.18)
+/mnt/data/audit_ui44/scripts/main.gd:3666:    make_cylinder(body, 0.105, 0.025, Vector3(0, 0.36, 0.25), make_mat(Color("#E5C67B"), 0.70, 0.16), "CoinMark")
+/mnt/data/audit_ui44/scripts/main.gd:3791:    var panda_mat := make_fur_mat(Color("#465B72"))
+/mnt/data/audit_ui44/scripts/main.gd:3878:        make_sphere(root,0.10,Vector3(0,1.93,0.02),make_mat(Color("#C69B55"),0.45,0.22),"LegendGem")
+/mnt/data/audit_ui44/scripts/main.gd:3882:    var horn := make_cylinder(root,0.10,0.58,Vector3(0,1.88,0.05),make_mat(Color("#C69B55"),0.50,0.20),"UnicornHorn")
+/mnt/data/audit_ui44/scripts/main.gd:3887:        make_box(root,Vector3(0.80,0.18,0.25),Vector3(0,1.78,0),make_mat(Color("#B88645"),0.50,0.22),"Crown")
+/mnt/data/audit_ui44/scripts/main.gd:3891:    make_box(root,Vector3(0.72,0.72,0.08),Vector3(-0.55,1.22,-0.05),make_mat(Color("#8B7C9B"),0.15,0.32),"WingL")
+/mnt/data/audit_ui44/scripts/main.gd:3892:    make_box(root,Vector3(0.72,0.72,0.08),Vector3(0.55,1.22,-0.05),make_mat(Color("#9B7E8F"),0.15,0.32),"WingR")
+/mnt/data/audit_ui44/scripts/main.gd:3893:    make_sphere(root,0.09,Vector3(0,1.92,0),make_mat(Color("#C6A45D"),0.35,0.28),"FairyStar")
+/mnt/data/audit_ui44/scripts/main.gd:3899:    make_box(root,Vector3(0.22,0.32,0.18),Vector3(0,1.74,0.05),make_mat(Color("#B88645"),0.45,0.22),"Beak")
+/mnt/data/audit_ui44/scripts/main.gd:3902:    var metal := make_mat(Color("#A8B9CA"),0.72,0.20)
+/mnt/data/audit_ui44/scripts/main.gd:3903:    var darkmetal := make_mat(Color("#27344A"),0.88,0.16)
+/mnt/data/audit_ui44/scripts/main.gd:3907:        make_sphere(root,0.085,Vector3(x,1.64,0.42),make_mat(Color("#6B7880"),0.65,0.20),"RobotEye")
+/mnt/data/audit_ui44/scripts/main.gd:3910:    make_cylinder(root,0.08,0.42,Vector3(0,2.10,0),make_mat(Color("#6B7880"),0.65,0.20),"Antenna")
+/mnt/data/audit_ui44/scripts/main.gd:3912:        make_box(root,Vector3(0.62,0.16,0.20),Vector3(0,1.98,0),make_mat(Color("#B58A43"),0.65,0.20),"MasterBadge")
+/mnt/data/audit_ui44/scripts/main.gd:3916:    var helmet := make_sphere(root,0.66,Vector3(0,1.20,0),make_mat(Color(0.30,0.34,0.36,1.0),0.35,0.18),"SpaceHelmet")
+/mnt/data/audit_ui44/scripts/main.gd:3918:    make_box(root,Vector3(0.22,0.10,0.10),Vector3(-0.42,1.10,0.25),make_mat(Color("#6B7880"),0.65,0.22),"SpaceBadge")
+/mnt/data/audit_ui44/scripts/main.gd:3925:    make_box(root,Vector3(0.38,0.18,0.20),Vector3(0,1.19,0.72),make_fur_mat(Color("#E88C2E")),"DuckBeak")
+/mnt/data/audit_ui44/scripts/main.gd:3931:    var metal := make_mat(Color("#71879B"),0.72,0.22)
+/mnt/data/audit_ui44/scripts/main.gd:3934:        make_sphere(root,0.055,Vector3(x,1.36,0.73),make_mat(Color("#D5B45A"),0.65,0.18),"CyberEye")
+/mnt/data/audit_ui44/scripts/main.gd:3938:    var metal := make_mat(Color("#8B98A5"),0.75,0.20)
+/mnt/data/audit_ui44/scripts/main.gd:3942:    make_sphere(root,0.06,Vector3(-0.17,1.34,0.66),make_mat(Color("#D5B45A"),0.7,0.18),"MechaEyeL")
+/mnt/data/audit_ui44/scripts/main.gd:3943:    make_sphere(root,0.06,Vector3(0.17,1.34,0.66),make_mat(Color("#D5B45A"),0.7,0.18),"MechaEyeR")
+/mnt/data/audit_ui44/scripts/main.gd:3947:    var helmet := make_sphere(root,0.72,Vector3(0,1.02,0.05),make_mat(Color(0.55,0.68,0.76,1.0),0.25,0.12),"SpaceSharkHelmet")
+/mnt/data/audit_ui44/scripts/main.gd:3949:    make_box(root,Vector3(0.55,0.08,0.08),Vector3(0,1.00,0.67),make_mat(Color("#C6A45D"),0.5,0.2),"SpaceBadge")
+/mnt/data/audit_ui44/scripts/main.gd:3953:    var star := make_mat(Color("#D9B85A"),0.65,0.18)
+/mnt/data/audit_ui44/scripts/main.gd:3959:    var wing := make_fur_mat(Color("#B99AE8"))
+/mnt/data/audit_ui44/scripts/main.gd:3962:    make_cylinder(root,0.08,0.48,Vector3(0,1.92,0),make_mat(Color("#D5B45A"),0.55,0.2),"FairyWand")
+/mnt/data/audit_ui44/scripts/main.gd:3966:    var wingmat := make_fur_mat(Color("#D68A9C"))
+/mnt/data/audit_ui44/scripts/main.gd:3969:    make_box(root,Vector3(0.24,0.30,0.20),Vector3(0,1.72,0.12),make_fur_mat(Color("#D4A33D")),"GriffinBeak")
+/mnt/data/audit_ui44/scripts/main.gd:3978:            return base.lerp(Color("#FF78B7"), 0.22)
+/mnt/data/audit_ui44/scripts/main.gd:3986:    var white := make_fur_mat(Color("#E2B66B"))
+/mnt/data/audit_ui44/scripts/main.gd:3987:    var dark := make_mat(Color("#172033"), 0.03, 0.48)
+/mnt/data/audit_ui44/scripts/main.gd:3988:    var pink := make_fur_mat(Color("#FF789F"))
+/mnt/data/audit_ui44/scripts/main.gd:4027:        var badge_color = make_mat(Color("#C6A45D"),0.40,0.24)
+/mnt/data/audit_ui44/scripts/main.gd:4031:        var badge_color = make_mat(Color("#8A6E8D"),0.25,0.28)
+/mnt/data/audit_ui44/scripts/main.gd:4046:    o.add_theme_color_override("font_color", Color("#F1E5D6"))
+/mnt/data/audit_ui44/scripts/main.gd:4047:    o.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4048:    o.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+/mnt/data/audit_ui44/scripts/main.gd:4049:    o.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4050:    o.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4051:    o.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4052:    o.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4053:    o.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4057:        pop.add_theme_color_override("font_color", Color("#F1E5D6"))
+/mnt/data/audit_ui44/scripts/main.gd:4058:        pop.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
+/mnt/data/audit_ui44/scripts/main.gd:4059:        pop.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+/mnt/data/audit_ui44/scripts/main.gd:4060:        pop.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
+/mnt/data/audit_ui44/scripts/main.gd:4061:        pop.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#76583F"), 14, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4062:        pop.add_theme_stylebox_override("hover", make_style(Color("#4A3022"), Color("#A3754D"), 10, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4063:        pop.add_theme_stylebox_override("separator", make_style(Color("#6E4B33"), Color("#6E4B33"), 0, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4067:    c.add_theme_color_override("font_color", Color("#F1E5D6"))
+/mnt/data/audit_ui44/scripts/main.gd:4068:    c.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4069:    c.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+/mnt/data/audit_ui44/scripts/main.gd:4070:    c.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4071:    c.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
+/mnt/data/audit_ui44/scripts/main.gd:4072:    c.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 14, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4073:    c.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 14, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4074:    c.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 14, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4075:    c.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 14, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4087:    slider.add_theme_stylebox_override("slider", make_style(Color("#17120F"), Color("#6E4B33"), 8, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4088:    slider.add_theme_stylebox_override("grabber_area", make_style(Color("#6E4B33"), Color("#6E4B33"), 8, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4089:    slider.add_theme_stylebox_override("grabber_area_highlighted", make_style(Color("#8A684C"), Color("#8A684C"), 8, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4097:        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4098:        vs.add_theme_stylebox_override("grabber", make_style(Color("#76583F"), Color("#A3754D"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4099:        vs.add_theme_stylebox_override("grabber_highlighted", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4101:        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4102:        hs.add_theme_stylebox_override("grabber", make_style(Color("#76583F"), Color("#A3754D"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4103:        hs.add_theme_stylebox_override("grabber_highlighted", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:4111:    var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:4117:    dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
+/mnt/data/audit_ui44/scripts/main.gd:4118:    dialog.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4119:    dialog.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+/mnt/data/audit_ui44/scripts/main.gd:4120:    dialog.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4124:        label.add_theme_color_override("font_color", Color("#F1E5D6"))
+/mnt/data/audit_ui44/scripts/main.gd:4132:        style_button(ok, Color("#A8754A"))
+/mnt/data/audit_ui44/scripts/main.gd:4136:        style_button(cancel, Color("#6E4B33"))
+/mnt/data/audit_ui44/scripts/main.gd:4152:func style_button(b: Button, accent: Color = Color("#A8754A"), large: bool = false) -> void:
+/mnt/data/audit_ui44/scripts/main.gd:4160:    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4161:    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4162:    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4163:    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4165:func style_panel(p: PanelContainer, bg: Color = Color("#1D1612"), border: Color = Color("#76583F"), radius: int = 26, border_width: int = 3) -> void:
+/mnt/data/audit_ui44/scripts/main.gd:4176:    b.add_theme_color_override("font_color", Color("#F1E5D6"))
+/mnt/data/audit_ui44/scripts/main.gd:4177:    b.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+/mnt/data/audit_ui44/scripts/main.gd:4178:    b.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
+/mnt/data/audit_ui44/scripts/main.gd:4179:    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4180:    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4181:    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#C19A70"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4182:    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:4190:    title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:4199:        sub.modulate = Color("#9FB8D9")
+/mnt/data/audit_ui44/scripts/main.gd:4213:    backdrop.color = Color(0.035, 0.027, 0.022, 0.99)
+/mnt/data/audit_ui44/scripts/main.gd:4222:    top_panel.add_theme_stylebox_override("panel", make_style(Color("#1C1511"), Color("#76583F"), 30, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4233:    brand.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:4243:    subtitle.modulate = Color("#9E846D")
+/mnt/data/audit_ui44/scripts/main.gd:4247:    var play := make_menu_button("▶  ИГРАТЬ", Vector2(75, 265), Vector2(930, 92), Color("#A8754A"), true)
+/mnt/data/audit_ui44/scripts/main.gd:4265:    var shop := make_menu_button("🛒  МАГАЗИН", Vector2(left_x, y1), Vector2(col_w, row_h), Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4269:    var coll := make_menu_button("★  КОЛЛЕКЦИЯ", Vector2(right_x, y1), Vector2(col_w, row_h), Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:4273:    var achievements := make_menu_button("🏆  ДОСТИЖЕНИЯ", Vector2(left_x, y2), Vector2(col_w, row_h), Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:4277:    var referral := make_menu_button("👥  РЕФЕРАЛЬНАЯ СИСТЕМА", Vector2(right_x, y2), Vector2(col_w, row_h), Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:4281:    var promo := make_menu_button("🎟  ПРОМОКОДЫ", Vector2(left_x, y3), Vector2(col_w, row_h), Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4285:    var rating := make_menu_button("🏆  РЕЙТИНГ", Vector2(right_x, y3), Vector2(col_w, row_h), Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4289:    news_menu_button = make_menu_button("📰  НОВОСТИ", Vector2(left_x, y4), Vector2(col_w, row_h), Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4293:    var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4297:    var help := make_menu_button("❓  ПОМОЩЬ", Vector2(left_x, y4 + row_h + gap), Vector2(930, row_h), Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4463:    style_button(b, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:4706:    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), Color("#4D8068"))
+/mnt/data/audit_ui44/scripts/main.gd:4712:    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), Color("#7A5A42"))
+/mnt/data/audit_ui44/scripts/main.gd:4717:    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), Color("#536B82"))
+/mnt/data/audit_ui44/scripts/main.gd:4726:    style_button(daily_btn, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:4727:    daily_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#9A7653"), 41, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4728:    daily_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#C09A70"), 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:4729:    daily_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:4739:    style_button(weekly_btn, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:4740:    weekly_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#76583F"), 41, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4741:    weekly_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:4742:    weekly_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:4752:    style_button(daily_claim_button, Color("#C09A70"))
+/mnt/data/audit_ui44/scripts/main.gd:4753:    daily_claim_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#C09A70"), 41, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4764:    style_button(event_button, Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:4765:    event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#8A684C"), 41, 3))
+/mnt/data/audit_ui44/scripts/main.gd:4766:    event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#C09A70"), 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:4767:    event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:4781:    style_panel(mission_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
+/mnt/data/audit_ui44/scripts/main.gd:4793:    mt.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:4807:    mtimer.modulate = Color("#D6A14A")
+/mnt/data/audit_ui44/scripts/main.gd:4996:    style_panel(daily_login_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
+/mnt/data/audit_ui44/scripts/main.gd:5035:    daily_timer.modulate = Color("#D6A14A")
+/mnt/data/audit_ui44/scripts/main.gd:5101:                style_button(btn, Color("#5FBF72"))
+/mnt/data/audit_ui44/scripts/main.gd:5105:                style_button(btn, Color("#C09A70"))
+/mnt/data/audit_ui44/scripts/main.gd:5108:                style_button(btn, Color("#4A3022"))
+/mnt/data/audit_ui44/scripts/main.gd:5205:    var profile := {"accent":Color("#8A684C"), "glow":Color("#F2DCC0"), "capture":0.06, "reward":1.15, "rare":0.04, "toy":0.35, "title":String(event.get("name", "Событие"))}
+/mnt/data/audit_ui44/scripts/main.gd:5208:        profile = {"accent":Color("#D6A73A"), "glow":Color("#FFF0B0"), "capture":0.10, "reward":1.50, "rare":0.10, "toy":0.55, "title":"🎆 НОВОГОДНИЙ ПРАЗДНИК"}
+/mnt/data/audit_ui44/scripts/main.gd:5210:        profile = {"accent":Color("#FF7A2F"), "glow":Color("#FFB14E"), "capture":0.12, "reward":1.65, "rare":0.14, "toy":0.60, "title":"🎃 ХЭЛЛОУИН"}
+/mnt/data/audit_ui44/scripts/main.gd:5212:        profile = {"accent":Color("#FF4F8B"), "glow":Color("#FF9FC2"), "capture":0.08, "reward":1.35, "rare":0.08, "toy":0.50, "title":"❤️ ДЕНЬ ВЛЮБЛЁННЫХ"}
+/mnt/data/audit_ui44/scripts/main.gd:5214:        profile = {"accent":Color("#38B86B"), "glow":Color("#8DEBFF"), "capture":0.10, "reward":1.45, "rare":0.10, "toy":0.65, "title":"🧸 ДЕНЬ ЗАЩИТЫ ДЕТЕЙ"}
+/mnt/data/audit_ui44/scripts/main.gd:5216:        profile = {"accent":Color("#4D83FF"), "glow":Color("#E9F2FF"), "capture":0.08, "reward":1.40, "rare":0.08, "toy":0.50, "title":"🇷🇺 ДЕНЬ РОССИИ"}
+/mnt/data/audit_ui44/scripts/main.gd:5218:        profile = {"accent":Color("#3E8ED0"), "glow":Color("#FFD65A"), "capture":0.07, "reward":1.30, "rare":0.06, "toy":0.45, "title":"🎒 ДЕНЬ ЗНАНИЙ"}
+/mnt/data/audit_ui44/scripts/main.gd:5220:        profile = {"accent":Color("#8A4DFF"), "glow":Color("#D7C7FF"), "capture":0.08, "reward":1.30, "rare":0.06, "toy":0.45, "title":String(event.get("name", "ПРАЗДНИК"))}
+/mnt/data/audit_ui44/scripts/main.gd:5224:            "winter": profile = {"accent":Color("#4D9FE8"), "glow":Color("#C9F3FF"), "capture":0.06, "reward":1.15, "rare":0.04, "toy":0.35, "title":"❄️ ЗИМНИЙ СЕЗОН"}
+/mnt/data/audit_ui44/scripts/main.gd:5225:            "spring": profile = {"accent":Color("#59B879"), "glow":Color("#FFD4E8"), "capture":0.06, "reward":1.15, "rare":0.04, "toy":0.35, "title":"🌸 ВЕСЕННИЙ СЕЗОН"}
+/mnt/data/audit_ui44/scripts/main.gd:5226:            "summer": profile = {"accent":Color("#2BB7D8"), "glow":Color("#FFE27A"), "capture":0.06, "reward":1.15, "rare":0.04, "toy":0.35, "title":"☀️ ЛЕТНИЙ СЕЗОН"}
+/mnt/data/audit_ui44/scripts/main.gd:5227:            "autumn": profile = {"accent":Color("#C56A32"), "glow":Color("#FFD08A"), "capture":0.06, "reward":1.15, "rare":0.04, "toy":0.35, "title":"🍂 ОСЕННИЙ СЕЗОН"}
+/mnt/data/audit_ui44/scripts/main.gd:5237:    active_event_accent = Color(profile.get("accent", Color("#8A684C")))
+/mnt/data/audit_ui44/scripts/main.gd:5238:    active_event_glow = Color(profile.get("glow", Color("#F2DCC0")))
+/mnt/data/audit_ui44/scripts/main.gd:5248:        event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#8A684C"), 41, 3))
+/mnt/data/audit_ui44/scripts/main.gd:5259:        event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), active_event_accent, 41, 3))
+/mnt/data/audit_ui44/scripts/main.gd:5260:        event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), active_event_glow, 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:5261:        event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), active_event_glow, 41, 4))
+/mnt/data/audit_ui44/scripts/main.gd:5263:        style_panel(event_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
+/mnt/data/audit_ui44/scripts/main.gd:5325:    style_panel(event_panel, Color("#6E4B33"), Color("#A3754D"), 22, 3)
+/mnt/data/audit_ui44/scripts/main.gd:5433:    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), accent, 39, 3))
+/mnt/data/audit_ui44/scripts/main.gd:5434:    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), accent.lightened(0.18), 39, 4))
+/mnt/data/audit_ui44/scripts/main.gd:5435:    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color.WHITE, 39, 4))
+/mnt/data/audit_ui44/scripts/main.gd:5436:    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), accent, 39, 3))
+/mnt/data/audit_ui44/scripts/main.gd:5451:    top.color = Color("#211813")
+/mnt/data/audit_ui44/scripts/main.gd:5461:    connection_status_label.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:5471:    style_panel(info_panel, Color("#241B16"), Color("#76583F"), 22, 2)
+/mnt/data/audit_ui44/scripts/main.gd:5478:    style_button(hud_profile_button, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:5498:    rubles_title.modulate = Color("#C9B39A")
+/mnt/data/audit_ui44/scripts/main.gd:5504:    coins_label.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:5520:    level_title.modulate = Color("#C9B39A")
+/mnt/data/audit_ui44/scripts/main.gd:5527:    level_label.modulate = Color("#E4C9A3")
+/mnt/data/audit_ui44/scripts/main.gd:5534:    xp_bar.add_theme_stylebox_override("background", make_style(Color("#120F0D"), Color("#4B392B"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:5535:    xp_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:5543:    xp_label.modulate = Color("#E7D8C6")
+/mnt/data/audit_ui44/scripts/main.gd:5549:    style_panel(machine_panel, Color("#241B16"), Color("#76583F"), 22, 2)
+/mnt/data/audit_ui44/scripts/main.gd:5557:    machine_status_label.add_theme_color_override("font_outline_color", Color("#120E0A"))
+/mnt/data/audit_ui44/scripts/main.gd:5565:    style_button(menu, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:5594:    style_button(pass_btn, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:5605:    style_button(grab, Color("#8A684C"), true)
+/mnt/data/audit_ui44/scripts/main.gd:5620:    style_panel(achievement_strip, Color("#241B16"), Color("#8A684C"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:5627:    achievement_strip_label.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:5660:    style_button(b, Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:5669:    style_panel(result_popup, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:5679:    popup_title_label.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:5684:    popup_name_label.modulate = Color("#F39C32")
+/mnt/data/audit_ui44/scripts/main.gd:5689:    popup_info_label.modulate = Color("#C7B4A0")
+/mnt/data/audit_ui44/scripts/main.gd:5694:    popup_xp_label.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:5699:    popup_rating_label.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:5705:    popup_achievement_label.modulate = Color("#C7B4A0")
+/mnt/data/audit_ui44/scripts/main.gd:5713:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:5732:    subtitle.modulate = Color("#D7C9E8")
+/mnt/data/audit_ui44/scripts/main.gd:5737:    style_button(vip_button, Color("#C69A35"))
+/mnt/data/audit_ui44/scripts/main.gd:5772:    shop_feedback_label.modulate = Color("#F0D4A9")
+/mnt/data/audit_ui44/scripts/main.gd:5801:    style_panel(shop_insufficient_popup, Color("#241B16"), Color("#76583F"), 24, 3)
+/mnt/data/audit_ui44/scripts/main.gd:5809:    label.modulate = Color("#F0D4A9")
+/mnt/data/audit_ui44/scripts/main.gd:5849:    d.modulate = Color("#D7C9E8")
+/mnt/data/audit_ui44/scripts/main.gd:6056:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
+/mnt/data/audit_ui44/scripts/main.gd:6060:    var title := Label.new(); title.text = "💎  VIP МАГАЗИН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 40); title.modulate = Color("#FFE58A"); v.add_child(title)
+/mnt/data/audit_ui44/scripts/main.gd:6079:        style_button(b, Color("#C69A35")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
+/mnt/data/audit_ui44/scripts/main.gd:6120:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:6151:    current.modulate = Color("#F0E1CE")
+/mnt/data/audit_ui44/scripts/main.gd:6159:    bonus.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:6207:    note.modulate = Color("#C9D9D0")
+/mnt/data/audit_ui44/scripts/main.gd:6254:                b.modulate = Color("#F0E1CE")
+/mnt/data/audit_ui44/scripts/main.gd:6275:            item.modulate = GOLD if sid == active_season_id else Color("#E0D4C6")
+/mnt/data/audit_ui44/scripts/main.gd:6307:            item.modulate = Color("#E0D4C6")
+/mnt/data/audit_ui44/scripts/main.gd:6467:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:6503:    help.modulate = Color("#E0D4C6")
+/mnt/data/audit_ui44/scripts/main.gd:6520:        style_button(b, Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:6672:        style_panel(row, Color("#241B16"), Color("#76583F"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:6687:        name_label.modulate = Color("#F0E1CE")
+/mnt/data/audit_ui44/scripts/main.gd:6693:        desc.modulate = Color("#CDBBA7")
+/mnt/data/audit_ui44/scripts/main.gd:6700:        module_bar.add_theme_stylebox_override("background", make_style(Color("#17120F"), Color("#4B392B"), 5, 1))
+/mnt/data/audit_ui44/scripts/main.gd:6701:        module_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 5, 1))
+/mnt/data/audit_ui44/scripts/main.gd:6709:        style_button(upgrade, Color("#241B16"))
+/mnt/data/audit_ui44/scripts/main.gd:6730:        style_button(b, Color("#241B16"))
+/mnt/data/audit_ui44/scripts/main.gd:6739:    style_button(cal, Color("#241B16"))
+/mnt/data/audit_ui44/scripts/main.gd:6749:    style_button(oc, Color("#241B16"))
+/mnt/data/audit_ui44/scripts/main.gd:6758:    style_button(job, Color("#241B16"))
+/mnt/data/audit_ui44/scripts/main.gd:6767:    desc.modulate = Color("#CDBBA7")
+/mnt/data/audit_ui44/scripts/main.gd:6791:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:6824:    info.modulate = Color("#E8D8C8")
+/mnt/data/audit_ui44/scripts/main.gd:6837:    style_button(close, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:6848:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:6884:        title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:6907:        difficulty.modulate = Color("#C7B4A0")
+/mnt/data/audit_ui44/scripts/main.gd:6918:        names.modulate = Color("#F0E7DC") if got == needed else Color("#9B8D80")
+/mnt/data/audit_ui44/scripts/main.gd:6924:    style_button(close, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:6934:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:6948:    h.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:6955:    summary.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:6963:    category_title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:6988:        style_button(cb, Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:7000:    style_button(close, Color("#8A684C"))
+/mnt/data/audit_ui44/scripts/main.gd:7026:            cb.add_theme_stylebox_override("normal", make_style(Color("#4A3022"), Color("#C19A70"), 18, 3))
+/mnt/data/audit_ui44/scripts/main.gd:7028:            cb.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
+/mnt/data/audit_ui44/scripts/main.gd:7034:        style_panel(row, Color("#3A271D"), Color("#76583F"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:7043:        label.modulate = Color("#E8D2B5") if unlocked else Color("#A58D76")
+/mnt/data/audit_ui44/scripts/main.gd:7091:    title.modulate = Color("#B9A38D")
+/mnt/data/audit_ui44/scripts/main.gd:7098:    value.modulate = Color("#F0D4A9")
+/mnt/data/audit_ui44/scripts/main.gd:7113:    style_panel(p, Color("#241B16"), Color("#76583F"), 22, 3)
+/mnt/data/audit_ui44/scripts/main.gd:7140:    title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:7149:    style_panel(identity, Color("#241B16"), Color("#76583F"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:7163:    style_panel(avatar_box, Color("#17120F"), Color("#B98B5C"), 16, 2)
+/mnt/data/audit_ui44/scripts/main.gd:7185:    name_now.modulate = Color("#F0E1CE")
+/mnt/data/audit_ui44/scripts/main.gd:7192:    title_now.modulate = Color("#C09A70")
+/mnt/data/audit_ui44/scripts/main.gd:7199:    level.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:7206:    xp.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:7213:    xp_bar.add_theme_stylebox_override("background", make_style(Color("#120F0D"), Color("#4B392B"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:7214:    xp_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
+/mnt/data/audit_ui44/scripts/main.gd:7223:    quick.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:7229:    style_panel(id_card, Color("#1A130F"), Color("#9A7653"), 16, 2)
+/mnt/data/audit_ui44/scripts/main.gd:7246:    id_caption.modulate = Color("#C09A70")
+/mnt/data/audit_ui44/scripts/main.gd:7254:    id_value.modulate = Color("#F0D4A9")
+/mnt/data/audit_ui44/scripts/main.gd:7262:    style_button(copy_id, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7270:    style_panel(referral_card, Color("#1A130F"), Color("#9A7653"), 16, 2)
+/mnt/data/audit_ui44/scripts/main.gd:7285:    referral_caption.modulate = Color("#C09A70")
+/mnt/data/audit_ui44/scripts/main.gd:7292:    referral_value.modulate = Color("#F0D4A9")
+/mnt/data/audit_ui44/scripts/main.gd:7300:    style_button(copy_referral, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7309:    style_panel(edit_card, Color("#241B16"), Color("#76583F"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:7326:    name_caption.modulate = Color("#C09A70")
+/mnt/data/audit_ui44/scripts/main.gd:7337:    name_input.add_theme_stylebox_override("normal", make_style(Color("#17120F"), Color("#76583F"), 12, 2))
+/mnt/data/audit_ui44/scripts/main.gd:7338:    name_input.add_theme_stylebox_override("focus", make_style(Color("#1F1712"), Color("#B98B5C"), 12, 2))
+/mnt/data/audit_ui44/scripts/main.gd:7344:    avatar_title.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:7362:        style_button(b, Color("#B98B5C") if i == player_avatar_index else Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7371:    style_button(save_profile, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:7381:    status.modulate = Color("#C09A70")
+/mnt/data/audit_ui44/scripts/main.gd:7388:    stats_title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:7404:    style_button(close, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:7507:                style_button(b, Color("#B98B5C") if i == idx else Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7541:        style_panel(card, Color("#241B16"), Color("#5E4938"), 12, 1)
+/mnt/data/audit_ui44/scripts/main.gd:7553:        key.modulate = Color("#C09A70")
+/mnt/data/audit_ui44/scripts/main.gd:7562:        val.modulate = Color("#E7D8C6")
+/mnt/data/audit_ui44/scripts/main.gd:7578:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:7592:    h.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:7601:    style_button(close, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7650:        title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:7654:            style_panel(row, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7659:            label.modulate = Color("#F0E1CE")
+/mnt/data/audit_ui44/scripts/main.gd:7722:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:7755:    referral_link_label.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:7761:    style_button(copy, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:7798:    style_button(claim, Color("#C09A70"))
+/mnt/data/audit_ui44/scripts/main.gd:7813:    note.modulate = Color("#B9A28D")
+/mnt/data/audit_ui44/scripts/main.gd:7819:    style_button(close, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:7861:    style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:7874:    h.add_theme_font_size_override("font_size", 38); h.modulate = Color("#E1C29A"); v.add_child(h)
+/mnt/data/audit_ui44/scripts/main.gd:7947:    var test_notification := Button.new(); test_notification.text="🔔  ОТПРАВИТЬ ТЕСТОВОЕ УВЕДОМЛЕНИЕ"; test_notification.custom_minimum_size=Vector2(0,64); style_button(test_notification,Color("#76583F")); test_notification.add_theme_font_size_override("font_size",18); test_notification.pressed.connect(func(): test_game_notification()); v.add_child(test_notification)
+/mnt/data/audit_ui44/scripts/main.gd:7955:    var info := Label.new(); info.name="SettingsInfo"; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
+/mnt/data/audit_ui44/scripts/main.gd:7959:    var reset_settings := Button.new(); reset_settings.text="ВОССТАНОВИТЬ НАСТРОЙКИ ПО УМОЛЧАНИЮ"; reset_settings.custom_minimum_size=Vector2(0,68); style_button(reset_settings,Color("#76583F")); reset_settings.add_theme_font_size_override("font_size",18); reset_settings.pressed.connect(confirm_reset_settings); v.add_child(reset_settings)
+/mnt/data/audit_ui44/scripts/main.gd:7960:    var reset := Button.new(); reset.text="СБРОСИТЬ ПРОГРЕСС"; reset.custom_minimum_size=Vector2(0,78); style_button(reset,Color("#76583F")); reset.pressed.connect(confirm_reset_progress); v.add_child(reset)
+/mnt/data/audit_ui44/scripts/main.gd:7961:    var close := Button.new(); close.text="←  НАЗАД"; close.custom_minimum_size=Vector2(0,78); style_button(close,Color("#9A7653")); close.pressed.connect(func(): show_main_menu()); v.add_child(close)
+/mnt/data/audit_ui44/scripts/main.gd:7966:    var label := Label.new(); label.text=title_text; label.add_theme_font_size_override("font_size",17); label.modulate=Color("#D8C3AA"); box.add_child(label); box.add_child(control)
+/mnt/data/audit_ui44/scripts/main.gd:8177:    style_panel(p, Color("#241B16"), Color("#76583F"), 24, 3)
+/mnt/data/audit_ui44/scripts/main.gd:8188:    h.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:8195:    intro.modulate = Color("#BCA996")
+/mnt/data/audit_ui44/scripts/main.gd:8202:    body.modulate = Color("#F0E1CE")
+/mnt/data/audit_ui44/scripts/main.gd:8210:    social_title.modulate = Color("#E1C29A")
+/mnt/data/audit_ui44/scripts/main.gd:8217:    social_hint.modulate = Color("#BCA996")
+/mnt/data/audit_ui44/scripts/main.gd:8228:    style_button(vk, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:8238:    style_button(reviews, Color("#8A6B45"))
+/mnt/data/audit_ui44/scripts/main.gd:8249:    style_button(max_btn, Color("#7A5D91"))
+/mnt/data/audit_ui44/scripts/main.gd:8259:    style_button(close, Color("#9A7653"))
+/mnt/data/audit_ui44/scripts/main.gd:9290:    style_panel(collection_completion_popup, Color("#241B16"), Color("#76583F"), 26, 3)
+/mnt/data/audit_ui44/scripts/main.gd:9301:    title.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:9307:    name.modulate = Color("#F39C32")
+/mnt/data/audit_ui44/scripts/main.gd:9314:    info.modulate = Color("#C7B4A0")
+/mnt/data/audit_ui44/scripts/main.gd:9321:    toys_label.modulate = Color("#D8C3AA")
+/mnt/data/audit_ui44/scripts/main.gd:9327:    reward.modulate = Color("#DDB47A")
+/mnt/data/audit_ui44/scripts/main.gd:9334:    style_button(cont, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:9876:        style_panel(sale_panel, Color("#241B16"), Color("#76583F"), 18, 2)
+/mnt/data/audit_ui44/scripts/main.gd:9885:        style_button(sell, Color("#C09A70"))
+/mnt/data/audit_ui44/scripts/main.gd:9892:        style_button(keep, Color("#76583F"))
+/mnt/data/audit_ui44/scripts/main.gd:10160:        "ОБЫЧНАЯ": return Color("#D6D0C8")
+/mnt/data/audit_ui44/scripts/main.gd:10161:        "НЕОБЫЧНАЯ": return Color("#76B77B")
+/mnt/data/audit_ui44/scripts/main.gd:10162:        "РЕДКАЯ": return Color("#6E9FD8")
+/mnt/data/audit_ui44/scripts/main.gd:10163:        "ЭПИЧЕСКАЯ": return Color("#9C78D8")
+/mnt/data/audit_ui44/scripts/main.gd:10164:        "ЛЕГЕНДАРНАЯ": return Color("#D6A14A")
+/mnt/data/audit_ui44/scripts/main.gd:10165:        "МИФИЧЕСКАЯ": return Color("#D36C55")
+/mnt/data/audit_ui44/scenes/Main.tscn:16:color = Color(0.05, 0.025, 0.02, 1)
