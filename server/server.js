@@ -7,6 +7,7 @@ const { URL } = require('url');
 
 const APP_VERSION = '2.0.0';
 const PORT = Number(process.env.PORT || 8080);
+const HOST = process.env.HOST || '127.0.0.1';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'state.json');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
@@ -82,26 +83,10 @@ function normalizePlayer(p){
   return p;
 }
 function getPlayer(id0,name){const pid=String(id0||'').slice(0,100);if(!pid)return null;if(!state.players[pid]){state.players[pid]=normalizePlayer({player_id:pid,name});audit('player_register',{player_id:pid},'system','new player');}return normalizePlayer(state.players[pid]);}
-function applyClientGameState(p,s){
-  if(!s||typeof s!=='object')return;
-  const copy=(k,def)=>{if(s[k]!==undefined)p[k]=JSON.parse(JSON.stringify(s[k]));};
-  for(const k of ['coins','score','level','xp','xp_to_next','games','total_prizes_won','total_xp_earned','highest_balance_rubles','highest_reward_rubles','total_daily_claims','total_weekly_claims','perfect_grabs','heavy_toy_wins','lucky_toy_wins','best_result','best_result_xp','current_win_streak','best_win_streak','workshop_parts','workshop_level','workshop_claw_power','workshop_speed','workshop_precision','workshop_luck','workshop_motor','workshop_servo','workshop_cable','workshop_damper','workshop_cooling','workshop_controller','workshop_calibration','workshop_overclock_games','workshop_overclock','workshop_job_end_unix','workshop_job_active','workshop_job_name','workshop_job_reward','player_avatar_index','selected_claw_skin','selected_toy_skin','selected_machine_skin','vip_selected','selected_claw','active_season_id','last_active_unix','return_bonus_claimed']) if(s[k]!==undefined){const target=k==='total_prizes_won'?'prizes':k;p[target]=JSON.parse(JSON.stringify(s[k]));}
-  if(s.player_name!==undefined)p.name=String(s.player_name).slice(0,20);
-  for(const k of ['collection','completed_collections','claimed_achievements','missions','season','referral_code','referral_used','promo_codes_used','owned_items','owned_claws','owned_claw_ids','owned_claw_skins','owned_toy_skins','owned_machine_skins','vip_owned','rarity_wins','achievement_historical_values','settings'])copy(k);
-  if(s.inventory&&typeof s.inventory==='object'){p.inventory=JSON.parse(JSON.stringify(s.inventory));}
-  else {
-    if(s.chest_inventory!==undefined){p.inventory.chests=JSON.parse(JSON.stringify(s.chest_inventory));}
-    if(s.chest_keys!==undefined)p.inventory.chest_keys=Number(s.chest_keys)||0;
-    if(s.engineering_parts!==undefined)p.inventory.parts=Number(s.engineering_parts)||0;
-    if(s.upgrades!==undefined)p.inventory.upgrade_levels=JSON.parse(JSON.stringify(s.upgrades));
-  }
-  if(s.login_streak!==undefined)p.login_streak=Number(s.login_streak)||0;
-  if(s.last_login_claim_date!==undefined)p.last_login_claim_date=String(s.last_login_claim_date||'');
-  if(s.last_daily_bonus_date!==undefined)p.login={...(p.login||{}),daily_bonus_date:String(s.last_daily_bonus_date||'')};
-  if(s.daily_mission_date!==undefined)p.missions={...(p.missions||{}),daily_key:String(s.daily_mission_date||'')};
-  if(s.weekly_mission_key!==undefined)p.missions={...(p.missions||{}),weekly_key:String(s.weekly_mission_key||'')};
-  normalizePlayer(p);
-}
+// Never copy a complete client snapshot into the authoritative player record.
+// Offline/local-first progress is intentionally treated as untrusted input.
+// Critical economy/progress changes must arrive through typed, idempotent actions.
+function applyClientGameState(_p,_s){ return false; }
 function publicPlayer(p){const x=JSON.parse(JSON.stringify(p));delete x.action_ids;delete x.audit_ids;return x;}
 function playerIsBanned(p){if(!p)return false;if(!p.banned)return false;if(Number(p.ban_until||0)>0 && Number(p.ban_until)<=Math.floor(now()/1000)){p.banned=false;p.ban_reason='';p.ban_until=0;p.sync_version=(p.sync_version||0)+1;return false;}return true;}
 function bumpPlayerVersion(p){p.sync_version=Number(p.sync_version||0)+1;}
@@ -168,7 +153,10 @@ function session(token0){const s=sessions.get(token0);if(!s)return null;if(s.exp
 function requirePlayer(req){const s=session(parseAuth(req));return s&&s.kind==='player'?state.players[s.player_id]:null;}
 function requireAdmin(req){const s=session(parseAuth(req));return s&&s.kind==='admin'?s:null;}
 function json(res,code,obj){const b=JSON.stringify(obj);res.writeHead(code,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Khvataika-Version':APP_VERSION,'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'Content-Type, Authorization, Idempotency-Key','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS'});res.end(b);}
-function body(req){return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>MAX_BODY){reject(new Error('body too large'));req.destroy();}});req.on('end',()=>{try{resolve(raw?JSON.parse(raw):{});}catch(e){reject(e);}});req.on('error',reject);});}
+function body(req){
+  if(req.__khvataika_body!==undefined){const x=req.__khvataika_body;delete req.__khvataika_body;return Promise.resolve(x);}
+  return new Promise((resolve,reject)=>{let raw='';req.on('data',c=>{raw+=c;if(raw.length>MAX_BODY){reject(new Error('body too large'));req.destroy();}});req.on('end',()=>{try{resolve(raw?JSON.parse(raw):{});}catch(e){reject(e);}});req.on('error',reject);});
+}
 function actionAlready(p,aid){return !!(aid&&((p.action_ids||[]).includes(aid)||state.actions[aid]));}
 function rememberAction(p,aid,result){if(!aid)return;state.actions[aid]={at:iso(),player_id:p.player_id,result};p.action_ids.push(aid);p.action_ids=p.action_ids.slice(-1000);}
 function finishResponse(p,extra={},includeCatalog=false,includeConfig=false){normalizePlayer(p);bumpPlayerVersion(p);saveState();const out={ok:true,player:publicPlayer(p),game_state:gameState(p),...extra};if(includeConfig)out.config=publicConfig(p,includeCatalog);out.leaderboard=leaderboard();return out;}
@@ -309,13 +297,12 @@ async function playerAction(req,res,p){
     const a=p.game.current_attempt;if(!a||a.resolved)return json(res,409,{ok:false,code:'NO_ACTIVE_ATTEMPT',message:'Нет активной игры'});if(now()-a.started_at<500)return json(res,409,{ok:false,code:'TOO_FAST',message:'Игра ещё не завершена'});a.resolved=true;p.game.current_attempt=null;
     const requestedSuccess = b.success === undefined ? null : !!b.success;
     const requestedToyId = String(b.toy_id || '');
-    if(requestedSuccess !== null){
-      // Offline-first: the client finishes locally and sends its result later.
-      // The server accepts the recorded attempt/toy and persists that result.
-      // It never accepts a different toy than the one reserved at game_start.
-      if(requestedSuccess && requestedToyId && String(a.toy?.id || '') !== requestedToyId)
-        return json(res,409,{ok:false,code:'TOY_MISMATCH',message:'Игрушка попытки не совпадает'});
-      a.success=requestedSuccess;
+    // The client may report what it displayed, but it can never decide the
+    // authoritative outcome. The result reserved by game_start is the only
+    // result that can affect economy/progress. A mismatched client report is
+    // recorded for audit, but it is ignored for the actual reward.
+    if(requestedToyId && String(a.toy?.id || '') !== requestedToyId){
+      audit('game_finish_client_mismatch',{player_id:p.player_id,attempt_id:a.id,server_toy_id:String(a.toy?.id||''),client_toy_id:requestedToyId},'server','client result mismatch');
     }
     if(a.success){const toy=a.toy||{};const duplicate=Number((p.inventory.toys||{})[toy.id]||0)>0;const event=activeEvent();const eventMultiplier=event?clampNum(Number(event.reward_multiplier??event.reward_mult??1),0,100):1;const baseReward={...a.reward,amount:Math.max(0,Math.round(Number(a.reward?.amount||0)*eventMultiplier))};const reward=grant(p,baseReward,'успешное получение игрушки',aid);p.prizes++;p.score+=3;p.rating+=clampInt(state.settings.rating_success,0,100);p.rarity_wins=p.rarity_wins||{};p.rarity_wins[toy.rarity]=(p.rarity_wins[toy.rarity]||0)+1;p.current_win_streak=(p.current_win_streak||0)+1;p.best_win_streak=Math.max(p.best_win_streak||0,p.current_win_streak);p.highest_reward_rubles=Math.max(p.highest_reward_rubles,Number((a.reward||{}).amount||0));p.collection[toy.name||toy.id]=toy.rarity||'ОБЫЧНАЯ';p.inventory.toys=p.inventory.toys||{};p.inventory.toys[toy.id]=(p.inventory.toys[toy.id]||0)+1;const xpGain=xpForRarity(toy.rarity);p.total_xp_earned=(p.total_xp_earned||0)+xpGain;const levels=applyXpAndLevels(p,xpGain);if(p.workshop_overclock&&Number(p.workshop_overclock_games||0)>0){p.workshop_overclock_games=Math.max(0,Number(p.workshop_overclock_games)-1);if(p.workshop_overclock_games===0)p.workshop_overclock=false;}p.season.xp+=xpGain;const seasonLevels=[];const seasonRewards=[];while(p.season.xp>=100&&p.season.level<(state.season.max_level||30)){p.season.xp-=100;p.season.level++;seasonLevels.push(p.season.level);seasonRewards.push(grantSeasonReward(p,p.season.level));}p.missions.daily_progress=Math.min(missionTarget('daily'),(p.missions.daily_progress||0)+1);p.missions.weekly_progress=Math.min(missionTarget('weekly'),(p.missions.weekly_progress||0)+1);p.inventory.chests=p.inventory.chests||{};const chest=chestForRarity(toy.rarity);p.inventory.chests[chest]=(p.inventory.chests[chest]||0)+1;const collections=checkCompletedCollections(p,aid); const achievements=checkServerAchievements(p,aid); result=finishResponse(p,{success:true,prize:toy,reward,duplicate,collections,achievements,levels,xp_gain:xpGain,season_levels:seasonLevels,season_rewards:seasonRewards,season:p.season,mission_progress:p.missions});}
     else {p.current_win_streak=0;result=finishResponse(p,{success:false,prize:null,reward:{type:'none',amount:0},season:p.season,mission_progress:p.missions});}
@@ -421,8 +408,16 @@ async function handle(req,res){
   if(pth==='/api/config'&&req.method==='GET'){const pid=u.searchParams.get('player_id');const p=pid?getPlayer(pid,u.searchParams.get('name')):null;return json(res,200,{ok:true,player:p?publicPlayer(p):null,game_state:p?gameState(p):{},config:publicConfig(p,true),leaderboard:leaderboard()});}
   if(pth==='/api/rating'&&req.method==='GET')return json(res,200,{ok:true,leaderboard:leaderboard()});
   if(pth==='/api/player/register'&&req.method==='POST'){const b=await body(req);const pid=String(b.player_id||'').trim().slice(0,100);if(!pid)return json(res,400,{ok:false,code:'INVALID_PLAYER_ID',message:'player_id обязателен'});const p=getPlayer(pid,b.name);p.last_seen=iso();p.last_active_unix=Math.floor(now()/1000);const t=crypto.randomBytes(32).toString('hex');sessions.set(t,{kind:'player',player_id:p.player_id,expires:now()+PLAYER_SESSION_TTL});saveState();return json(res,200,{ok:true,token:t,player:publicPlayer(p),game_state:gameState(p),config:publicConfig(p,true),leaderboard:leaderboard()});}
+  // Compact Server Gateway aliases: the client can use one bootstrap call and
+  // small typed requests afterwards without exposing a large mutable snapshot.
+  if(pth==='/api/game/bootstrap'&&req.method==='GET'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация'});p.last_seen=iso();return json(res,200,finishResponse(p,{},true,true));}
+  if(pth==='/api/game/sync'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const b=await body(req);const known=Number(b.known_server_version||0);p.last_seen=iso();p.last_active_unix=Math.floor(now()/1000);if(Number(p.sync_version||0)>known)return json(res,200,{ok:true,conflict:'server_newer',mode:'server_authoritative',player:publicPlayer(p),game_state:gameState(p),server_sync_version:p.sync_version||0,leaderboard:leaderboard()});saveState();return json(res,200,{ok:true,mode:'server_authoritative',player:publicPlayer(p),game_state:gameState(p),server_sync_version:p.sync_version||0,leaderboard:leaderboard()});}
+  if(pth==='/api/game/purchase'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const b=await body(req);b.type=String(b.type||'shop_buy');req.__khvataika_body=b;return playerAction(req,res,p);}
+  if(pth==='/api/game/reward'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const b=await body(req);b.type=String(b.type||'claim_daily');req.__khvataika_body=b;return playerAction(req,res,p);}
+  if(pth==='/api/game/referral'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const b=await body(req);b.type='referral_apply';req.__khvataika_body=b;return playerAction(req,res,p);}
+  if(pth==='/api/game/season'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const b=await body(req);b.type='season_claim';req.__khvataika_body=b;return playerAction(req,res,p);}
   if(pth==='/api/player/action'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});return playerAction(req,res,p);}
-  if(pth==='/api/player/sync'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Старая синхронизация отключена. Выполните регистрацию.'});const b=await body(req);const known=Number(b.known_server_version||0);if(Number(p.sync_version||0)>known){p.last_seen=iso();p.last_active_unix=Math.floor(now()/1000);return json(res,200,{ok:true,conflict:'server_newer',player:publicPlayer(p),game_state:gameState(p),server_sync_version:p.sync_version||0,leaderboard:leaderboard()});}if(b.game_state&&typeof b.game_state==='object')applyClientGameState(p,b.game_state);p.last_seen=iso();p.last_active_unix=Math.floor(now()/1000);bumpPlayerVersion(p);saveState();return json(res,200,{ok:true,player:publicPlayer(p),game_state:gameState(p),server_sync_version:p.sync_version||0,leaderboard:leaderboard()});}
+  if(pth==='/api/player/sync'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const b=await body(req);const known=Number(b.known_server_version||0);p.last_seen=iso();p.last_active_unix=Math.floor(now()/1000);if(Number(p.sync_version||0)>known){return json(res,200,{ok:true,conflict:'server_newer',player:publicPlayer(p),game_state:gameState(p),server_sync_version:p.sync_version||0,leaderboard:leaderboard()});}saveState();return json(res,200,{ok:true,mode:'server_authoritative',player:publicPlayer(p),game_state:gameState(p),server_sync_version:p.sync_version||0,leaderboard:leaderboard()});}
   if(pth==='/api/player/bootstrap'&&req.method==='GET'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация'});p.last_seen=iso();return json(res,200,finishResponse(p,{},true,true));}
   if(pth==='/api/notifications/poll'&&req.method==='GET'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const pid=p.player_id;const cursor=Number(u.searchParams.get('cursor')||p.notification_cursor);const items=state.notifications.filter(n=>Number(n.id_num||0)>cursor&&(n.target==='all'||n.target===p.player_id)&&(!n.deliver_at||Date.parse(n.deliver_at)<=now())&&!n.cancelled).sort((a,b)=>(a.id_num||0)-(b.id_num||0)).slice(0,50);if(items.length){p.notification_cursor=Math.max(cursor,...items.map(x=>Number(x.id_num||0)));for(const n of items){state.notification_history.push({notification_id:n.id,player_id:p.player_id,status:'delivered',delivered_at:iso()});}state.notification_history=state.notification_history.slice(-5000);}saveState();return json(res,200,{ok:true,notifications:items,next_cursor:p.notification_cursor,server_time:Math.floor(now()/1000)});}
   if(pth==='/api/device/register'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});return json(res,200,{ok:true,player_id:p.player_id});}
@@ -472,4 +467,4 @@ function systemScheduler(){
 }
 function queueNotification(target,title,message,kind='general',deliverAt=''){const n={id:id('notification'),id_num:Date.now()+Math.floor(Math.random()*1000),target:String(target||'all'),title:String(title||'Хватайка').slice(0,120),message:String(message||'').slice(0,1000),kind:String(kind||'general'),icon:'assets/1000088915.png',deliver_at:deliverAt,enabled:true,created_at:iso(),created_by:'server'};state.notifications.push(n);state.notifications=state.notifications.slice(-2000);return n;}
 systemScheduler();setInterval(()=>{for(const [t,s] of sessions)if(s.expires<now())sessions.delete(t);systemScheduler();},60000);
-http.createServer((req,res)=>handle(req,res).catch(e=>{console.error(e);json(res,500,{ok:false,message:'server error'});})).listen(PORT,()=>console.log(`Хватайка authoritative server: 0.0.0.0:${PORT}`));
+http.createServer((req,res)=>handle(req,res).catch(e=>{console.error(e);json(res,500,{ok:false,message:'server error'});})).listen(PORT,HOST,()=>console.log(`Хватайка authoritative server: ${HOST}:${PORT}`));
