@@ -1872,7 +1872,7 @@
       {
         "id": "first_win",
         "name": "ПЕРВАЯ ИГРУШКА",
-        "description": "Достаньте первую игрушку.",
+        "desc": "Достаньте первую игрушку.",
         "kind": "toys",
         "value": 1,
         "difficulty": "Лёгкое",
@@ -1885,7 +1885,7 @@
       {
         "id": "toys_5",
         "name": "НАЧАЛО КОЛЛЕКЦИИ",
-        "description": "Достаньте 5 игрушек.",
+        "desc": "Достаньте 5 игрушек.",
         "kind": "toys",
         "value": 5,
         "difficulty": "Обычное",
@@ -1898,7 +1898,7 @@
       {
         "id": "toys_10",
         "name": "ОХОТНИК ЗА ПРИЗАМИ",
-        "description": "Достаньте 10 игрушек.",
+        "desc": "Достаньте 10 игрушек.",
         "kind": "toys",
         "value": 10,
         "difficulty": "Обычное",
@@ -1911,7 +1911,7 @@
       {
         "id": "toys_25",
         "name": "ЗАВОДНОЙ ИГРОК",
-        "description": "Достаньте 25 игрушек.",
+        "desc": "Достаньте 25 игрушек.",
         "kind": "toys",
         "value": 25,
         "difficulty": "Обычное",
@@ -1924,7 +1924,7 @@
       {
         "id": "toys_50",
         "name": "ОПЫТНЫЙ ОПЕРАТОР",
-        "description": "Достаньте 50 игрушек.",
+        "desc": "Достаньте 50 игрушек.",
         "kind": "toys",
         "value": 50,
         "difficulty": "Сложное",
@@ -1937,7 +1937,7 @@
       {
         "id": "toys_100",
         "name": "МАСТЕР ХВАТАЙКИ",
-        "description": "Достаньте 100 игрушек.",
+        "desc": "Достаньте 100 игрушек.",
         "kind": "toys",
         "value": 100,
         "difficulty": "Очень сложное",
@@ -1950,7 +1950,7 @@
       {
         "id": "toys_250",
         "name": "ПРОФЕССИОНАЛ",
-        "description": "Достаньте 250 игрушек.",
+        "desc": "Достаньте 250 игрушек.",
         "kind": "toys",
         "value": 250,
         "difficulty": "Обычное",
@@ -1963,7 +1963,7 @@
       {
         "id": "toys_500",
         "name": "ЛЕГЕНДА АППАРАТА",
-        "description": "Достаньте 500 игрушек.",
+        "desc": "Достаньте 500 игрушек.",
         "kind": "toys",
         "value": 500,
         "difficulty": "Обычное",
@@ -1976,7 +1976,7 @@
       {
         "id": "games_10",
         "name": "ПЕРВЫЕ 10 ИГР",
-        "description": "Сыграйте 10 раз.",
+        "desc": "Сыграйте 10 раз.",
         "kind": "games",
         "value": 10,
         "difficulty": "Обычное",
@@ -1989,7 +1989,7 @@
       {
         "id": "games_50",
         "name": "НЕ ОСТАНОВИТЬ",
-        "description": "Сыграйте 50 раз.",
+        "desc": "Сыграйте 50 раз.",
         "kind": "games",
         "value": 50,
         "difficulty": "Обычное",
@@ -2002,7 +2002,7 @@
       {
         "id": "games_100",
         "name": "СТО ПОПЫТОК",
-        "description": "Сыграйте 100 раз.",
+        "desc": "Сыграйте 100 раз.",
         "kind": "games",
         "value": 100,
         "difficulty": "Обычное",
@@ -2015,7 +2015,7 @@
       {
         "id": "games_500",
         "name": "МАРАФОН",
-        "description": "Сыграйте 500 раз.",
+        "desc": "Сыграйте 500 раз.",
         "kind": "games",
         "value": 500,
         "difficulty": "Обычное",
@@ -2028,77 +2028,77 @@
       {
         "id": "common_25",
         "name": "ПРОСТЫЕ ПРИЗЫ",
-        "description": "Получите 25 обычных игрушек.",
+        "desc": "Получите 25 обычных игрушек.",
         "kind": "rarity",
+        "rarity": "ОБЫЧНАЯ",
         "value": 25,
         "difficulty": "Обычное",
         "reward": {
           "type": "coins",
           "amount": 100
         },
-        "enabled": true,
-        "rarity": "ОБЫЧНАЯ"
+        "enabled": true
       },
       {
         "id": "rare_10",
         "name": "ОХОТА НА РЕДКИХ",
-        "description": "Получите 10 редких игрушек.",
+        "desc": "Получите 10 редких игрушек.",
         "kind": "rarity",
+        "rarity": "РЕДКАЯ",
         "value": 10,
         "difficulty": "Обычное",
         "reward": {
           "type": "coins",
           "amount": 100
         },
-        "enabled": true,
-        "rarity": "РЕДКАЯ"
+        "enabled": true
       },
       {
         "id": "epic_5",
         "name": "ЭПИЧЕСКИЙ УСПЕХ",
-        "description": "Получите 5 эпических игрушек.",
+        "desc": "Получите 5 эпических игрушек.",
         "kind": "rarity",
+        "rarity": "ЭПИЧЕСКАЯ",
         "value": 5,
         "difficulty": "Обычное",
         "reward": {
           "type": "coins",
           "amount": 100
         },
-        "enabled": true,
-        "rarity": "ЭПИЧЕСКАЯ"
+        "enabled": true
       },
       {
         "id": "legend_1",
         "name": "ЛЕГЕНДАРНЫЙ ПРИЗ",
-        "description": "Получите легендарную игрушку.",
+        "desc": "Получите легендарную игрушку.",
         "kind": "rarity",
+        "rarity": "ЛЕГЕНДАРНАЯ",
         "value": 1,
         "difficulty": "Обычное",
         "reward": {
           "type": "coins",
           "amount": 100
         },
-        "enabled": true,
-        "rarity": "ЛЕГЕНДАРНАЯ"
+        "enabled": true
       },
       {
         "id": "legend_5",
         "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК",
-        "description": "Получите 5 легендарных игрушек.",
+        "desc": "Получите 5 легендарных игрушек.",
         "kind": "rarity",
+        "rarity": "ЛЕГЕНДАРНАЯ",
         "value": 5,
         "difficulty": "Обычное",
         "reward": {
           "type": "coins",
           "amount": 100
         },
-        "enabled": true,
-        "rarity": "ЛЕГЕНДАРНАЯ"
+        "enabled": true
       },
       {
         "id": "collections_1",
         "name": "СОБРАНО!",
-        "description": "Завершите 1 коллекцию.",
+        "desc": "Завершите 1 коллекцию.",
         "kind": "collections",
         "value": 1,
         "difficulty": "Обычное",
@@ -2111,7 +2111,7 @@
       {
         "id": "collections_2",
         "name": "ДВА НАБОРА",
-        "description": "Завершите 2 коллекции.",
+        "desc": "Завершите 2 коллекции.",
         "kind": "collections",
         "value": 2,
         "difficulty": "Обычное",
@@ -2124,7 +2124,7 @@
       {
         "id": "collections_4",
         "name": "ПОЛОВИНА ПУТИ",
-        "description": "Завершите 4 коллекции.",
+        "desc": "Завершите 4 коллекции.",
         "kind": "collections",
         "value": 4,
         "difficulty": "Обычное",
@@ -2135,22 +2135,17 @@
         "enabled": true
       },
       {
-        "id": "collections_8",
+        "id": "collections_16",
         "name": "ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ",
-        "description": "Завершите все 8 коллекций.",
+        "desc": "Завершите все 16 коллекций.",
         "kind": "collections",
-        "value": 8,
-        "difficulty": "Обычное",
-        "reward": {
-          "type": "coins",
-          "amount": 100
-        },
+        "value": 16,
         "enabled": true
       },
       {
         "id": "level_5",
         "name": "НОВИЧОК",
-        "description": "Достигните 5 уровня.",
+        "desc": "Достигните 5 уровня.",
         "kind": "level",
         "value": 5,
         "difficulty": "Обычное",
@@ -2163,7 +2158,7 @@
       {
         "id": "level_10",
         "name": "УВЕРЕННЫЙ ИГРОК",
-        "description": "Достигните 10 уровня.",
+        "desc": "Достигните 10 уровня.",
         "kind": "level",
         "value": 10,
         "difficulty": "Обычное",
@@ -2176,7 +2171,7 @@
       {
         "id": "level_25",
         "name": "ПРОДВИНУТЫЙ",
-        "description": "Достигните 25 уровня.",
+        "desc": "Достигните 25 уровня.",
         "kind": "level",
         "value": 25,
         "difficulty": "Обычное",
@@ -2189,7 +2184,7 @@
       {
         "id": "level_50",
         "name": "ВЫСШАЯ ЛИГА",
-        "description": "Достигните 50 уровня.",
+        "desc": "Достигните 50 уровня.",
         "kind": "level",
         "value": 50,
         "difficulty": "Обычное",
@@ -2202,7 +2197,7 @@
       {
         "id": "level_100",
         "name": "СОТЫЙ УРОВЕНЬ",
-        "description": "Достигните 100 уровня.",
+        "desc": "Достигните 100 уровня.",
         "kind": "level",
         "value": 100,
         "difficulty": "Обычное",
@@ -2215,7 +2210,7 @@
       {
         "id": "level_250",
         "name": "МАСТЕР 250",
-        "description": "Достигните 250 уровня.",
+        "desc": "Достигните 250 уровня.",
         "kind": "level",
         "value": 250,
         "difficulty": "Обычное",
@@ -2228,7 +2223,7 @@
       {
         "id": "level_500",
         "name": "МАСТЕР 500",
-        "description": "Достигните 500 уровня.",
+        "desc": "Достигните 500 уровня.",
         "kind": "level",
         "value": 500,
         "difficulty": "Обычное",
@@ -2241,7 +2236,7 @@
       {
         "id": "level_1000",
         "name": "ВЕРШИНА",
-        "description": "Достигните максимального 1000 уровня.",
+        "desc": "Достигните максимального 1000 уровня.",
         "kind": "level",
         "value": 1000,
         "difficulty": "Обычное",
@@ -2254,7 +2249,7 @@
       {
         "id": "rubles_500",
         "name": "ПЕРВЫЕ НАКОПЛЕНИЯ",
-        "description": "Накопите 500 ₽.",
+        "desc": "Накопите 500 ₽.",
         "kind": "rubles",
         "value": 500,
         "difficulty": "Обычное",
@@ -2267,7 +2262,7 @@
       {
         "id": "rubles_1000",
         "name": "КАПИТАЛ",
-        "description": "Накопите 1000 ₽.",
+        "desc": "Накопите 1000 ₽.",
         "kind": "rubles",
         "value": 1000,
         "difficulty": "Обычное",
@@ -2280,7 +2275,7 @@
       {
         "id": "rubles_5000",
         "name": "БОЛЬШОЙ БАЛАНС",
-        "description": "Накопите 5000 ₽.",
+        "desc": "Накопите 5000 ₽.",
         "kind": "rubles",
         "value": 5000,
         "difficulty": "Обычное",
@@ -2291,48 +2286,33 @@
         "enabled": true
       },
       {
-        "id": "claws_3",
-        "name": "АРСЕНАЛ",
-        "description": "Откройте 3 разные клешни.",
-        "kind": "claws",
-        "value": 3,
-        "difficulty": "Обычное",
-        "reward": {
-          "type": "coins",
-          "amount": 100
-        },
+        "id": "games_1000",
+        "name": "ВЕЛИКИЙ МАРАФОН",
+        "desc": "Сыграйте 1000 раз.",
+        "kind": "games",
+        "value": 1000,
         "enabled": true
       },
       {
-        "id": "claws_6",
-        "name": "КОЛЛЕКЦИЯ КЛЕШНЕЙ",
-        "description": "Откройте 6 разных клешней.",
-        "kind": "claws",
-        "value": 6,
-        "difficulty": "Обычное",
-        "reward": {
-          "type": "coins",
-          "amount": 100
-        },
+        "id": "toys_1000",
+        "name": "БОЛЬШАЯ КОЛЛЕКЦИЯ",
+        "desc": "Достаньте 1000 игрушек.",
+        "kind": "toys",
+        "value": 1000,
         "enabled": true
       },
       {
-        "id": "claws_10",
-        "name": "ПОЛНЫЙ АРСЕНАЛ",
-        "description": "Откройте все 10 клешней.",
-        "kind": "claws",
-        "value": 10,
-        "difficulty": "Обычное",
-        "reward": {
-          "type": "coins",
-          "amount": 100
-        },
+        "id": "rubles_10000",
+        "name": "СЕРЬЁЗНЫЙ КАПИТАЛ",
+        "desc": "Накопите 10 000 ₽.",
+        "kind": "rubles",
+        "value": 10000,
         "enabled": true
       },
       {
         "id": "upgrades_5",
         "name": "ПЕРВАЯ НАСТРОЙКА",
-        "description": "Купите 5 уровней улучшений.",
+        "desc": "Купите 5 уровней улучшений.",
         "kind": "upgrades",
         "value": 5,
         "difficulty": "Обычное",
@@ -2345,7 +2325,7 @@
       {
         "id": "upgrades_15",
         "name": "ТЕХНИК",
-        "description": "Купите 15 уровней улучшений.",
+        "desc": "Купите 15 уровней улучшений.",
         "kind": "upgrades",
         "value": 15,
         "difficulty": "Обычное",
@@ -2358,7 +2338,7 @@
       {
         "id": "upgrades_30",
         "name": "ИНЖЕНЕР",
-        "description": "Купите 30 уровней улучшений.",
+        "desc": "Купите 30 уровней улучшений.",
         "kind": "upgrades",
         "value": 30,
         "difficulty": "Обычное",
@@ -2371,7 +2351,7 @@
       {
         "id": "upgrades_50",
         "name": "МАКСИМАЛЬНАЯ НАСТРОЙКА",
-        "description": "Купите 50 уровней улучшений.",
+        "desc": "Купите 50 уровней улучшений.",
         "kind": "upgrades",
         "value": 50,
         "difficulty": "Обычное",
@@ -2382,9 +2362,563 @@
         "enabled": true
       },
       {
+        "id": "toy_master_1",
+        "name": "ОХОТНИК 1",
+        "desc": "Достаньте 75 игрушек.",
+        "kind": "toys",
+        "value": 75,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_2",
+        "name": "ОХОТНИК 2",
+        "desc": "Достаньте 150 игрушек.",
+        "kind": "toys",
+        "value": 150,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_3",
+        "name": "ОХОТНИК 3",
+        "desc": "Достаньте 300 игрушек.",
+        "kind": "toys",
+        "value": 300,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_4",
+        "name": "ОХОТНИК 4",
+        "desc": "Достаньте 600 игрушек.",
+        "kind": "toys",
+        "value": 600,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_5",
+        "name": "ОХОТНИК 5",
+        "desc": "Достаньте 1200 игрушек.",
+        "kind": "toys",
+        "value": 1200,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_6",
+        "name": "ОХОТНИК 6",
+        "desc": "Достаньте 2500 игрушек.",
+        "kind": "toys",
+        "value": 2500,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_7",
+        "name": "ОХОТНИК 7",
+        "desc": "Достаньте 5000 игрушек.",
+        "kind": "toys",
+        "value": 5000,
+        "enabled": true
+      },
+      {
+        "id": "toy_master_8",
+        "name": "ОХОТНИК 8",
+        "desc": "Достаньте 10000 игрушек.",
+        "kind": "toys",
+        "value": 10000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_1",
+        "name": "МАРАФОНЕЦ 1",
+        "desc": "Сыграйте 1000 раз.",
+        "kind": "games",
+        "value": 1000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_2",
+        "name": "МАРАФОНЕЦ 2",
+        "desc": "Сыграйте 2500 раз.",
+        "kind": "games",
+        "value": 2500,
+        "enabled": true
+      },
+      {
+        "id": "game_master_3",
+        "name": "МАРАФОНЕЦ 3",
+        "desc": "Сыграйте 5000 раз.",
+        "kind": "games",
+        "value": 5000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_4",
+        "name": "МАРАФОНЕЦ 4",
+        "desc": "Сыграйте 10000 раз.",
+        "kind": "games",
+        "value": 10000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_5",
+        "name": "МАРАФОНЕЦ 5",
+        "desc": "Сыграйте 20000 раз.",
+        "kind": "games",
+        "value": 20000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_6",
+        "name": "МАРАФОНЕЦ 6",
+        "desc": "Сыграйте 40000 раз.",
+        "kind": "games",
+        "value": 40000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_7",
+        "name": "МАРАФОНЕЦ 7",
+        "desc": "Сыграйте 75000 раз.",
+        "kind": "games",
+        "value": 75000,
+        "enabled": true
+      },
+      {
+        "id": "game_master_8",
+        "name": "МАРАФОНЕЦ 8",
+        "desc": "Сыграйте 150000 раз.",
+        "kind": "games",
+        "value": 150000,
+        "enabled": true
+      },
+      {
+        "id": "collection_master_1",
+        "name": "КОЛЛЕКЦИОНЕР 1",
+        "desc": "Завершите 10 коллекций.",
+        "kind": "collections",
+        "value": 10,
+        "enabled": true
+      },
+      {
+        "id": "collection_master_2",
+        "name": "КОЛЛЕКЦИОНЕР 2",
+        "desc": "Завершите 12 коллекций.",
+        "kind": "collections",
+        "value": 12,
+        "enabled": true
+      },
+      {
+        "id": "collection_master_3",
+        "name": "КОЛЛЕКЦИОНЕР 3",
+        "desc": "Завершите 14 коллекций.",
+        "kind": "collections",
+        "value": 14,
+        "enabled": true
+      },
+      {
+        "id": "collection_master_4",
+        "name": "КОЛЛЕКЦИОНЕР 4",
+        "desc": "Завершите 16 коллекций.",
+        "kind": "collections",
+        "value": 16,
+        "enabled": true
+      },
+      {
+        "id": "level_master_1",
+        "name": "УРОВЕНЬ 1",
+        "desc": "Достигните 150 уровня.",
+        "kind": "level",
+        "value": 150,
+        "enabled": true
+      },
+      {
+        "id": "level_master_2",
+        "name": "УРОВЕНЬ 2",
+        "desc": "Достигните 300 уровня.",
+        "kind": "level",
+        "value": 300,
+        "enabled": true
+      },
+      {
+        "id": "level_master_3",
+        "name": "УРОВЕНЬ 3",
+        "desc": "Достигните 450 уровня.",
+        "kind": "level",
+        "value": 450,
+        "enabled": true
+      },
+      {
+        "id": "level_master_4",
+        "name": "УРОВЕНЬ 4",
+        "desc": "Достигните 600 уровня.",
+        "kind": "level",
+        "value": 600,
+        "enabled": true
+      },
+      {
+        "id": "level_master_5",
+        "name": "УРОВЕНЬ 5",
+        "desc": "Достигните 750 уровня.",
+        "kind": "level",
+        "value": 750,
+        "enabled": true
+      },
+      {
+        "id": "level_master_6",
+        "name": "УРОВЕНЬ 6",
+        "desc": "Достигните 850 уровня.",
+        "kind": "level",
+        "value": 850,
+        "enabled": true
+      },
+      {
+        "id": "level_master_7",
+        "name": "УРОВЕНЬ 7",
+        "desc": "Достигните 925 уровня.",
+        "kind": "level",
+        "value": 925,
+        "enabled": true
+      },
+      {
+        "id": "level_master_8",
+        "name": "УРОВЕНЬ 8",
+        "desc": "Достигните 975 уровня.",
+        "kind": "level",
+        "value": 975,
+        "enabled": true
+      },
+      {
+        "id": "rare_master_1",
+        "name": "ОХОТНИК ЗА РЕДКИМИ 1",
+        "desc": "Получите 20 редких игрушек.",
+        "kind": "rarity",
+        "value": 20,
+        "rarity": "РЕДКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "rare_master_2",
+        "name": "ОХОТНИК ЗА РЕДКИМИ 2",
+        "desc": "Получите 50 редких игрушек.",
+        "kind": "rarity",
+        "value": 50,
+        "rarity": "РЕДКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "rare_master_3",
+        "name": "ОХОТНИК ЗА РЕДКИМИ 3",
+        "desc": "Получите 100 редких игрушек.",
+        "kind": "rarity",
+        "value": 100,
+        "rarity": "РЕДКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "rare_master_4",
+        "name": "ОХОТНИК ЗА РЕДКИМИ 4",
+        "desc": "Получите 250 редких игрушек.",
+        "kind": "rarity",
+        "value": 250,
+        "rarity": "РЕДКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "rare_master_5",
+        "name": "ОХОТНИК ЗА РЕДКИМИ 5",
+        "desc": "Получите 500 редких игрушек.",
+        "kind": "rarity",
+        "value": 500,
+        "rarity": "РЕДКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "rare_master_6",
+        "name": "ОХОТНИК ЗА РЕДКИМИ 6",
+        "desc": "Получите 1000 редких игрушек.",
+        "kind": "rarity",
+        "value": 1000,
+        "rarity": "РЕДКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "epic_master_1",
+        "name": "ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР 1",
+        "desc": "Получите 10 эпических игрушек.",
+        "kind": "rarity",
+        "value": 10,
+        "rarity": "ЭПИЧЕСКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "epic_master_2",
+        "name": "ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР 2",
+        "desc": "Получите 25 эпических игрушек.",
+        "kind": "rarity",
+        "value": 25,
+        "rarity": "ЭПИЧЕСКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "epic_master_3",
+        "name": "ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР 3",
+        "desc": "Получите 50 эпических игрушек.",
+        "kind": "rarity",
+        "value": 50,
+        "rarity": "ЭПИЧЕСКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "epic_master_4",
+        "name": "ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР 4",
+        "desc": "Получите 100 эпических игрушек.",
+        "kind": "rarity",
+        "value": 100,
+        "rarity": "ЭПИЧЕСКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "epic_master_5",
+        "name": "ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР 5",
+        "desc": "Получите 250 эпических игрушек.",
+        "kind": "rarity",
+        "value": 250,
+        "rarity": "ЭПИЧЕСКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "epic_master_6",
+        "name": "ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР 6",
+        "desc": "Получите 500 эпических игрушек.",
+        "kind": "rarity",
+        "value": 500,
+        "rarity": "ЭПИЧЕСКАЯ",
+        "enabled": true
+      },
+      {
+        "id": "legend_master_1",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК 1",
+        "desc": "Получите 2 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 2,
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "enabled": true
+      },
+      {
+        "id": "legend_master_2",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК 2",
+        "desc": "Получите 5 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 5,
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "enabled": true
+      },
+      {
+        "id": "legend_master_3",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК 3",
+        "desc": "Получите 10 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 10,
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "enabled": true
+      },
+      {
+        "id": "legend_master_4",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК 4",
+        "desc": "Получите 25 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 25,
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "enabled": true
+      },
+      {
+        "id": "legend_master_5",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК 5",
+        "desc": "Получите 50 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 50,
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "enabled": true
+      },
+      {
+        "id": "legend_master_6",
+        "name": "ЛЕГЕНДАРНЫЙ ОХОТНИК 6",
+        "desc": "Получите 100 легендарных игрушек.",
+        "kind": "rarity",
+        "value": 100,
+        "rarity": "ЛЕГЕНДАРНАЯ",
+        "enabled": true
+      },
+      {
+        "id": "streak_3",
+        "name": "ПЕРВАЯ СЕРИЯ",
+        "desc": "Выиграйте 3 игры подряд.",
+        "kind": "best_streak",
+        "value": 3,
+        "enabled": true
+      },
+      {
+        "id": "streak_7",
+        "name": "СЕРИЯ 7 ПОБЕД",
+        "desc": "Выиграйте 7 игр подряд.",
+        "kind": "best_streak",
+        "value": 7,
+        "enabled": true
+      },
+      {
+        "id": "streak_15",
+        "name": "ЖЕЛЕЗНАЯ СЕРИЯ",
+        "desc": "Выиграйте 15 игр подряд.",
+        "kind": "best_streak",
+        "value": 15,
+        "enabled": true
+      },
+      {
+        "id": "streak_30",
+        "name": "МАШИНА ПОБЕД",
+        "desc": "Выиграйте 30 игр подряд.",
+        "kind": "best_streak",
+        "value": 30,
+        "enabled": true
+      },
+      {
+        "id": "streak_50",
+        "name": "НЕПОБЕДИМЫЙ",
+        "desc": "Выиграйте 50 игр подряд.",
+        "kind": "best_streak",
+        "value": 50,
+        "enabled": true
+      },
+      {
+        "id": "perfect_5",
+        "name": "ЧИСТЫЙ ХВАТ",
+        "desc": "Сделайте 5 идеальных захватов.",
+        "kind": "perfect",
+        "value": 5,
+        "enabled": true
+      },
+      {
+        "id": "perfect_25",
+        "name": "ЮВЕЛИР",
+        "desc": "Сделайте 25 идеальных захватов.",
+        "kind": "perfect",
+        "value": 25,
+        "enabled": true
+      },
+      {
+        "id": "perfect_100",
+        "name": "МАСТЕР ТОЧНОСТИ",
+        "desc": "Сделайте 100 идеальных захватов.",
+        "kind": "perfect",
+        "value": 100,
+        "enabled": true
+      },
+      {
+        "id": "heavy_10",
+        "name": "СИЛАЧ",
+        "desc": "Поймайте 10 тяжёлых игрушек.",
+        "kind": "heavy",
+        "value": 10,
+        "enabled": true
+      },
+      {
+        "id": "heavy_50",
+        "name": "ГРУЗЧИК",
+        "desc": "Поймайте 50 тяжёлых игрушек.",
+        "kind": "heavy",
+        "value": 50,
+        "enabled": true
+      },
+      {
+        "id": "heavy_200",
+        "name": "ТЯЖЁЛАЯ АРТИЛЛЕРИЯ",
+        "desc": "Поймайте 200 тяжёлых игрушек.",
+        "kind": "heavy",
+        "value": 200,
+        "enabled": true
+      },
+      {
+        "id": "lucky_5",
+        "name": "СЧАСТЛИВЧИК",
+        "desc": "Поймайте 5 счастливых игрушек.",
+        "kind": "lucky",
+        "value": 5,
+        "enabled": true
+      },
+      {
+        "id": "lucky_25",
+        "name": "ФАВОРИТ УДАЧИ",
+        "desc": "Поймайте 25 счастливых игрушек.",
+        "kind": "lucky",
+        "value": 25,
+        "enabled": true
+      },
+      {
+        "id": "lucky_100",
+        "name": "ЗОЛОТАЯ УДАЧА",
+        "desc": "Поймайте 100 счастливых игрушек.",
+        "kind": "lucky",
+        "value": 100,
+        "enabled": true
+      },
+      {
+        "id": "xp_1000",
+        "name": "ПЕРВЫЙ ТЫСЯЧНИК",
+        "desc": "Заработайте 1000 XP.",
+        "kind": "xp",
+        "value": 1000,
+        "enabled": true
+      },
+      {
+        "id": "xp_10000",
+        "name": "XP-МАНЬЯК",
+        "desc": "Заработайте 10 000 XP.",
+        "kind": "xp",
+        "value": 10000,
+        "enabled": true
+      },
+      {
+        "id": "xp_100000",
+        "name": "ЛЕГЕНДА ОПЫТА",
+        "desc": "Заработайте 100 000 XP.",
+        "kind": "xp",
+        "value": 100000,
+        "enabled": true
+      },
+      {
+        "id": "reward_100",
+        "name": "КРУПНЫЙ УЛОВ",
+        "desc": "Получите награду 100 ₽ или больше за игру.",
+        "kind": "max_reward",
+        "value": 100,
+        "enabled": true
+      },
+      {
+        "id": "reward_500",
+        "name": "БОЛЬШОЙ УЛОВ",
+        "desc": "Получите награду 500 ₽ или больше за игру.",
+        "kind": "max_reward",
+        "value": 500,
+        "enabled": true
+      },
+      {
+        "id": "reward_1000",
+        "name": "ДЖЕКПОТ",
+        "desc": "Получите награду 1000 ₽ или больше за игру.",
+        "kind": "max_reward",
+        "value": 1000,
+        "enabled": true
+      },
+      {
+        "id": "chests_1",
+        "name": "ПЕРВЫЙ СУНДУК",
+        "desc": "Откройте 1 сундук.",
+        "kind": "chests_opened",
+        "value": 1,
+        "enabled": true
+      },
+      {
         "id": "chests_10",
         "name": "ОТКРЫВАТЕЛЬ",
-        "description": "Откройте 10 сундуков",
+        "desc": "Откройте 10 сундуков.",
         "kind": "chests_opened",
         "value": 10,
         "difficulty": "Сложное",
@@ -2396,8 +2930,8 @@
       },
       {
         "id": "chests_50",
-        "name": "ХРАНИТЕЛЬ СУНДУКОВ",
-        "description": "Откройте 50 сундуков",
+        "name": "ОХОТНИК ЗА СУНДУКАМИ",
+        "desc": "Откройте 50 сундуков.",
         "kind": "chests_opened",
         "value": 50,
         "difficulty": "Очень сложное",
@@ -2408,9 +2942,177 @@
         "enabled": true
       },
       {
+        "id": "chests_250",
+        "name": "СОКРОВИЩНИК",
+        "desc": "Откройте 250 сундуков.",
+        "kind": "chests_opened",
+        "value": 250,
+        "enabled": true
+      },
+      {
+        "id": "keys_25",
+        "name": "СВЯЗКА КЛЮЧЕЙ",
+        "desc": "Получите 25 ключей за всё время.",
+        "kind": "keys_earned",
+        "value": 25,
+        "enabled": true
+      },
+      {
+        "id": "keys_100",
+        "name": "ХРАНИТЕЛЬ КЛЮЧЕЙ",
+        "desc": "Получите 100 ключей за всё время.",
+        "kind": "keys_earned",
+        "value": 100,
+        "enabled": true
+      },
+      {
+        "id": "exclusive_1",
+        "name": "СЕКРЕТНЫЙ ПРИЗ",
+        "desc": "Получите 1 эксклюзивную награду из сундука.",
+        "kind": "exclusive",
+        "value": 1,
+        "enabled": true
+      },
+      {
+        "id": "exclusive_10",
+        "name": "ОХОТНИК ЗА ЭКСКЛЮЗИВАМИ",
+        "desc": "Получите 10 эксклюзивных наград.",
+        "kind": "exclusive",
+        "value": 10,
+        "enabled": true
+      },
+      {
+        "id": "workshop_5",
+        "name": "ЮНЫЙ МЕХАНИК",
+        "desc": "Достигните 5 уровня мастерской.",
+        "kind": "workshop_level",
+        "value": 5,
+        "enabled": true
+      },
+      {
+        "id": "workshop_10",
+        "name": "ИНЖЕНЕР-МЕХАНИК",
+        "desc": "Достигните 10 уровня мастерской.",
+        "kind": "workshop_level",
+        "value": 10,
+        "enabled": true
+      },
+      {
+        "id": "workshop_15",
+        "name": "ГЛАВНЫЙ ИНЖЕНЕР",
+        "desc": "Достигните 15 уровня мастерской.",
+        "kind": "workshop_level",
+        "value": 15,
+        "enabled": true
+      },
+      {
+        "id": "parts_100",
+        "name": "ЗАПАС ДЕТАЛЕЙ",
+        "desc": "Накопите 100 деталей одновременно.",
+        "kind": "parts",
+        "value": 100,
+        "enabled": true
+      },
+      {
+        "id": "parts_500",
+        "name": "СКЛАД ЗАПЧАСТЕЙ",
+        "desc": "Накопите 500 деталей одновременно.",
+        "kind": "parts",
+        "value": 500,
+        "enabled": true
+      },
+      {
+        "id": "calibration_5",
+        "name": "ИДЕАЛЬНАЯ КАЛИБРОВКА",
+        "desc": "Прокачайте калибровку до 5 уровня.",
+        "kind": "calibration",
+        "value": 5,
+        "enabled": true
+      },
+      {
+        "id": "overclock_1",
+        "name": "ТУРБО-РЕЖИМ",
+        "desc": "Используйте оверклок хотя бы один раз.",
+        "kind": "overclock",
+        "value": 1,
+        "enabled": true
+      },
+      {
+        "id": "claw_skins_3",
+        "name": "СТИЛЬНАЯ КЛЕШНЯ",
+        "desc": "Откройте 3 скина клешни.",
+        "kind": "claw_skins",
+        "value": 3,
+        "enabled": true
+      },
+      {
+        "id": "claw_skins_8",
+        "name": "КОЛЛЕКЦИОНЕР КЛЕШНЕЙ",
+        "desc": "Откройте 8 скинов клешни.",
+        "kind": "claw_skins",
+        "value": 8,
+        "enabled": true
+      },
+      {
+        "id": "toy_skins_3",
+        "name": "МОДНИК",
+        "desc": "Откройте 3 скина игрушек.",
+        "kind": "toy_skins",
+        "value": 3,
+        "enabled": true
+      },
+      {
+        "id": "machine_skins_3",
+        "name": "НОВЫЙ КОРПУС",
+        "desc": "Откройте 3 скина аппарата.",
+        "kind": "machine_skins",
+        "value": 3,
+        "enabled": true
+      },
+      {
+        "id": "login_3",
+        "name": "ТРИ ДНЯ ПОДРЯД",
+        "desc": "Продержите серию входов 3 дня.",
+        "kind": "login_streak",
+        "value": 3,
+        "enabled": true
+      },
+      {
+        "id": "login_7",
+        "name": "НЕДЕЛЯ В ИГРЕ",
+        "desc": "Продержите серию входов 7 дней.",
+        "kind": "login_streak",
+        "value": 7,
+        "enabled": true
+      },
+      {
+        "id": "daily_10",
+        "name": "ЕЖЕДНЕВНЫЙ ГЕРОЙ",
+        "desc": "Выполните 10 ежедневных миссий.",
+        "kind": "daily_claims",
+        "value": 10,
+        "enabled": true
+      },
+      {
+        "id": "weekly_10",
+        "name": "НЕДЕЛЬНЫЙ МАРАФОН",
+        "desc": "Закройте 10 недельных миссий.",
+        "kind": "weekly_claims",
+        "value": 10,
+        "enabled": true
+      },
+      {
+        "id": "referrals_1",
+        "name": "ДРУГ ПРИВЁЛ ДРУГА",
+        "desc": "Пригласите 1 друга.",
+        "kind": "referrals",
+        "value": 1,
+        "enabled": true
+      },
+      {
         "id": "referrals_10",
-        "name": "КОМАНДА ОХОТНИКОВ",
-        "description": "Пригласите 10 друзей",
+        "name": "КОМАНДА",
+        "desc": "Пригласите 10 друзей.",
         "kind": "referrals",
         "value": 10,
         "difficulty": "Легендарное",
@@ -3042,5 +3744,13 @@
   "actions": {},
   "transactions": [],
   "audit": [],
-  "admins": []
+  "admins": [],
+  "content_sync": {
+    "game_version": "2.0.0",
+    "source": "game/scripts/main.gd",
+    "toys": 72,
+    "collections": 16,
+    "achievements": 130,
+    "manifest_version": "game-2.0.0-content-130"
+  }
 }
