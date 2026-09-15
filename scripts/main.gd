@@ -1666,6 +1666,15 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
                 remote_queued_action_name = action_name
                 remote_queued_action_payload = payload.duplicate(true)
                 return true
+            # Игровой раунд не должен оставаться незавершённым, если
+            # game_start ещё обрабатывается HTTPRequest. В частности,
+            # тайм-аут клиента может потребовать game_cancel сразу после
+            # game_start. Ставим только завершающие игровые операции в
+            # короткую очередь за текущим game_start.
+            if remote_request_kind == "action:game_start" and action_name in ["game_finish", "game_cancel"]:
+                remote_queued_action_name = action_name
+                remote_queued_action_payload = payload.duplicate(true)
+                return true
             return false
         return false
     var data := payload.duplicate(true)
@@ -2187,6 +2196,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                     apply_language()
                     update_quality_info()
             update_ui()
+            # Если во время текущего серверного действия была поставлена
+            # завершающая операция игрового раунда, отправляем её сразу после
+            # ответа. Это особенно важно для game_cancel/game_finish после
+            # медленного game_start.
+            if remote_queued_action_name != "":
+                call_deferred("_flush_queued_server_action")
         return
     if data.has("game_state") and data["game_state"] is Dictionary:
         apply_server_game_state(data["game_state"])
@@ -9234,7 +9249,7 @@ func drop_claw() -> void:
         server_attempt_success = false
         server_attempt_toy_id = ""
         server_attempt_reward = {}
-        claw_server_wait_timer = 3.5
+        claw_server_wait_timer = 6.0
         var target_index := choose_top_layer_prize()
         var target_toy_id := ""
         var target_distance := 0.82
