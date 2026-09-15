@@ -259,6 +259,12 @@ var remote_sync_pending: bool = false
 # никогда не блокируют покупку, выбор скина или игровую попытку.
 var remote_queued_action_name: String = ""
 var remote_queued_action_payload: Dictionary = {}
+# Отдельные слоты для игрового старта и его локального завершения.
+# Это не даёт фоновому sync перетереть game_start/game_finish.
+var remote_queued_game_start: bool = false
+var remote_queued_game_start_payload: Dictionary = {}
+var remote_queued_game_finish: bool = false
+var remote_queued_game_finish_payload: Dictionary = {}
 var remote_rating_pending: bool = false
 var remote_pending_promo: String = ""
 var remote_pending_referral: String = ""
@@ -1662,16 +1668,19 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
     # очередь и отправляется сразу после ответа фонового запроса.
     if remote_request_kind != "":
         if action_name in ["game_start", "game_finish", "game_cancel", "shop_buy", "shop_select", "cosmetic_buy", "daily_login", "workshop_upgrade", "workshop_blueprint", "workshop_calibrate", "sell_duplicate"]:
-            if remote_request_kind in ["config", "sync", "notifications", "rating", "register"]:
-                remote_queued_action_name = action_name
-                remote_queued_action_payload = payload.duplicate(true)
+            if action_name == "game_start" and remote_request_kind != "action:game_start":
+                remote_queued_game_start = true
+                remote_queued_game_start_payload = payload.duplicate(true)
                 return true
-            # Игровой раунд не должен оставаться незавершённым, если
-            # game_start ещё обрабатывается HTTPRequest. В частности,
-            # тайм-аут клиента может потребовать game_cancel сразу после
-            # game_start. Ставим только завершающие игровые операции в
-            # короткую очередь за текущим game_start.
-            if remote_request_kind == "action:game_start" and action_name in ["game_finish", "game_cancel"]:
+            if action_name in ["game_finish", "game_cancel"]:
+                if remote_request_kind == "action:game_start":
+                    remote_queued_action_name = action_name
+                    remote_queued_action_payload = payload.duplicate(true)
+                else:
+                    remote_queued_game_finish = true
+                    remote_queued_game_finish_payload = payload.duplicate(true)
+                return true
+            if remote_request_kind in ["config", "sync", "notifications", "rating", "register"]:
                 remote_queued_action_name = action_name
                 remote_queued_action_payload = payload.duplicate(true)
                 return true
@@ -1690,12 +1699,27 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
     return true
 
 func _flush_queued_server_action() -> void:
-    if remote_request_kind != "" or remote_queued_action_name == "":
+    if remote_request_kind != "":
         return
-    var action_name := remote_queued_action_name
-    var payload := remote_queued_action_payload.duplicate(true)
-    remote_queued_action_name = ""
-    remote_queued_action_payload.clear()
+    var action_name := ""
+    var payload: Dictionary = {}
+    if remote_queued_action_name != "":
+        action_name = remote_queued_action_name
+        payload = remote_queued_action_payload.duplicate(true)
+        remote_queued_action_name = ""
+        remote_queued_action_payload.clear()
+    elif remote_queued_game_start:
+        action_name = "game_start"
+        payload = remote_queued_game_start_payload.duplicate(true)
+        remote_queued_game_start = false
+        remote_queued_game_start_payload.clear()
+    elif remote_queued_game_finish:
+        action_name = "game_finish"
+        payload = remote_queued_game_finish_payload.duplicate(true)
+        remote_queued_game_finish = false
+        remote_queued_game_finish_payload.clear()
+    if action_name == "":
+        return
     if not _server_action(action_name, payload):
         current_result = "НЕ УДАЛОСЬ ОТПРАВИТЬ ОПЕРАЦИЮ НА СЕРВЕР"
         update_ui()
@@ -2200,7 +2224,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             # завершающая операция игрового раунда, отправляем её сразу после
             # ответа. Это особенно важно для game_cancel/game_finish после
             # медленного game_start.
-            if remote_queued_action_name != "":
+            if remote_queued_action_name != "" or remote_queued_game_start or remote_queued_game_finish:
                 call_deferred("_flush_queued_server_action")
         return
     if data.has("game_state") and data["game_state"] is Dictionary:
@@ -2891,7 +2915,9 @@ func initialize_game_async() -> void:
     await set_loading_status("СОЗДАЁМ АВТОМАТ И АКТИВИРУЕМ СОБЫТИЕ...")
     build_machine()
     if not STARTUP_CONTROL_TEST:
-        activate_calendar_event()
+        # Состояние события нужно для игровой логики, но его тяжёлые 3D-декорации
+        # и Android-уведомления не должны тормозить первый кадр игры.
+        activate_calendar_event(false, false)
     await set_loading_progress(30.0, "АВТОМАТ СОЗДАН")
     _startup_write_phase("BUILD_CLAW")
     await set_loading_status("СОЗДАЁМ РЕЛЬСЫ, КЛЕШНЮ И ПРИЦЕЛ...")
@@ -2920,18 +2946,9 @@ func initialize_game_async() -> void:
     _startup_write_phase("BUILD_UI")
     await build_ui()
 
-    _startup_write_phase("BUILD_AUDIO")
-    await set_loading_status("ЗАГРУЖАЕМ ЗВУКОВЫЕ РЕСУРСЫ...")
-    if not STARTUP_CONTROL_TEST:
-        build_audio()
-    await get_tree().process_frame
-    await set_loading_progress(97.0, "ЗВУК ПОДГОТОВЛЕН")
-    _startup_write_phase("SHOP_VISUALS")
-    await set_loading_status("ПРИМЕНЯЕМ ВИЗУАЛЬНЫЕ НАСТРОЙКИ МАГАЗИНА...")
-    if not STARTUP_CONTROL_TEST:
-        apply_shop_visuals()
-    await get_tree().process_frame
-    await set_loading_progress(98.0, "НАСТРОЙКИ МАГАЗИНА ПРИМЕНЕНЫ")
+    # Аудио и визуальные украшения магазина больше не входят в критический
+    # путь запуска. Они подключатся после первого полноценного игрового кадра.
+    await set_loading_progress(97.0, "ОСНОВНЫЕ РЕСУРСЫ ПОДГОТОВЛЕНЫ")
     _startup_write_phase("DAILY_EVENTS")
     await set_loading_status("ПОДГОТАВЛИВАЕМ БОНУСЫ, СОХРАНЕНИЕ И СОБЫТИЯ...")
     if DAILY_ONLY_TEST:
@@ -2946,12 +2963,13 @@ func initialize_game_async() -> void:
         await get_tree().process_frame
         setup_login_streak()
         await get_tree().process_frame
-        setup_events()
+        # Состояние события уже рассчитано выше без тяжёлых декораций.
+        # Полное оформление подключится после первого игрового кадра.
     await get_tree().process_frame
     update_ui()
     await get_tree().process_frame
-    apply_quality_settings()
-    await get_tree().process_frame
+    # Качество уже применено сразу после создания мира. Повторный вызов здесь
+    # только заставлял Android ещё раз проходить тяжёлые настройки рендера.
     await set_loading_progress(99.0, "БОНУСЫ И СОХРАНЕНИЕ ПОДГОТОВЛЕНЫ")
 
     # До этой точки НИ ОДНО пользовательское меню и сам игровой экран не
@@ -3002,12 +3020,18 @@ func activate_extra_features_after_startup() -> void:
     await get_tree().process_frame
     if OFFLINE_MODE:
         # Полностью офлайн-режим: после первого кадра не создаём HTTPRequest
-        # и не запускаем серверные вызовы. Это исключает сетевые сбои на Android.
-        build_audio()
-        build_upgrade_sound_system()
-        apply_music_settings()
-        apply_shop_visuals()
-        refresh_shop()
+        # и не запускаем серверные вызовы. Тяжёлые локальные подсистемы включаем
+        # по очереди уже после того, как игрок получил управление.
+        if not STARTUP_CONTROL_TEST:
+            activate_calendar_event()
+            await get_tree().process_frame
+            build_audio()
+            await get_tree().process_frame
+            build_upgrade_sound_system()
+            await get_tree().process_frame
+            apply_music_settings()
+            apply_shop_visuals()
+            refresh_shop()
         return
     # Server is intentionally initialized only after the first playable frame.
     ensure_player_id()
@@ -3022,10 +3046,14 @@ func activate_extra_features_after_startup() -> void:
     connection_check_timer = 0.1
     call_deferred("register_player_remote")
     call_deferred("sync_remote_config")
-    # All audio resources are loaded after the first playable frame.
+    # All heavy local resources are loaded after the first playable frame and
+    # deliberately split by frames so the first interaction is not blocked.
     build_audio()
+    await get_tree().process_frame
     build_upgrade_sound_system()
+    await get_tree().process_frame
     apply_music_settings()
+    await get_tree().process_frame
     # Shop visuals are applied after the startup path is complete.
     apply_shop_visuals()
     refresh_shop()
@@ -3503,9 +3531,10 @@ func build_prizes() -> void:
         spawn_random_prizes(TARGET_PRIZE_COUNT - prize_bodies.size())
 
 func build_prizes_async() -> void:
-    # Реальная последовательная загрузка игрушек. Каждая игрушка создаётся
-    # отдельно, после чего загрузчик обновляет фактический прогресс и отдаёт
-    # кадр движку. Поэтому на экране всегда видно, сколько объектов уже создано.
+    # Android-friendly загрузка: игрушки создаются небольшими пакетами, а не
+    # с отдельным кадром и перерисовкой загрузочного экрана для каждой игрушки.
+    # Это заметно снижает лишнюю работу UI и не даёт одному длинному циклу
+    # надолго заморозить первый экран.
     for body in prize_bodies:
         if body and is_instance_valid(body):
             body.queue_free()
@@ -3516,13 +3545,15 @@ func build_prizes_async() -> void:
     if not saved_prizes.is_empty():
         total_to_build = saved_prizes.size()
     total_to_build = maxi(total_to_build, 1)
+    const BATCH_SIZE := 8
 
     if saved_prizes.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
-            await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКУ %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
             spawn_one_random_prize(i)
-            var toy_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
-            await set_loading_progress(toy_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
+            if ((i + 1) % BATCH_SIZE == 0) or i == INITIAL_PRIZE_COUNT - 1:
+                var built := i + 1
+                var toy_progress := 43.0 + (19.0 * float(built) / float(INITIAL_PRIZE_COUNT))
+                await set_loading_progress(toy_progress, "ИГРУШКИ %d ИЗ %d ГОТОВЫ" % [built, INITIAL_PRIZE_COUNT])
         return
 
     var valid_saved_count := 0
@@ -3537,7 +3568,6 @@ func build_prizes_async() -> void:
         if not (saved is Dictionary):
             continue
         loaded_count += 1
-        await set_loading_status("ВОССТАНАВЛИВАЕМ ИГРУШКУ %d ИЗ %d..." % [loaded_count, valid_saved_count])
         var source_index: int = clampi(int(saved.get("source_index", 0)), 0, toys.size() - 1)
         var pos_data: Variant = saved.get("position", [0.0, 3.5, 0.0])
         var rot_data: Variant = saved.get("rotation", [0.0, 0.0, 0.0])
@@ -3557,22 +3587,24 @@ func build_prizes_async() -> void:
             body.rotation = rot
             prize_bodies.append(body)
             prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
-        var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
-        await set_loading_progress(saved_progress, "ИГРУШКА %d ИЗ %d ВОССТАНОВЛЕНА" % [loaded_count, valid_saved_count])
+
+        if (loaded_count % BATCH_SIZE == 0) or loaded_count == valid_saved_count:
+            var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
+            await set_loading_progress(saved_progress, "ИГРУШКИ %d ИЗ %d ВОССТАНОВЛЕНЫ" % [loaded_count, valid_saved_count])
 
     if prize_bodies.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
-            await set_loading_status("ДОПОЛНЯЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
             spawn_one_random_prize(i)
-            var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
-            await set_loading_progress(fallback_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
+            if ((i + 1) % BATCH_SIZE == 0) or i == INITIAL_PRIZE_COUNT - 1:
+                var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+                await set_loading_progress(fallback_progress, "ИГРУШКИ %d ИЗ %d СОЗДАНЫ" % [i + 1, INITIAL_PRIZE_COUNT])
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         var missing := TARGET_PRIZE_COUNT - prize_bodies.size()
         for i in range(missing):
-            await set_loading_status("ДОЗАГРУЖАЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, missing])
             spawn_one_random_prize(i)
-            var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
-            await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])
+            if ((i + 1) % BATCH_SIZE == 0) or i == missing - 1:
+                var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
+                await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНЫЕ ИГРУШКИ %d ИЗ %d ГОТОВЫ" % [i + 1, missing])
 
 func spawn_one_random_prize(n: int) -> void:
     var rng := RandomNumberGenerator.new()
@@ -5513,7 +5545,7 @@ func get_event_profile(event: Dictionary) -> Dictionary:
             "autumn": profile = {"accent":Color("#C56A32"), "glow":Color("#FFD08A"), "capture":0.06, "reward":1.15, "rare":0.04, "toy":0.35, "title":"🍂 ОСЕННИЙ СЕЗОН"}
     return profile
 
-func activate_calendar_event() -> void:
+func activate_calendar_event(persist_to_disk: bool = true, build_visuals: bool = true) -> void:
     var event := get_today_event()
     var profile := get_event_profile(event)
     active_event_id = String(event.get("id", ""))
@@ -5526,14 +5558,16 @@ func activate_calendar_event() -> void:
     active_event_reward_mult = float(profile.get("reward", 1.15))
     active_event_rare_bonus = float(profile.get("rare", 0.0))
     active_event_toy_bonus = float(profile.get("toy", 0.35))
-    apply_event_theme()
+    if build_visuals:
+        apply_event_theme()
     if event_panel:
         update_event_panel()
     if event_button:
         event_button.tooltip_text = "НЕДЕЛЬНЫЕ СОБЫТИЯ"
         event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_COPPER, 41, 3))
-    save_game()
-    if notifications_on:
+    if persist_to_disk:
+        save_game()
+    if persist_to_disk and notifications_on:
         schedule_background_notifications()
 
 func apply_event_theme() -> void:
@@ -9016,26 +9050,8 @@ func process_claw(delta: float) -> void:
         drop_time += delta
         animate_grip(clampf(drop_time / claw_grip_close_time(), 0.0, 1.0))
         if drop_time >= claw_grip_close_time():
-            if _server_ready() and player_token != "" and not server_attempt_ready:
-                # Ждём только ограниченное время. Если сеть зависла, клешня
-                # безопасно возвращается домой и новый раунд не запускается.
-                claw_server_wait_timer -= delta
-                if claw_server_wait_timer <= 0.0:
-                    current_result = "СЕРВЕР НЕ ОТВЕТИЛ • КЛЕШНЯ ВОЗВРАЩАЕТСЯ"
-                    _server_action("game_cancel")
-                    grabbed_toy = null
-                    grabbed_index = -1
-                    pending_prize_data.clear()
-                    claw_move_target = CLAW_HOME
-                    claw_target = CLAW_HOME
-                    drop_state = 8
-                    drop_time = 0.0
-                    animate_grip(0.0)
-                    save_game()
-                    update_ui()
-                else:
-                    drop_time = 0.30
-                return
+            # Игровой цикл никогда не ждёт HTTP. Результат захвата считается
+            # локально, а сервер получает попытку и её итог в фоне.
             var grabbed := resolve_grab()
             claw_server_wait_timer = 0.0
             drop_time = 0.0
@@ -9043,7 +9059,7 @@ func process_claw(delta: float) -> void:
                 drop_state = 3
             else:
                 if _server_ready() and player_token != "":
-                    _server_action("game_finish")
+                    _server_action("game_finish", {"success": false})
                 # Если клешня ничего не взяла, никаких лишних движений к отверстию:
                 # сразу плавно возвращаем её в верхнюю парковочную точку над отверстием.
                 grabbed_toy = null
@@ -9064,7 +9080,7 @@ func process_claw(delta: float) -> void:
         if claw_pos.y >= CLAW_HOME.y - 0.03:
             # Иногда игрушка соскальзывает после подъёма. В этом случае она
             # остаётся обычным призом и НЕ засчитывается игроку.
-            if not SERVER_AUTHORITATIVE and grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
+            if grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
                 if _server_ready() and player_token != "":
                     _server_action("game_finish")
                 grabbed_toy.freeze = false
@@ -9240,16 +9256,12 @@ func drop_claw() -> void:
         return
     play_upgrade_sound("grab")
     register_game_activity()
-    if _server_ready():
-        if player_token == "":
-            current_result = "НЕТ АВТОРИЗАЦИИ СЕРВЕРА"
-            update_ui()
-            return
+    if _server_ready() and player_token != "":
+        # Только фоновая фиксация начала попытки. Игровой цикл от ответа не зависит.
         server_attempt_ready = false
         server_attempt_success = false
         server_attempt_toy_id = ""
         server_attempt_reward = {}
-        claw_server_wait_timer = 6.0
         var target_index := choose_top_layer_prize()
         var target_toy_id := ""
         var target_distance := 0.82
@@ -9263,8 +9275,7 @@ func drop_claw() -> void:
             current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
             update_ui()
             return
-    if not SERVER_AUTHORITATIVE:
-        total_games += 1
+    total_games += 1
     if vibration_on:
         Input.vibrate_handheld(55, 0.35)
     save_game()
@@ -9277,50 +9288,8 @@ func drop_claw() -> void:
     update_ui()
 
 func resolve_grab() -> bool:
-    # В онлайне результат захвата уже определён сервером в game_start.
-    # Клиент отвечает только за визуальную часть и выбор игрушки под клешнёй.
-    if _server_ready() and player_token != "":
-        if not server_attempt_ready:
-            current_result = "ЖДЁМ ОТВЕТ СЕРВЕРА…"
-            update_ui()
-            return false
-        if not server_attempt_success:
-            current_result = "НЕ УДЕРЖАЛА 😅"
-            play_upgrade_sound("fail")
-            current_win_streak = 0
-            update_ui()
-            return false
-        var server_choice := -1
-        if server_attempt_toy_id != "":
-            for i in range(prize_data.size()):
-                if String(prize_data[i].get("kind", "toy")) == "toy":
-                    var pi := int(prize_data[i].get("index", -1))
-                    if pi >= 0 and pi < toys.size() and String(toys[pi].get("id", "")) == server_attempt_toy_id:
-                        server_choice = i
-                        break
-        var chosen_server := server_choice
-        if chosen_server < 0 or chosen_server >= prize_bodies.size():
-            current_result = "ИГРУШКА СЕРВЕРА НЕ НАЙДЕНА • СИНХРОНИЗАЦИЯ"
-            _server_action("game_cancel")
-            update_ui()
-            return false
-        grabbed_index = chosen_server
-        var selected_body_server := prize_bodies[chosen_server]
-        grabbed_toy = selected_body_server
-        pending_prize_data = prize_data[chosen_server].duplicate(true)
-        pending_prize_data["weight"] = float(selected_body_server.get_meta("toy_weight", 38.0)) if selected_body_server else 38.0
-        last_reward_rubles = int(server_attempt_reward.get("amount", 0))
-        last_prize_xp = 0
-        last_prize_name = String(pending_prize_data.get("name", "Приз"))
-        last_prize_collection = String(pending_prize_data.get("collection", ""))
-        last_prize_rarity = String(pending_prize_data.get("rarity", ""))
-        if grabbed_toy and is_instance_valid(grabbed_toy):
-            grabbed_toy.freeze = true
-            grabbed_toy.sleeping = true
-        current_result = "ЗАХВАТ: %s • СЕРВЕР ПОДТВЕРДИЛ" % last_prize_name
-        update_ui()
-        return true
-
+    # Захват всегда рассчитывается локально. Сервер получает результат
+    # асинхронно и не блокирует физику, анимацию или управление.
     var bonus: float = float(claw_specs[selected_claw]["bonus"])
     var success_chance: float = 0.28 + bonus
     success_chance += float(shop_upgrade_level(0)) * 0.035
@@ -9391,15 +9360,10 @@ func finalize_delivered_prize() -> void:
             pending_prize_data.clear()
             update_ui()
             return
-        if not _server_action("game_finish"):
-            current_result = "СЕРВЕР ЗАНЯТ — НАГРАДА НЕ ЗАЧИСЛЕНА"
-            update_ui()
-            return
-        # В онлайн-режиме награду, игрушку, XP, сундук и достижения выдаёт только сервер.
-        pending_prize_data.clear()
-        current_result = "РЕЗУЛЬТАТ ПРОВЕРЯЕТСЯ СЕРВЕРОМ…"
-        update_ui()
-        return
+        # Сервер получает локальный итог в фоне. Локальная выдача продолжается
+        # ниже без ожидания HTTP, поэтому клешня и награда не блокируются сетью.
+        var local_finish := {"success": true, "toy_id": String(pending_prize_data.get("id", ""))}
+        _server_action("game_finish", local_finish)
     if pending_prize_data.is_empty():
         return
     var d: Dictionary = pending_prize_data
@@ -10414,7 +10378,8 @@ func setup_daily_systems() -> void:
     if lucky_toy_date != today:
         lucky_toy_date = today
         lucky_toy_index = abs(today.hash()) % toys.size()
-    save_game()
+    # Не пишем сохранение на диск посреди запуска. Финальный save_game()
+    # выполняется после полной инициализации и делает это один раз.
 
 func register_game_activity() -> void:
     last_game_activity = time_alive
