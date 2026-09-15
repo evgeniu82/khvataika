@@ -3228,13 +3228,10 @@ func build_world() -> void:
     add_child(camera)
     camera.look_at(camera_look, Vector3.UP)
 
-    var reflection: ReflectionProbe = ReflectionProbe.new()
-    reflection_probe = reflection
-    reflection.position = Vector3(0.0, 5.2, 0.0)
-    reflection.size = Vector3(9.0, 8.0, 6.0)
-    reflection.origin_offset = Vector3(0.0, 1.0, 0.0)
-    reflection.intensity = 0.45
-    add_child(reflection)
+    # Мобильная стабильность: никаких ReflectionProbe/реaltime-источников света
+    # при запуске. Сцена освещается только дешёвым ambient-светом Environment.
+    # Это не меняет механику или игрушки и не создаёт GPU-нагрузку от света.
+    reflection_probe = null
 
     var floor_mat := make_mat(Color("#2A211B"), 0.55, 0.30)
     make_box(self, Vector3(24, 0.3, 22), Vector3(0, -0.3, 0), floor_mat, "PolishedFloor")
@@ -3245,29 +3242,9 @@ func build_world() -> void:
     for z in [-5.5, -2.0, 1.5, 5.0]:
         make_box(self, Vector3(21.0, 0.025, 0.035), Vector3(0, -0.13, z), make_mat(Color("#4B3525"), 0.10, 0.45), "FloorInlay")
 
-    var key := OmniLight3D.new()
-    key.position = Vector3(0, 9.5, 8.0)
-    key.light_energy = 3.2
-    key.omni_range = 23.0
-    key.light_color = Color("#FFE9CE")
-    add_child(key)
-    scene_lights.append(key)
-
-    var fill := OmniLight3D.new()
-    fill.position = Vector3(-7, 5, 3)
-    fill.light_energy = 0.75
-    fill.omni_range = 12.0
-    fill.light_color = Color("#E7D2B7")
-    add_child(fill)
-    scene_lights.append(fill)
-
-    var fill2 := OmniLight3D.new()
-    fill2.position = Vector3(7, 5, 2)
-    fill2.light_energy = 1.0
-    fill2.omni_range = 15.0
-    fill2.light_color = Color("#F2E4D0")
-    add_child(fill2)
-    scene_lights.append(fill2)
+    # Реaltime OmniLight3D намеренно не создаём.
+    # Освещение остаётся мягким за счёт ambient_light_environment.
+    scene_lights.clear()
 
 
 func build_machine() -> void:
@@ -3420,16 +3397,8 @@ func build_machine() -> void:
         for k in range(5):
             make_box(machine, Vector3(0.055, 0.05, 0.25), Vector3(x - 0.30 + float(k) * 0.15, 1.19, 3.18), chrome, "VentSlot")
 
-    # Lighting inside the cabinet: four small warm corner lights.
-    for pos in [Vector3(-3.05, 8.65, 1.55), Vector3(3.05, 8.65, 1.55), Vector3(-3.05, 3.75, 1.55), Vector3(3.05, 3.75, 1.55)]:
-        var corner_light := OmniLight3D.new()
-        corner_light.position = pos
-        corner_light.light_energy = 0.18
-        corner_light.omni_range = 3.4
-        corner_light.light_color = Color("#F2DCC0")
-        add_child(corner_light)
-        machine_lights.append(corner_light)
-        scene_lights.append(corner_light)
+    # Локальные realtime-светильники отключены для мобильной стабильности.
+    # Мягкое освещение полностью обеспечивается Environment ambient light.
 
 func build_overhead_rails() -> void:
     var rails := Node3D.new()
@@ -8453,7 +8422,7 @@ func apply_quality_settings() -> void:
     # количество игрушек, модели, механика и содержимое игры сохраняются.
     if world_environment and is_instance_valid(world_environment) and world_environment.environment:
         var env := world_environment.environment
-        env.glow_enabled = quality_level >= 3
+        env.glow_enabled = false
         env.ambient_light_energy = 0.46
 
 func set_gameplay_3d_visible(show_game: bool) -> void:
@@ -8945,10 +8914,7 @@ func _process(delta: float) -> void:
     update_android_navigation()
     if refill_animation_timer > 0.0:
         refill_animation_timer -= delta
-        for light in machine_lights:
-            if light and is_instance_valid(light):
-                light.light_energy += 0.45 + sin(time_alive * 12.0) * 0.18
-        var all_refill_done := true
+        # Освещение не анимируется: никаких изменений Light3D во время refill.\n        var all_refill_done := true
         for body in prize_bodies:
             if not body or not is_instance_valid(body):
                 continue
