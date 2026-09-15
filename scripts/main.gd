@@ -14,6 +14,9 @@ const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
 # on HTTP; network operations are asynchronous and retried in the background.
 const OFFLINE_MODE: bool = false
 var SERVER_AUTHORITATIVE: bool = true
+# Local-first UX: gameplay/progress updates happen immediately on device;
+# the existing server is used quietly for persistence, account identity and rating.
+var LOCAL_FIRST_MODE: bool = true
 const PLAY_COST: int = 0
 const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
 const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
@@ -1202,7 +1205,7 @@ func update_return_bonus_state() -> void:
         return_bonus_button.visible = return_bonus_available and hud_layer != null and hud_layer.visible
 
 func claim_return_bonus() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("return_bonus"):
@@ -1225,7 +1228,7 @@ func claim_return_bonus() -> void:
     update_ui()
 
 func start_workshop_job() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_job_start", {}):
@@ -1250,7 +1253,7 @@ func start_workshop_job() -> void:
     refresh_live_systems_panel()
 
 func process_workshop_job() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not workshop_job_active:
             return
         if int(Time.get_unix_time_from_system()) < workshop_job_end_unix:
@@ -1345,7 +1348,13 @@ func _normalized_server_url() -> String:
     return server_url.strip_edges().trim_suffix("/")
 
 func _server_ready() -> bool:
-    return SERVER_AUTHORITATIVE and remote_http != null and _normalized_server_url() != ""
+    return SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and remote_http != null and _normalized_server_url() != ""
+
+func _server_persistence_ready() -> bool:
+    return SERVER_AUTHORITATIVE and remote_http != null and _normalized_server_url() != "" and player_token != ""
+
+func _local_progress_exists() -> bool:
+    return coins != 120 or player_level > 1 or player_xp > 0 or total_games > 0 or total_prizes_won > 0 or not collection.is_empty() or not completed_collections.is_empty() or not owned_claw_ids.is_empty() or upgrade_levels.any(func(v): return int(v) > 0)
 
 func get_server_game_state() -> Dictionary:
     return {
@@ -1835,16 +1844,17 @@ func sync_remote_config() -> void:
         remote_sync_status = "ОШИБКА ПОДКЛЮЧЕНИЯ"
 
 func sync_player_to_server() -> void:
-    if not _server_ready():
+    if not _server_persistence_ready():
         return
     if remote_request_kind != "":
         remote_sync_pending = true
         return
-    # Старый клиентский state больше не отправляем как источник истины.
-    # Сервер возвращает свой snapshot; клиент хранит только визуальный/cache state.
+    # Local-first: send the current device snapshot quietly for persistence.
+    # The server never pushes an older snapshot back over active local progress.
     var payload := {
         "player_id": player_id,
-        "name": player_name
+        "name": player_name,
+        "game_state": get_server_game_state()
     }
     remote_request_kind = "sync"
     var headers := _remote_headers()
@@ -2104,7 +2114,12 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         if kind == "action:settings_update": server_settings_dirty = false
         if kind == "action:promo_redeem": remote_promo_request_active = false
         if bool(data.get("ok", false)) and data.has("game_state") and data["game_state"] is Dictionary:
-            apply_server_game_state(data["game_state"])
+            # Local-first: after we already have local progress, the server
+            # response is an acknowledgement, not an instruction to roll back
+            # the player. A fresh install with no local progress may bootstrap
+            # from the server normally.
+            if not LOCAL_FIRST_MODE or not _local_progress_exists():
+                apply_server_game_state(data["game_state"])
         if bool(data.get("ok", false)) and data.has("achievements") and data["achievements"] is Array:
             pending_new_achievements.clear()
             for achievement in data["achievements"]:
@@ -2244,7 +2259,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 call_deferred("_flush_queued_server_action")
         return
     if data.has("game_state") and data["game_state"] is Dictionary:
-        apply_server_game_state(data["game_state"])
+        if not LOCAL_FIRST_MODE or not _local_progress_exists():
+            apply_server_game_state(data["game_state"])
     if kind == "notifications":
         var items: Variant = data.get("notifications", [])
         if items is Array:
@@ -5504,7 +5520,7 @@ func claim_login_reward() -> void:
     claim_login_reward_for_day(current_day)
 
 func claim_login_reward_for_day(day: int) -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if day < 1 or day > 7: return
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
@@ -6320,10 +6336,10 @@ func build_shop_machine_skins() -> void:
 
 func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
     if index < 0 or index >= specs.size(): return selected
-    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on and not owned[index]:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and not skip_confirmation and confirm_purchases_on and not owned[index]:
         confirm_purchase("Покупка скина", "Купить «%s» за %d ₽?" % [String(specs[index]["name"]), int(specs[index]["price"])], func(): buy_cosmetic(index, specs, owned, selected, true))
         return selected
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
             show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
@@ -6473,7 +6489,7 @@ func refresh_vip_panel() -> void:
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         _server_action("vip_buy", {"index":index}); return
     if index >= vip_owned.size(): vip_owned.resize(vip_specs.size())
@@ -6950,7 +6966,7 @@ func refresh_chests_panel() -> void:
             b.disabled = chest_opening or amount <= 0 or chest_keys < need
 
 func workshop_upgrade(stat: String) -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_upgrade", {"stat":stat}):
@@ -6988,7 +7004,7 @@ func workshop_blueprint_cost(tier: String) -> int:
     return {"basic":250, "advanced":650, "elite":1400}.get(tier, 999999)
 
 func workshop_buy_blueprint(stat: String, tier: String) -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_blueprint", {"stat":stat,"tier":tier}):
@@ -7007,7 +7023,7 @@ func workshop_buy_blueprint(stat: String, tier: String) -> void:
     save_game(); check_achievements(); update_ui(); refresh_workshop_panel()
 
 func workshop_calibrate() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_calibrate", {}):
@@ -7027,7 +7043,7 @@ func workshop_calibrate() -> void:
     refresh_workshop_panel()
 
 func workshop_toggle_overclock() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_overclock", {}):
@@ -7841,7 +7857,7 @@ func build_profile_panel() -> PanelContainer:
 
 func select_profile_avatar(index: int) -> void:
     player_avatar_index = clampi(index, 0, AVATAR_OPTIONS.size() - 1)
-    if SERVER_AUTHORITATIVE and _server_ready() and player_token != "":
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and _server_ready() and player_token != "":
         _server_action("profile_update", {"avatar_index":player_avatar_index})
     refresh_profile_panel()
 
@@ -7854,7 +7870,7 @@ func save_profile_changes() -> void:
         var clean := input.text.strip_edges()
         if clean == "": clean = "ИГРОК"
         player_name = clean.substr(0, 20)
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "ПРОФИЛЬ НЕ СОХРАНЁН: НЕТ СЕРВЕРА"; update_ui(); return
         _server_action("profile_update", {"name":player_name,"avatar_index":player_avatar_index})
@@ -8687,7 +8703,7 @@ func build_help_panel() -> PanelContainer:
     return p
 
 func start_game() -> void:
-    if SERVER_AUTHORITATIVE and (not _server_ready() or player_token == ""):
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and (not _server_ready() or player_token == ""):
         current_result = "ПОДКЛЮЧЕНИЕ К СЕРВЕРУ НЕ УСТАНОВЛЕНО — ИГРА ЗАБЛОКИРОВАНА"
         update_ui()
         register_player_remote()
@@ -8904,7 +8920,7 @@ func _process(delta: float) -> void:
             remote_auth_retry_timer = 10.0
             register_player_remote()
     remote_sync_timer -= delta
-    if game_initialized and remote_sync_timer <= 0.0 and _server_ready() and player_token != "":
+    if game_initialized and remote_sync_timer <= 0.0 and _server_persistence_ready():
         remote_sync_timer = clampf(float(ProjectSettings.get_setting("application/config/online_sync_interval", 20.0)), 10.0, 120.0)
         sync_player_to_server()
     remote_notification_timer -= delta
@@ -9626,7 +9642,7 @@ func award_toy_xp(rarity: String) -> int:
     return gained
 
 func check_collection_completion(collection_name: String) -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         return
     if completed_collections.has(collection_name):
         return
@@ -10094,7 +10110,7 @@ func grant_achievement_reward(spec: Dictionary) -> void:
     total_keys_earned += int(r.get("keys", 0))
 
 func check_achievements() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         # В онлайне достижения и их награды выдаёт только сервер. Клиент
         # лишь отображает подтверждённый snapshot, чтобы не было двойных выплат.
         refresh_achievements_panel()
@@ -10165,10 +10181,10 @@ func confirm_purchase(title_text: String, message_text: String, action: Callable
 
 func buy_claw(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= claw_specs.size(): return
-    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on and not (index < owned_claws.size() and owned_claws[index]):
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and not skip_confirmation and confirm_purchases_on and not (index < owned_claws.size() and owned_claws[index]):
         confirm_purchase("Покупка клешни", "Купить «%s» за %d ₽?" % [String(claw_specs[index]["name"]), int(claw_specs[index]["price"])], func(): buy_claw(index, true))
         return
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
             show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
@@ -10206,13 +10222,13 @@ func buy_claw(index: int, skip_confirmation: bool = false) -> void:
 
 func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= upgrade_specs.size(): return
-    if SERVER_AUTHORITATIVE and not skip_confirmation and confirm_purchases_on:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and not skip_confirmation and confirm_purchases_on:
         var level := int(upgrade_levels[index])
         var price := int(upgrade_specs[index]["base_price"]) * (level + 1)
         if level < 5:
             confirm_purchase("Покупка улучшения", "Улучшить «%s» до уровня %d за %d ₽?" % [String(upgrade_specs[index]["name"]), level + 1, price], func(): buy_upgrade(index, true))
             return
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
             show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
@@ -10285,7 +10301,7 @@ func show_sale_offer() -> void:
 
 func sell_duplicate() -> void:
     if not sale_available: return
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("sell_duplicate", {"toy_name":sale_name,"amount":sale_price}):
             sale_available = false
@@ -10522,7 +10538,7 @@ func complete_weekly_mission_if_ready() -> void:
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
 
 func claim_daily_bonus() -> void:
-    if SERVER_AUTHORITATIVE:
+    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
         if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("claim_daily"):
             return
