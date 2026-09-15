@@ -905,10 +905,10 @@ func _ready() -> void:
             var permission_callable := Callable(self, "_on_notification_permission_result")
             if not get_tree().is_connected("on_request_permissions_result", permission_callable):
                 get_tree().connect("on_request_permissions_result", permission_callable)
+        # Онлайн-слой НЕ запускаем во время тяжёлого старта.
+        # Регистрация, конфиг и уведомления подключаются только после того,
+        # как первый игровой кадр уже показан и игрок получил управление.
         update_return_bonus_state()
-        call_deferred("setup_android_notifications")
-        call_deferred("register_player_remote")
-        call_deferred("sync_remote_config")
     call_deferred("initialize_game_async")
     if not STARTUP_CONTROL_TEST:
         call_deferred("build_upgrade_sound_system")
@@ -3028,6 +3028,16 @@ func initialize_game_async() -> void:
 
 func activate_extra_features_after_startup() -> void:
     await get_tree().process_frame
+    # Только теперь, когда игровой экран уже показан, включаем сетевой слой.
+    # Ни один HTTP-запрос, удалённый каталог или Android notification API
+    # не должен конкурировать с созданием мира и игрушек на старте.
+    if ONLINE_ENABLED and not OFFLINE_MODE and SERVER_AUTHORITATIVE:
+        await get_tree().process_frame
+        setup_android_notifications()
+        await get_tree().process_frame
+        register_player_remote()
+        await get_tree().process_frame
+        sync_remote_config()
     if OFFLINE_MODE:
         # Полностью офлайн-режим: после первого кадра не создаём HTTPRequest
         # и не запускаем серверные вызовы. Тяжёлые локальные подсистемы включаем
@@ -8862,7 +8872,7 @@ func _process(delta: float) -> void:
                 _send_pending_test_notification()
     server_settings_sync_timer -= delta
     connection_check_timer -= delta
-    if connection_check_timer <= 0.0:
+    if game_initialized and connection_check_timer <= 0.0:
         connection_check_timer = 20.0
         _check_server_connection()
     if shop_feedback_timer > 0.0:
@@ -8883,16 +8893,16 @@ func _process(delta: float) -> void:
     # Статус соединения не меняется каждый кадр: обновляем его только при
     # изменении/проверке соединения, чтобы не перерисовывать Label 60 раз/с.
     remote_auth_retry_timer -= delta
-    if _server_ready() and player_token == "" and remote_request_kind == "":
+    if game_initialized and _server_ready() and player_token == "" and remote_request_kind == "":
         if remote_auth_retry_timer <= 0.0:
             remote_auth_retry_timer = 10.0
             register_player_remote()
     remote_sync_timer -= delta
-    if remote_sync_timer <= 0.0 and _server_ready() and player_token != "":
+    if game_initialized and remote_sync_timer <= 0.0 and _server_ready() and player_token != "":
         remote_sync_timer = clampf(float(ProjectSettings.get_setting("application/config/online_sync_interval", 20.0)), 10.0, 120.0)
         sync_player_to_server()
     remote_notification_timer -= delta
-    if remote_notification_timer <= 0.0 and _server_ready():
+    if game_initialized and remote_notification_timer <= 0.0 and _server_ready():
         remote_notification_timer = 30.0
         poll_server_notifications()
     if rarity_flash_timer > 0.0:
