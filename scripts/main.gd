@@ -330,6 +330,16 @@ var loading_percent: Label
 var loading_tip: Label
 var loading_ring: Panel
 var loading_elapsed: float = 0.0
+
+# Кэши ресурсов для Android: игрушки состоят из большого количества одинаковых
+# примитивов. Не создаём новый Shader/Mesh для каждого элемента каждой игрушки.
+# Это особенно важно на старте: компиляция десятков одинаковых ресурсов подряд
+# раньше могла давать зависание около 43–50%.
+var fur_shader_cache: Shader = null
+var fur_material_cache: Dictionary = {}
+var sphere_mesh_cache: Dictionary = {}
+var box_mesh_cache: Dictionary = {}
+var cylinder_mesh_cache: Dictionary = {}
 var loading_tip_index: int = 0
 var loading_step_index: int = 0
 var game_initialized: bool = false
@@ -2927,7 +2937,7 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
     build_aim_marker()
     await get_tree().process_frame
-    await set_loading_progress(43.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА")
+    await set_loading_progress(43.0, "МЕХАНИКА КЛЕШНИ ПОДГОТОВЛЕНА • ПОДГОТОВКА ИГРУШЕК")
     _startup_write_phase("BUILD_PRIZES")
     await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКИ...")
     await build_prizes_async()
@@ -3069,10 +3079,15 @@ func _notification(what: int) -> void:
             _on_android_back_pressed()
 
 func make_fur_mat(color: Color) -> ShaderMaterial:
-    # Процедурный материал мягкого плюша: матовая ткань, мелкая неоднородность
-    # и лёгкий "ворс" по краям без тяжёлых внешних 3D-моделей.
-    var shader := Shader.new()
-    shader.code = """
+    # Один общий shader + кэш материалов по цвету. Создание Shader с исходным
+    # кодом на каждый фрагмент игрушки было слишком дорогим для Android.
+    var key := "%.4f_%.4f_%.4f_%.4f" % [color.r, color.g, color.b, color.a]
+    if fur_material_cache.has(key):
+        return fur_material_cache[key] as ShaderMaterial
+
+    if fur_shader_cache == null:
+        var shader := Shader.new()
+        shader.code = """
 shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
 
@@ -3102,11 +3117,14 @@ void fragment() {
     SPECULAR = 0.12;
 }
 """
-    shader.set_code(shader.code)
+        shader.set_code(shader.code)
+        fur_shader_cache = shader
+
     var mat := ShaderMaterial.new()
-    mat.shader = shader
+    mat.shader = fur_shader_cache
     mat.set_shader_parameter("base_color", color)
     mat.set_shader_parameter("fuzz", 0.035)
+    fur_material_cache[key] = mat
     return mat
 
 func make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emission_strength: float = 0.0) -> StandardMaterial3D:
@@ -3123,8 +3141,14 @@ func make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emiss
 func make_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, node_name: String = "Box") -> MeshInstance3D:
     var n := MeshInstance3D.new()
     n.name = node_name
-    var mesh := BoxMesh.new()
-    mesh.size = size
+    var key := "%.3f_%.3f_%.3f" % [size.x, size.y, size.z]
+    var mesh: BoxMesh
+    if box_mesh_cache.has(key):
+        mesh = box_mesh_cache[key] as BoxMesh
+    else:
+        mesh = BoxMesh.new()
+        mesh.size = size
+        box_mesh_cache[key] = mesh
     n.mesh = mesh
     n.material_override = material
     n.position = pos
@@ -3165,11 +3189,18 @@ func make_collision_box(parent: Node3D, size: Vector3, pos: Vector3, node_name: 
 func make_sphere(parent: Node3D, radius: float, pos: Vector3, material: Material, node_name: String = "Sphere") -> MeshInstance3D:
     var n := MeshInstance3D.new()
     n.name = node_name
-    var mesh := SphereMesh.new()
-    mesh.radius = radius
-    mesh.height = radius * 2.0
-    mesh.radial_segments = 32
-    mesh.rings = 18
+    var key := "%.3f" % radius
+    var mesh: SphereMesh
+    if sphere_mesh_cache.has(key):
+        mesh = sphere_mesh_cache[key] as SphereMesh
+    else:
+        mesh = SphereMesh.new()
+        mesh.radius = radius
+        mesh.height = radius * 2.0
+        # Для мобильного автомата 16x10 достаточно и заметно дешевле 32x18.
+        mesh.radial_segments = 16
+        mesh.rings = 10
+        sphere_mesh_cache[key] = mesh
     n.mesh = mesh
     n.material_override = material
     n.position = pos
@@ -3179,11 +3210,17 @@ func make_sphere(parent: Node3D, radius: float, pos: Vector3, material: Material
 func make_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, material: Material, node_name: String = "Cylinder") -> MeshInstance3D:
     var n := MeshInstance3D.new()
     n.name = node_name
-    var mesh := CylinderMesh.new()
-    mesh.top_radius = radius
-    mesh.bottom_radius = radius
-    mesh.height = height
-    mesh.radial_segments = 32
+    var key := "%.3f_%.3f" % [radius, height]
+    var mesh: CylinderMesh
+    if cylinder_mesh_cache.has(key):
+        mesh = cylinder_mesh_cache[key] as CylinderMesh
+    else:
+        mesh = CylinderMesh.new()
+        mesh.top_radius = radius
+        mesh.bottom_radius = radius
+        mesh.height = height
+        mesh.radial_segments = 16
+        cylinder_mesh_cache[key] = mesh
     n.mesh = mesh
     n.material_override = material
     n.position = pos
@@ -3545,7 +3582,7 @@ func build_prizes_async() -> void:
     if not saved_prizes.is_empty():
         total_to_build = saved_prizes.size()
     total_to_build = maxi(total_to_build, 1)
-    const BATCH_SIZE := 8
+    const BATCH_SIZE := 2
 
     if saved_prizes.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
