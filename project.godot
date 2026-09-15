@@ -9,7 +9,7 @@ config/icon="res://store/icon_512.png"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 # Stage 1 online connection: background health/auth only. Gameplay remains offline/local.
-config/online_stage1_enabled=true
+config/online_stage1_enabled=false
 config/online_stage1_server_url="http://135.106.209.40:8080"
 config/online_stage1_timeout=3.0
 # Production 2.0.0 online runtime.
