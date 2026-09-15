@@ -7,13 +7,13 @@ extends Node3D
 
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
-const ONLINE_ENABLED: bool = false
+const ONLINE_ENABLED: bool = true
 const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
 # 2.0.0 production online mode: the server is authoritative for economy,
 # progress and game outcomes. Local UI/physics continue to run without blocking
 # on HTTP; network operations are asynchronous and retried in the background.
-const OFFLINE_MODE: bool = true
-var SERVER_AUTHORITATIVE: bool = false
+const OFFLINE_MODE: bool = false
+var SERVER_AUTHORITATIVE: bool = true
 const PLAY_COST: int = 0
 const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
 const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
@@ -1416,7 +1416,8 @@ func apply_server_game_state(data: Dictionary) -> void:
     if ci is Dictionary:
         for k in chest_inventory.keys():
             chest_inventory[k] = maxi(0, int(ci.get(k, chest_inventory[k])))
-    chest_keys = maxi(0, int(data.get("chest_keys", chest_keys)))
+    chest_keys = maxi(0, int(data.get("chest_keys", chest_inventory.get("chest_keys", chest_keys))))
+    chest_inventory["chest_keys"] = chest_keys
     var cet: Variant = data.get("chest_exclusive_toys", chest_exclusive_toys)
     if cet is Dictionary: chest_exclusive_toys = cet
     var ces: Variant = data.get("chest_exclusive_skins", chest_exclusive_skins)
@@ -1452,8 +1453,13 @@ func apply_server_game_state(data: Dictionary) -> void:
     total_prizes_won = maxi(0, int(data.get("total_prizes_won", total_prizes_won)))
     var rw: Variant = data.get("rarity_wins", rarity_wins)
     if rw is Dictionary: rarity_wins = rw
-    var ach: Variant = data.get("achievements", unlocked_achievements)
-    if ach is Dictionary: unlocked_achievements = ach
+    var ach: Variant = data.get("achievements", null)
+    if ach is Dictionary:
+        unlocked_achievements = ach
+    var claimed_remote: Variant = data.get("claimed_achievements", null)
+    if claimed_remote is Dictionary:
+        for aid in claimed_remote.keys():
+            unlocked_achievements[String(aid)] = true
     last_daily_bonus_date = String(data.get("last_daily_bonus_date", last_daily_bonus_date))
     login_streak = maxi(0, int(data.get("login_streak", login_streak)))
     last_login_claim_date = String(data.get("last_login_claim_date", last_login_claim_date))
@@ -2612,7 +2618,7 @@ func refresh_rating_panel() -> void:
     if rows.is_empty():
         var empty := Label.new(); empty.text="Рейтинг пока пуст."; empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; empty.add_theme_font_size_override("font_size",19); list.add_child(empty); return
     for i in range(rows.size()):
-        var row:=Label.new(); row.text="%d.  %s   •   %d" % [i+1,String(rows[i]["name"]),int(rows[i]["score"])] ; row.add_theme_font_size_override("font_size",20); row.modulate=GOLD if String(rows[i]["name"])==player_name else Color("#E0D4C6"); list.add_child(row)
+        var row:=Label.new(); row.text="%d.  %s   •   🏆 %d" % [i+1,String(rows[i]["name"]),int(rows[i].get("rating", rows[i].get("score", 0)))] ; row.add_theme_font_size_override("font_size",20); row.modulate=GOLD if String(rows[i]["name"])==player_name else Color("#E0D4C6"); list.add_child(row)
     rating_panel.set_meta("rating_ui_built", true)
 
 func build_return_bonus_panel() -> PanelContainer:
@@ -5845,7 +5851,7 @@ func build_hud() -> void:
     hud_profile_button.size = Vector2(165, 108)
     hud_profile_button.tooltip_text = "Открыть профиль игрока"
     style_button(hud_profile_button, Color("#76583F"))
-    hud_profile_button.add_theme_font_size_override("font_size", 17)
+    hud_profile_button.add_theme_font_size_override("font_size", 21)
     hud_profile_button.pressed.connect(func(): open_panel("profile"))
     hud_layer.add_child(hud_profile_button)
     update_hud_profile_button()
@@ -9614,6 +9620,8 @@ func award_toy_xp(rarity: String) -> int:
     return gained
 
 func check_collection_completion(collection_name: String) -> void:
+    if SERVER_AUTHORITATIVE:
+        return
     if completed_collections.has(collection_name):
         return
     var needed: int = 0
@@ -10080,6 +10088,11 @@ func grant_achievement_reward(spec: Dictionary) -> void:
     total_keys_earned += int(r.get("keys", 0))
 
 func check_achievements() -> void:
+    if SERVER_AUTHORITATIVE:
+        # В онлайне достижения и их награды выдаёт только сервер. Клиент
+        # лишь отображает подтверждённый snapshot, чтобы не было двойных выплат.
+        refresh_achievements_panel()
+        return
     var before_unlock_count := unlocked_achievements.size()
     audit_achievement_source_state()
     var unlocked_now: Array[String] = []
