@@ -331,15 +331,6 @@ var loading_tip: Label
 var loading_ring: Panel
 var loading_elapsed: float = 0.0
 
-# Кэши ресурсов для Android: игрушки состоят из большого количества одинаковых
-# примитивов. Не создаём новый Shader/Mesh для каждого элемента каждой игрушки.
-# Это особенно важно на старте: компиляция десятков одинаковых ресурсов подряд
-# раньше могла давать зависание около 43–50%.
-var fur_shader_cache: Shader = null
-var fur_material_cache: Dictionary = {}
-var sphere_mesh_cache: Dictionary = {}
-var box_mesh_cache: Dictionary = {}
-var cylinder_mesh_cache: Dictionary = {}
 var loading_tip_index: int = 0
 var loading_step_index: int = 0
 var game_initialized: bool = false
@@ -3089,15 +3080,10 @@ func _notification(what: int) -> void:
             _on_android_back_pressed()
 
 func make_fur_mat(color: Color) -> ShaderMaterial:
-    # Один общий shader + кэш материалов по цвету. Создание Shader с исходным
-    # кодом на каждый фрагмент игрушки было слишком дорогим для Android.
-    var key := "%.4f_%.4f_%.4f_%.4f" % [color.r, color.g, color.b, color.a]
-    if fur_material_cache.has(key):
-        return fur_material_cache[key] as ShaderMaterial
-
-    if fur_shader_cache == null:
-        var shader := Shader.new()
-        shader.code = """
+    # Процедурный материал мягкого плюша: матовая ткань, мелкая неоднородность
+    # и лёгкий "ворс" по краям без тяжёлых внешних 3D-моделей.
+    var shader := Shader.new()
+    shader.code = """
 shader_type spatial;
 render_mode diffuse_burley, specular_schlick_ggx;
 
@@ -3127,17 +3113,12 @@ void fragment() {
     SPECULAR = 0.12;
 }
 """
-        shader.set_code(shader.code)
-        fur_shader_cache = shader
-
+    shader.set_code(shader.code)
     var mat := ShaderMaterial.new()
-    mat.shader = fur_shader_cache
+    mat.shader = shader
     mat.set_shader_parameter("base_color", color)
     mat.set_shader_parameter("fuzz", 0.035)
-    fur_material_cache[key] = mat
-    return mat
-
-func make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emission_strength: float = 0.0) -> StandardMaterial3D:
+    return matfunc make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emission_strength: float = 0.0) -> StandardMaterial3D:
     var m := StandardMaterial3D.new()
     m.albedo_color = color
     m.metallic = metallic
@@ -3151,21 +3132,13 @@ func make_mat(color: Color, metallic: float = 0.0, roughness: float = 0.5, emiss
 func make_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, node_name: String = "Box") -> MeshInstance3D:
     var n := MeshInstance3D.new()
     n.name = node_name
-    var key := "%.3f_%.3f_%.3f" % [size.x, size.y, size.z]
-    var mesh: BoxMesh
-    if box_mesh_cache.has(key):
-        mesh = box_mesh_cache[key] as BoxMesh
-    else:
-        mesh = BoxMesh.new()
-        mesh.size = size
-        box_mesh_cache[key] = mesh
+    var mesh := BoxMesh.new()
+    mesh.size = size
     n.mesh = mesh
     n.material_override = material
     n.position = pos
     parent.add_child(n)
-    return n
-
-func make_static_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, node_name: String = "StaticBox") -> StaticBody3D:
+    return nfunc make_static_box(parent: Node3D, size: Vector3, pos: Vector3, material: Material, node_name: String = "StaticBox") -> StaticBody3D:
     var body := StaticBody3D.new()
     body.name = node_name + "Collision"
     body.position = pos
@@ -3199,25 +3172,16 @@ func make_collision_box(parent: Node3D, size: Vector3, pos: Vector3, node_name: 
 func make_sphere(parent: Node3D, radius: float, pos: Vector3, material: Material, node_name: String = "Sphere") -> MeshInstance3D:
     var n := MeshInstance3D.new()
     n.name = node_name
-    var key := "%.3f" % radius
-    var mesh: SphereMesh
-    if sphere_mesh_cache.has(key):
-        mesh = sphere_mesh_cache[key] as SphereMesh
-    else:
-        mesh = SphereMesh.new()
-        mesh.radius = radius
-        mesh.height = radius * 2.0
-        # Для мобильного автомата 16x10 достаточно и заметно дешевле 32x18.
-        mesh.radial_segments = 16
-        mesh.rings = 10
-        sphere_mesh_cache[key] = mesh
+    var mesh := SphereMesh.new()
+    mesh.radius = radius
+    mesh.height = radius * 2.0
+    mesh.radial_segments = 32
+    mesh.rings = 18
     n.mesh = mesh
     n.material_override = material
     n.position = pos
     parent.add_child(n)
-    return n
-
-func make_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, material: Material, node_name: String = "Cylinder") -> MeshInstance3D:
+    return nfunc make_cylinder(parent: Node3D, radius: float, height: float, pos: Vector3, material: Material, node_name: String = "Cylinder") -> MeshInstance3D:
     var n := MeshInstance3D.new()
     n.name = node_name
     var key := "%.3f_%.3f" % [radius, height]
@@ -3269,7 +3233,7 @@ func build_world() -> void:
     reflection.position = Vector3(0.0, 5.2, 0.0)
     reflection.size = Vector3(9.0, 8.0, 6.0)
     reflection.origin_offset = Vector3(0.0, 1.0, 0.0)
-    reflection.intensity = 1.25
+    reflection.intensity = 0.45
     add_child(reflection)
 
     var floor_mat := make_mat(Color("#2A211B"), 0.55, 0.30)
@@ -3283,7 +3247,7 @@ func build_world() -> void:
 
     var key := OmniLight3D.new()
     key.position = Vector3(0, 9.5, 8.0)
-    key.light_energy = 8.5
+    key.light_energy = 3.2
     key.omni_range = 23.0
     key.light_color = Color("#FFE9CE")
     add_child(key)
@@ -3291,7 +3255,7 @@ func build_world() -> void:
 
     var fill := OmniLight3D.new()
     fill.position = Vector3(-7, 5, 3)
-    fill.light_energy = 2.5
+    fill.light_energy = 0.75
     fill.omni_range = 12.0
     fill.light_color = Color("#E7D2B7")
     add_child(fill)
@@ -3299,7 +3263,7 @@ func build_world() -> void:
 
     var fill2 := OmniLight3D.new()
     fill2.position = Vector3(7, 5, 2)
-    fill2.light_energy = 3.8
+    fill2.light_energy = 1.0
     fill2.omni_range = 15.0
     fill2.light_color = Color("#F2E4D0")
     add_child(fill2)
@@ -3435,7 +3399,7 @@ func build_machine() -> void:
     make_cylinder(machine, 0.27, 0.18, Vector3(1.35, 2.86, 3.30), grab_mat, "GrabButton")
     var grab_light := OmniLight3D.new()
     grab_light.position = Vector3(1.35, 2.94, 3.18)
-    grab_light.light_energy = 0.38
+    grab_light.light_energy = 0.14
     grab_light.omni_range = 1.8
     grab_light.light_color = Color("#D85A45")
     add_child(grab_light)
@@ -3460,7 +3424,7 @@ func build_machine() -> void:
     for pos in [Vector3(-3.05, 8.65, 1.55), Vector3(3.05, 8.65, 1.55), Vector3(-3.05, 3.75, 1.55), Vector3(3.05, 3.75, 1.55)]:
         var corner_light := OmniLight3D.new()
         corner_light.position = pos
-        corner_light.light_energy = 0.55
+        corner_light.light_energy = 0.18
         corner_light.omni_range = 3.4
         corner_light.light_color = Color("#F2DCC0")
         add_child(corner_light)
@@ -3578,10 +3542,9 @@ func build_prizes() -> void:
         spawn_random_prizes(TARGET_PRIZE_COUNT - prize_bodies.size())
 
 func build_prizes_async() -> void:
-    # Android-friendly загрузка: игрушки создаются небольшими пакетами, а не
-    # с отдельным кадром и перерисовкой загрузочного экрана для каждой игрушки.
-    # Это заметно снижает лишнюю работу UI и не даёт одному длинному циклу
-    # надолго заморозить первый экран.
+    # Реальная последовательная загрузка игрушек. Каждая игрушка создаётся
+    # отдельно, после чего загрузчик обновляет фактический прогресс и отдаёт
+    # кадр движку. Поэтому на экране всегда видно, сколько объектов уже создано.
     for body in prize_bodies:
         if body and is_instance_valid(body):
             body.queue_free()
@@ -3592,15 +3555,13 @@ func build_prizes_async() -> void:
     if not saved_prizes.is_empty():
         total_to_build = saved_prizes.size()
     total_to_build = maxi(total_to_build, 1)
-    const BATCH_SIZE := 2
 
     if saved_prizes.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
+            await set_loading_status("ЗАГРУЖАЕМ И СОЗДАЁМ ИГРУШКУ %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
             spawn_one_random_prize(i)
-            if ((i + 1) % BATCH_SIZE == 0) or i == INITIAL_PRIZE_COUNT - 1:
-                var built := i + 1
-                var toy_progress := 43.0 + (19.0 * float(built) / float(INITIAL_PRIZE_COUNT))
-                await set_loading_progress(toy_progress, "ИГРУШКИ %d ИЗ %d ГОТОВЫ" % [built, INITIAL_PRIZE_COUNT])
+            var toy_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+            await set_loading_progress(toy_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
         return
 
     var valid_saved_count := 0
@@ -3615,6 +3576,7 @@ func build_prizes_async() -> void:
         if not (saved is Dictionary):
             continue
         loaded_count += 1
+        await set_loading_status("ВОССТАНАВЛИВАЕМ ИГРУШКУ %d ИЗ %d..." % [loaded_count, valid_saved_count])
         var source_index: int = clampi(int(saved.get("source_index", 0)), 0, toys.size() - 1)
         var pos_data: Variant = saved.get("position", [0.0, 3.5, 0.0])
         var rot_data: Variant = saved.get("rotation", [0.0, 0.0, 0.0])
@@ -3634,26 +3596,22 @@ func build_prizes_async() -> void:
             body.rotation = rot
             prize_bodies.append(body)
             prize_data.append({"kind":"toy", "index":source_index, "toy_id":"toy_%02d" % source_index, "name":toys[source_index]["name"], "rarity":toys[source_index]["rarity"], "collection":toys[source_index]["collection"], "weight":float(toys[source_index].get("weight", 38.0)), "slippery":bool(body.get_meta("slippery", false)), "variant":variant, "size_factor":size_factor})
-
-        if (loaded_count % BATCH_SIZE == 0) or loaded_count == valid_saved_count:
-            var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
-            await set_loading_progress(saved_progress, "ИГРУШКИ %d ИЗ %d ВОССТАНОВЛЕНЫ" % [loaded_count, valid_saved_count])
+        var saved_progress := 43.0 + (19.0 * float(loaded_count) / float(valid_saved_count))
+        await set_loading_progress(saved_progress, "ИГРУШКА %d ИЗ %d ВОССТАНОВЛЕНА" % [loaded_count, valid_saved_count])
 
     if prize_bodies.is_empty():
         for i in range(INITIAL_PRIZE_COUNT):
+            await set_loading_status("ДОПОЛНЯЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, INITIAL_PRIZE_COUNT])
             spawn_one_random_prize(i)
-            if ((i + 1) % BATCH_SIZE == 0) or i == INITIAL_PRIZE_COUNT - 1:
-                var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
-                await set_loading_progress(fallback_progress, "ИГРУШКИ %d ИЗ %d СОЗДАНЫ" % [i + 1, INITIAL_PRIZE_COUNT])
+            var fallback_progress := 43.0 + (19.0 * float(i + 1) / float(INITIAL_PRIZE_COUNT))
+            await set_loading_progress(fallback_progress, "ИГРУШКА %d ИЗ %d СОЗДАНА" % [i + 1, INITIAL_PRIZE_COUNT])
     elif prize_bodies.size() < TARGET_PRIZE_COUNT:
         var missing := TARGET_PRIZE_COUNT - prize_bodies.size()
         for i in range(missing):
+            await set_loading_status("ДОЗАГРУЖАЕМ ИГРУШКИ: %d ИЗ %d..." % [i + 1, missing])
             spawn_one_random_prize(i)
-            if ((i + 1) % BATCH_SIZE == 0) or i == missing - 1:
-                var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
-                await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНЫЕ ИГРУШКИ %d ИЗ %d ГОТОВЫ" % [i + 1, missing])
-
-func spawn_one_random_prize(n: int) -> void:
+            var refill_progress := 43.0 + (19.0 * float(i + 1) / float(missing))
+            await set_loading_progress(refill_progress, "ДОПОЛНИТЕЛЬНАЯ ИГРУШКА %d ИЗ %d ГОТОВА" % [i + 1, missing])func spawn_one_random_prize(n: int) -> void:
     var rng := RandomNumberGenerator.new()
     rng.randomize()
     var x: float = rng.randf_range(-2.65, 2.65)
@@ -8480,23 +8438,23 @@ func apply_quality_settings() -> void:
         reflection_probe.visible = quality_level >= 2
         reflection_probe.intensity = 0.65 if quality_level <= 1 else (0.95 if quality_level == 2 else (1.15 if quality_level == 3 else 1.25))
 
-    # Свет остаётся на всех уровнях; на низких пресетах уменьшается его стоимость.
-    var energy_mult: float = [0.62, 0.76, 0.88, 1.0, 1.08][quality_level]
+    # Освещение одинаковое и мягкое на всех пресетах. Тени от realtime-света
+    # полностью отключены: они дают скачки нагрузки на мобильном GPU и не нужны
+    # для стабильного внешнего вида автомата.
     for light in scene_lights:
         if light and is_instance_valid(light):
-            light.shadow_enabled = quality_level >= 3
-            if light.has_meta("quality_base_energy"):
-                light.light_energy = float(light.get_meta("quality_base_energy")) * energy_mult
+            light.shadow_enabled = false
+            if light.has_meta("stable_light_energy"):
+                light.light_energy = float(light.get_meta("stable_light_energy"))
             else:
-                light.set_meta("quality_base_energy", light.light_energy)
-                light.light_energy *= energy_mult
+                light.set_meta("stable_light_energy", light.light_energy)
 
     # На низком качестве уменьшаем только визуальную детализацию материалов/сглаживание;
     # количество игрушек, модели, механика и содержимое игры сохраняются.
     if world_environment and is_instance_valid(world_environment) and world_environment.environment:
         var env := world_environment.environment
         env.glow_enabled = quality_level >= 3
-        env.ambient_light_energy = [0.82, 0.74, 0.68, 0.65, 0.62][quality_level]
+        env.ambient_light_energy = 0.46
 
 func set_gameplay_3d_visible(show_game: bool) -> void:
     # Меню работает как отдельный экран: автомат не остаётся под окнами меню.
@@ -9062,10 +9020,8 @@ func animate_camera(delta: float) -> void:
     camera.look_at(target_look, Vector3.UP)
 
 func animate_machine_lights() -> void:
-    for i in range(machine_lights.size()):
-        var light := machine_lights[i]
-        var base := 0.55 if i >= 3 else 2.0
-        light.light_energy = base + sin(time_alive * 1.2 + float(i)) * (0.08 if i >= 3 else 0.25)
+    # Стабильное мягкое освещение: никаких ежекаровых изменений энергии.
+    return
 
 func process_claw(delta: float) -> void:
     if not claw: return
