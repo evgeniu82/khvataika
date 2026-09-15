@@ -2065,6 +2065,37 @@ func _apply_remote_config(config: Dictionary) -> void:
     var notif: Variant = config.get("notification_hours", {})
     if notif is Dictionary:
         online_notification_hours = notif
+    # Синхронизация названий коллекций: их ID остаются стабильными, а имя можно менять в админке.
+    var remote_catalog_for_collections: Variant = config.get("catalog", {})
+    if remote_catalog_for_collections is Dictionary:
+        var server_collections: Variant = remote_catalog_for_collections.get("collections", [])
+        if server_collections is Array:
+            for raw_collection in server_collections:
+                if not (raw_collection is Dictionary):
+                    continue
+                var cname := String(raw_collection.get("name", ""))
+                var ids: Variant = raw_collection.get("toy_ids", [])
+                if cname != "" and ids is Array:
+                    for raw_id in ids:
+                        var tid := String(raw_id)
+                        for toy in toys:
+                            if String(toy.get("id", "")) == tid:
+                                toy["collection"] = cname
+    # Цель и награда активных миссий должны совпадать с настройками сервера.
+    var server_missions: Variant = config.get("missions", {})
+    if server_missions is Dictionary:
+        var dm: Variant = server_missions.get("daily", [])
+        var wm: Variant = server_missions.get("weekly", [])
+        if dm is Array and not dm.is_empty() and dm[0] is Dictionary:
+            daily_mission_target = maxi(1, int(dm[0].get("target", daily_mission_target)))
+            var dr: Variant = dm[0].get("reward", {})
+            if dr is Dictionary:
+                daily_mission_reward = maxi(1, int(dr.get("amount", daily_mission_reward)))
+        if wm is Array and not wm.is_empty() and wm[0] is Dictionary:
+            weekly_mission_target = maxi(1, int(wm[0].get("target", weekly_mission_target)))
+            var wr: Variant = wm[0].get("reward", {})
+            if wr is Dictionary:
+                weekly_mission_reward = maxi(1, int(wr.get("amount", weekly_mission_reward)))
     var server_seasons: Variant = config.get("season_definitions", [])
     if server_seasons is Array and not server_seasons.is_empty():
         var season_list: Array[Dictionary] = []
