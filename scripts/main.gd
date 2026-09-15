@@ -7,13 +7,13 @@ extends Node3D
 
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
-const ONLINE_ENABLED: bool = true
+const ONLINE_ENABLED: bool = false
 const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
 # 2.0.0 production online mode: the server is authoritative for economy,
 # progress and game outcomes. Local UI/physics continue to run without blocking
 # on HTTP; network operations are asynchronous and retried in the background.
-const OFFLINE_MODE: bool = false
-var SERVER_AUTHORITATIVE: bool = true
+const OFFLINE_MODE: bool = true
+var SERVER_AUTHORITATIVE: bool = false
 const PLAY_COST: int = 0
 const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
 const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
