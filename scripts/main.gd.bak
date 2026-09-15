@@ -7,13 +7,11 @@ extends Node3D
 
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
-const ONLINE_ENABLED: bool = true
 const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
-# 2.0.0 production online mode: the server is authoritative for economy,
-# progress and game outcomes. Local UI/physics continue to run without blocking
-# on HTTP; network operations are asynchronous and retried in the background.
-const OFFLINE_MODE: bool = false
-var SERVER_AUTHORITATIVE: bool = true
+# 2.0.0 is intentionally a self-contained offline build. The online code remains
+# in the project for the later server phase, but it can never become authoritative
+# while this build is running.
+const OFFLINE_MODE: bool = true
 const PLAY_COST: int = 0
 const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
 const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
@@ -36,23 +34,10 @@ const DARK := Color("#050A17")
 const NAVY := Color("#081630")
 const STEEL := Color("#34435B")
 
-# Единая палитра UI: тёплая бронза/медь/латунь вместо случайных цветных обводок.
-# Используется только для интерфейса; цвета игровых игрушек, скинов и 3D-материалов не трогаются.
-const UI_BROWN_DEEP := Color("#5A3B29")
-const UI_BROWN := Color("#765238")
-const UI_COPPER := Color("#A96F43")
-const UI_BRASS := Color("#C18A4B")
-const UI_GOLD := Color("#D1A35A")
-const UI_GOLD_LIGHT := Color("#E6C786")
-const UI_TEXT := Color("#F1E5D6")
-const UI_TEXT_MUTED := Color("#B9A28D")
-
 var coins: int = 120
-var highest_balance_rubles: int = 120
 var selected_claw: int = 0
 var music_player: AudioStreamPlayer
 var owned_claws: Array[bool] = [true, false, false, false, false, false, false, false, false, false]
-var owned_claw_ids: Array[String] = ["claw_1"]
 var music_on: bool = true
 var sfx_on: bool = true
 var collection: Dictionary = {}
@@ -70,9 +55,6 @@ var total_games: int = 0
 var total_prizes_won: int = 0
 var rarity_wins: Dictionary = {}
 var unlocked_achievements: Dictionary = {}
-# Исторические максимумы/накопленные значения достижений. Нужны, чтобы после
-# покупок, трат и миграций прогресс никогда не откатывался.
-var achievement_historical_values: Dictionary = {}
 var pending_new_achievements: Array[String] = []
 var pending_achievement_rewards_text: Array[String] = []
 var last_daily_bonus_date: String = ""
@@ -229,6 +211,7 @@ var news_unread: int = 0
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
 const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
+const SERVER_AUTHORITATIVE: bool = false
 # CONTROL TEST: keep the five recently added feature groups out of startup.
 # Their code remains in the project; this switch only isolates the startup path.
 const STARTUP_CONTROL_TEST: bool = false
@@ -525,8 +508,6 @@ var popup_achievement_label: Label
 var achievement_strip: PanelContainer
 var achievement_strip_label: Label
 var achievement_strip_timer: float = 0.0
-var achievement_strip_batch_index: int = 0
-var achievement_check_timer: float = 0.0
 var toast_label: Label
 var main_menu_controls: Array[Control] = []
 var machine_lights: Array[OmniLight3D] = []
@@ -583,7 +564,7 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"collections_1","name":"СОБРАНО!","desc":"Завершите 1 коллекцию.","kind":"collections","value":1},
     {"id":"collections_2","name":"ДВА НАБОРА","desc":"Завершите 2 коллекции.","kind":"collections","value":2},
     {"id":"collections_4","name":"ПОЛОВИНА ПУТИ","desc":"Завершите 4 коллекции.","kind":"collections","value":4},
-    {"id":"collections_16","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":16},
+    {"id":"collections_8","name":"ХРАНИТЕЛЬ ВСЕХ КОЛЛЕКЦИЙ","desc":"Завершите все 16 коллекций.","kind":"collections","value":8},
     {"id":"level_5","name":"НОВИЧОК","desc":"Достигните 5 уровня.","kind":"level","value":5},
     {"id":"level_10","name":"УВЕРЕННЫЙ ИГРОК","desc":"Достигните 10 уровня.","kind":"level","value":10},
     {"id":"level_25","name":"ПРОДВИНУТЫЙ","desc":"Достигните 25 уровня.","kind":"level","value":25},
@@ -595,9 +576,9 @@ var achievement_specs: Array[Dictionary] = [
     {"id":"rubles_500","name":"ПЕРВЫЕ НАКОПЛЕНИЯ","desc":"Накопите 500 ₽.","kind":"rubles","value":500},
     {"id":"rubles_1000","name":"КАПИТАЛ","desc":"Накопите 1000 ₽.","kind":"rubles","value":1000},
     {"id":"rubles_5000","name":"БОЛЬШОЙ БАЛАНС","desc":"Накопите 5000 ₽.","kind":"rubles","value":5000},
-    {"id":"games_1000","name":"ВЕЛИКИЙ МАРАФОН","desc":"Сыграйте 1000 раз.","kind":"games","value":1000},
-    {"id":"toys_1000","name":"БОЛЬШАЯ КОЛЛЕКЦИЯ","desc":"Достаньте 1000 игрушек.","kind":"toys","value":1000},
-    {"id":"rubles_10000","name":"СЕРЬЁЗНЫЙ КАПИТАЛ","desc":"Накопите 10 000 ₽.","kind":"rubles","value":10000},
+    {"id":"claws_3","name":"АРСЕНАЛ","desc":"Откройте 3 разные клешни.","kind":"claws","value":3},
+    {"id":"claws_6","name":"КОЛЛЕКЦИЯ КЛЕШНЕЙ","desc":"Откройте 6 разных клешней.","kind":"claws","value":6},
+    {"id":"claws_10","name":"ПОЛНЫЙ АРСЕНАЛ","desc":"Откройте все 10 клешней.","kind":"claws","value":10},
     {"id":"upgrades_5","name":"ПЕРВАЯ НАСТРОЙКА","desc":"Купите 5 уровней улучшений.","kind":"upgrades","value":5},
     {"id":"upgrades_15","name":"ТЕХНИК","desc":"Купите 15 уровней улучшений.","kind":"upgrades","value":15},
     {"id":"upgrades_30","name":"ИНЖЕНЕР","desc":"Купите 30 уровней улучшений.","kind":"upgrades","value":30},
@@ -665,23 +646,14 @@ func sync_collection_from_inventory() -> void:
 
 
 func refresh_collection_panel() -> void:
+    # Окно коллекций создаётся заново при открытии, чтобы сразу показать
+    # актуальные отметки после получения новой игрушки.
     sync_collection_from_inventory()
-    if not collection_panel or not is_instance_valid(collection_panel):
-        return
-    var collection_key := "%d|%d" % [collection.size(), completed_collections.size()]
-    if collection_key == _collection_ui_last_key and collection_panel.has_meta("collection_ui_built"):
-        return
-    _collection_ui_last_key = collection_key
-
-    # Перестраиваем окно только когда действительно изменился состав коллекции.
-    # При обычном повторном открытии не создаём/удаляем сотни Control-узлов.
-    # ВАЖНО: здесь нельзя повторно вызывать refresh_collection_panel() —
-    # предыдущая оптимизация создавала бесконечную рекурсию и приводила к
-    # аварийному завершению запуска уже на этапе BUILD_UI.
-    if collection_panel.has_meta("collection_ui_built"):
+    if collection_panel and is_instance_valid(collection_panel):
+        menu_layer.remove_child(collection_panel)
         collection_panel.queue_free()
-        collection_panel = build_collection_panel()
-    collection_panel.set_meta("collection_ui_built", true)
+    collection_panel = build_collection_panel()
+
 
 func add_extended_collections() -> void:
     var extra_toys: Array[Dictionary] = [
@@ -747,6 +719,7 @@ func add_progressive_achievements() -> void:
         {"kind":"rarity","rarity":"РЕДКАЯ","prefix":"rare_master","name":"ОХОТНИК ЗА РЕДКИМИ","desc":"Получите %d редких игрушек.","values":[20,50,100,250,500,1000]},
         {"kind":"rarity","rarity":"ЭПИЧЕСКАЯ","prefix":"epic_master","name":"ЭПИЧЕСКИЙ КОЛЛЕКЦИОНЕР","desc":"Получите %d эпических игрушек.","values":[10,25,50,100,250,500]},
         {"kind":"rarity","rarity":"ЛЕГЕНДАРНАЯ","prefix":"legend_master","name":"ЛЕГЕНДАРНЫЙ ОХОТНИК","desc":"Получите %d легендарных игрушек.","values":[2,5,10,25,50,100]},
+        {"kind":"upgrades","prefix":"upgrade_master","name":"ИНЖЕНЕР","desc":"Купите %d уровней улучшений.","values":[60,80,100,125,150,200]}
     ]
     for tier in tiers:
         var values: Array = tier["values"]
@@ -765,7 +738,7 @@ func add_diverse_achievements() -> void:
     # косметика, задания, ключи, XP и особые захваты. Все цели независимы.
     var extra := [
         {"id":"streak_3","name":"ПЕРВАЯ СЕРИЯ","desc":"Выиграйте 3 игры подряд.","kind":"best_streak","value":3},
-        {"id":"streak_7","name":"СЕРИЯ 7 ПОБЕД","desc":"Выиграйте 7 игр подряд.","kind":"best_streak","value":7},
+        {"id":"streak_7","name":"НЕ ОСТАНОВИТЬ","desc":"Выиграйте 7 игр подряд.","kind":"best_streak","value":7},
         {"id":"streak_15","name":"ЖЕЛЕЗНАЯ СЕРИЯ","desc":"Выиграйте 15 игр подряд.","kind":"best_streak","value":15},
         {"id":"streak_30","name":"МАШИНА ПОБЕД","desc":"Выиграйте 30 игр подряд.","kind":"best_streak","value":30},
         {"id":"streak_50","name":"НЕПОБЕДИМЫЙ","desc":"Выиграйте 50 игр подряд.","kind":"best_streak","value":50},
@@ -794,7 +767,7 @@ func add_diverse_achievements() -> void:
         {"id":"exclusive_10","name":"ОХОТНИК ЗА ЭКСКЛЮЗИВАМИ","desc":"Получите 10 эксклюзивных наград.","kind":"exclusive","value":10},
         {"id":"workshop_5","name":"ЮНЫЙ МЕХАНИК","desc":"Достигните 5 уровня мастерской.","kind":"workshop_level","value":5},
         {"id":"workshop_10","name":"ИНЖЕНЕР-МЕХАНИК","desc":"Достигните 10 уровня мастерской.","kind":"workshop_level","value":10},
-        {"id":"workshop_15","name":"ГЛАВНЫЙ ИНЖЕНЕР","desc":"Достигните 15 уровня мастерской.","kind":"workshop_level","value":15},
+        {"id":"workshop_20","name":"ГЛАВНЫЙ ИНЖЕНЕР","desc":"Достигните 20 уровня мастерской.","kind":"workshop_level","value":20},
         {"id":"parts_100","name":"ЗАПАС ДЕТАЛЕЙ","desc":"Накопите 100 деталей одновременно.","kind":"parts","value":100},
         {"id":"parts_500","name":"СКЛАД ЗАПЧАСТЕЙ","desc":"Накопите 500 деталей одновременно.","kind":"parts","value":500},
         {"id":"calibration_5","name":"ИДЕАЛЬНАЯ КАЛИБРОВКА","desc":"Прокачайте калибровку до 5 уровня.","kind":"calibration","value":5},
@@ -805,6 +778,7 @@ func add_diverse_achievements() -> void:
         {"id":"machine_skins_3","name":"НОВЫЙ КОРПУС","desc":"Откройте 3 скина аппарата.","kind":"machine_skins","value":3},
         {"id":"login_3","name":"ТРИ ДНЯ ПОДРЯД","desc":"Продержите серию входов 3 дня.","kind":"login_streak","value":3},
         {"id":"login_7","name":"НЕДЕЛЯ В ИГРЕ","desc":"Продержите серию входов 7 дней.","kind":"login_streak","value":7},
+        {"id":"login_30","name":"МЕСЯЦ В ИГРЕ","desc":"Продержите серию входов 30 дней.","kind":"login_streak","value":30},
         {"id":"daily_10","name":"ЕЖЕДНЕВНЫЙ ГЕРОЙ","desc":"Выполните 10 ежедневных миссий.","kind":"daily_claims","value":10},
         {"id":"weekly_10","name":"НЕДЕЛЬНЫЙ МАРАФОН","desc":"Закройте 10 недельных миссий.","kind":"weekly_claims","value":10},
         {"id":"referrals_1","name":"ДРУГ ПРИВЁЛ ДРУГА","desc":"Пригласите 1 друга.","kind":"referrals","value":1},
@@ -820,19 +794,7 @@ func _achievement_exists(id: String) -> bool:
             return true
     return false
 
-func sanitize_unlocked_achievements() -> void:
-    # В сохранениях от старых версий могут остаться ID достижений,
-    # которых больше нет в актуальном списке. Не считаем их открытыми
-    # и не позволяем им искажать общий счётчик.
-    var valid_ids: Dictionary = {}
-    for spec in achievement_specs:
-        valid_ids[String(spec.get("id", ""))] = true
-    for id in unlocked_achievements.keys():
-        if not valid_ids.has(String(id)):
-            unlocked_achievements.erase(id)
-
 func _ready() -> void:
-    apply_global_brown_ui_theme()
     startup_diagnostic_previous = _startup_read_phase()
     _startup_write_phase("READY")
     # Показываем собственный загрузочный экран как можно раньше.
@@ -848,10 +810,8 @@ func _ready() -> void:
     await get_tree().process_frame
 
     if startup_diagnostic_previous != "" and startup_diagnostic_previous != "DONE":
-        # Не блокируем запуск из-за диагностического маркера старой версии.
-        # Если предыдущий запуск аварийно завершился, после исправления игры
-        # новая попытка должна пройти и перезаписать маркер текущими этапами.
-        print("Recovered from previous startup interruption at: ", startup_diagnostic_previous)
+        _startup_diag_halt(startup_diagnostic_previous)
+        return
 
     if not STARTUP_CONTROL_TEST:
         add_extended_collections()
@@ -864,24 +824,15 @@ func _ready() -> void:
         for i in range(owned_toy_skins.size()): owned_toy_skins[i] = (i == 0)
         for i in range(owned_machine_skins.size()): owned_machine_skins[i] = (i == 0)
     load_save()
-    sanitize_unlocked_achievements()
-    synchronize_achievement_ownership()
-    audit_achievement_source_state()
-    check_achievements()
+    sync_collection_from_inventory()
     # ID игрока нужен и в полностью офлайн-режиме, чтобы профиль не зависал
     # на «ПОЛУЧАЕМ…». Генерируем его сразу после загрузки сохранения.
     ensure_player_id()
-    if ONLINE_ENABLED and not OFFLINE_MODE and server_url == "":
-        server_url = String(ProjectSettings.get_setting("application/config/online_server_url", DEFAULT_SERVER_URL)).strip_edges().trim_suffix("/")
-    # The shared NetworkManager is a lightweight health monitor only.
-    var network_manager := get_node_or_null("/root/NetworkManager")
-    if network_manager != null and network_manager.has_method("configure_player"):
-        network_manager.configure_player(player_id, player_name)
     if not STARTUP_CONTROL_TEST and SERVER_AUTHORITATIVE:
         ensure_player_id()
         remote_http = HTTPRequest.new()
         remote_http.name = "RemoteGameHTTP"
-        remote_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
+        remote_http.timeout = 3.0
         add_child(remote_http)
         remote_http.request_completed.connect(_on_remote_http_completed)
         _ensure_connection_http()
@@ -1349,7 +1300,6 @@ func get_server_game_state() -> Dictionary:
         "workshop_job_active": workshop_job_active, "workshop_job_name": workshop_job_name, "workshop_job_reward": workshop_job_reward,
         "level": player_level, "xp": player_xp, "xp_to_next": xp_to_next, "games": total_games,
         "total_prizes_won": total_prizes_won, "rarity_wins": rarity_wins, "achievements": unlocked_achievements,
-            "achievement_historical_values": achievement_historical_values,
         "last_daily_bonus_date": last_daily_bonus_date, "login_streak": login_streak, "last_login_claim_date": last_login_claim_date,
         "best_result": best_result, "best_result_xp": best_result_xp, "current_win_streak": current_win_streak,
         "best_win_streak": best_win_streak, "total_xp_earned": total_xp_earned, "highest_reward_rubles": highest_reward_rubles,
@@ -1360,7 +1310,7 @@ func get_server_game_state() -> Dictionary:
         "daily_mission_completed_at": daily_mission_completed_at, "weekly_mission_completed_at": weekly_mission_completed_at,
         "daily_series_claimed_at": daily_series_claimed_at,
         "season_pass_xp": season_pass_xp, "season_pass_level": season_pass_level, "active_season_id": active_season_id,
-        "owned_claws": owned_claws, "owned_claw_ids": owned_claw_ids, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
+        "owned_claws": owned_claws, "owned_claw_skins": owned_claw_skins, "owned_toy_skins": owned_toy_skins,
         "owned_machine_skins": owned_machine_skins, "selected_claw_skin": selected_claw_skin,
         "selected_toy_skin": selected_toy_skin, "selected_machine_skin": selected_machine_skin,
         "vip_owned": vip_owned, "vip_selected": vip_selected, "collection": collection,
@@ -1492,16 +1442,6 @@ func apply_server_game_state(data: Dictionary) -> void:
         for item_id in owned_items_remote:
             if item_id is String:
                 var sid := String(item_id)
-                # Серверный owned_items содержит точный ID купленной клешни.
-                # Переносим его в локальный журнал владения, чтобы прогресс
-                # достижений обновлялся даже если owned_claws ещё не пришёл
-                # отдельным полем в snapshot.
-                var claw_id := _canonical_claw_id(sid)
-                if claw_id != "" and not owned_claw_ids.has(claw_id):
-                    owned_claw_ids.append(claw_id)
-                    var claw_idx := int(claw_id.trim_prefix("claw_")) - 1
-                    if claw_idx >= 0 and claw_idx < owned_claws.size():
-                        owned_claws[claw_idx] = true
                 if sid.begins_with("claw_skin_"):
                     var skin_index := clampi(int(sid.trim_prefix("claw_skin_")), 0, maxi(0, owned_claw_skins.size() - 1))
                     if skin_index >= 0 and skin_index < owned_claw_skins.size():
@@ -1576,13 +1516,8 @@ func apply_server_game_state(data: Dictionary) -> void:
         apply_music_settings()
         apply_language()
     if data.has("owned_items") and data["owned_items"] is Array:
-        # Серверный список — дополнительный источник истины. Объединяем его
-        # с локальным состоянием, не затирая уже известные покупки.
         var owned_server: Array = data.get("owned_items")
-        for i in range(owned_claws.size()):
-            if owned_server.has("claw_%d" % (i + 1)):
-                owned_claws[i] = true
-        owned_claws[0] = true
+        for i in range(owned_claws.size()): owned_claws[i] = owned_server.has("claw_%d" % (i + 1))
     if data.has("selected_claw"): selected_claw = clampi(int(data.get("selected_claw", selected_claw)), 0, claw_specs.size()-1)
     if data.has("upgrade_levels") and data["upgrade_levels"] is Array:
         upgrade_levels = _int_array_from_variant(data.get("upgrade_levels"), upgrade_levels)
@@ -1670,7 +1605,7 @@ func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
         return false
     var data := payload.duplicate(true)
     data["type"] = action_name
-    data["action_id"] = "%s_%s_%s_%s" % [action_name, player_id, str(Time.get_ticks_msec()), str(randi())]
+    data["action_id"] = "%s_%s_%s" % [action_name, player_id, str(Time.get_ticks_msec())]
     remote_action_name = action_name
     remote_request_kind = "action:" + action_name
     var err := remote_http.request(_normalized_server_url() + "/api/player/action", _remote_headers(), HTTPClient.METHOD_POST, JSON.stringify(data))
@@ -1695,7 +1630,7 @@ func _ensure_connection_http() -> void:
         return
     connection_http = HTTPRequest.new()
     connection_http.name = "ConnectionHealthHTTP"
-    connection_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
+    connection_http.timeout = 3.0
     add_child(connection_http)
     connection_http.request_completed.connect(_on_connection_http_completed)
 
@@ -2127,27 +2062,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
                 "action:shop_buy":
                     var bought: Variant = data.get("item", {})
                     if bought is Dictionary and String(bought.get("category", "")) == "claws":
-                        var bought_effect: Dictionary = bought.get("effect", {}) if bought.get("effect", {}) is Dictionary else {}
-                        var bought_id_from_server := String(bought.get("id", ""))
-                        var bought_index := -1
-                        if bought_effect.has("claw_index"):
-                            bought_index = clampi(int(bought_effect.get("claw_index", 0)), 0, claw_specs.size() - 1)
-                        elif _canonical_claw_id(bought_id_from_server) != "":
-                            bought_index = clampi(int(_canonical_claw_id(bought_id_from_server).trim_prefix("claw_")) - 1, 0, claw_specs.size() - 1)
-                        else:
-                            bought_index = clampi(selected_claw, 0, claw_specs.size() - 1)
-                        selected_claw = bought_index
-                        # Сервер подтвердил покупку: сразу записываем владение
-                        # в оба локальных источника, чтобы прогресс достижения
-                        # обновился в этом же кадре.
-                        if bought_index < owned_claws.size():
-                            owned_claws[bought_index] = true
-                        var bought_id := "claw_%d" % (bought_index + 1)
-                        if not owned_claw_ids.has(bought_id):
-                            owned_claw_ids.append(bought_id)
-                        synchronize_achievement_ownership()
-                        check_achievements()
-                        save_game()
+                        selected_claw = clampi(int((bought.get("effect", {}) as Dictionary).get("claw_index", selected_claw)), 0, claw_specs.size()-1)
                     apply_shop_visuals()
                     refresh_shop()
                     show_shop_feedback("✓ ПОКУПКА ПОДТВЕРЖДЕНА СЕРВЕРОМ", 2.8)
@@ -2226,9 +2141,7 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         remote_auth_retry_timer = 10.0
     if kind == "register":
         remote_sync_pending = false
-        # Registration already returns the authoritative player snapshot and
-        # full catalog/config. Do not immediately download the same payload again.
-        call_deferred("sync_player_to_server")
+        call_deferred("sync_remote_config")
     elif kind == "config":
         remote_sync_pending = false
         if pending_incoming_referral != "":
@@ -2335,10 +2248,9 @@ func add_panel_title(parent: VBoxContainer, title_text: String) -> void:
 func build_season_pass_panel() -> PanelContainer:
     var p := build_info_menu_panel("SeasonPassPanel", Vector2(970, 1120))
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.add_theme_constant_override("scroll_bar_width", 14)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -2479,7 +2391,7 @@ func refresh_season_pass_panel() -> void:
             if state_label:
                 if lvl < season_pass_level:
                     state_label.text = "✓ ПОЛУЧЕНО"
-                    state_label.modulate = Color("#C09A70")
+                    state_label.modulate = Color("#86C98A")
                 elif lvl == season_pass_level:
                     state_label.text = "★ ТЕКУЩИЙ УРОВЕНЬ"
                     state_label.modulate = Color("#DDB47A")
@@ -2507,7 +2419,6 @@ func refresh_promo_panel() -> void:
 func build_news_panel() -> PanelContainer:
     var p:=build_info_menu_panel("NewsPanel",Vector2(970,900))
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
-    style_scroll_container_brown(scroll)
     var v:=VBoxContainer.new(); v.name="NewsContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",12); scroll.add_child(v)
     add_panel_title(v,"📰  НОВОСТИ")
     var intro:=Label.new(); intro.text="Здесь будут появляться новости игры, события, новые функции, игрушки и новые промокоды."; intro.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; intro.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; intro.add_theme_font_size_override("font_size",18); intro.modulate=Color("#D8C3AA"); v.add_child(intro)
@@ -2519,8 +2430,6 @@ func build_news_panel() -> PanelContainer:
 func refresh_news_panel(panel: PanelContainer = null) -> void:
     var target := panel if panel != null else news_panel
     if target == null: return
-    if target == news_panel and _news_ui_built:
-        return
     var list := target.get_node_or_null("ScrollContainer/NewsContent/NewsList") as VBoxContainer
     if list == null: return
     for child in list.get_children(): child.queue_free()
@@ -2533,13 +2442,10 @@ func refresh_news_panel(panel: PanelContainer = null) -> void:
     empty.modulate = Color("#BCA996")
     list.add_child(empty)
     news_unread = 0
-    if target == news_panel:
-        _news_ui_built = true
 
 func build_rating_panel() -> PanelContainer:
     var p:=build_info_menu_panel("RatingPanel",Vector2(970,900))
     var scroll:=ScrollContainer.new(); scroll.name="ScrollContainer"; scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); p.add_child(scroll)
-    style_scroll_container_brown(scroll)
     var v:=VBoxContainer.new(); v.name="RatingContent"; v.custom_minimum_size=Vector2(900,0); v.add_theme_constant_override("separation",9); scroll.add_child(v)
     add_panel_title(v,"🏆  РЕЙТИНГ")
     var note:=Label.new(); note.name="RatingNote"; note.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; note.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; note.add_theme_font_size_override("font_size",16); note.modulate=Color("#BCA996"); v.add_child(note)
@@ -2549,10 +2455,6 @@ func build_rating_panel() -> PanelContainer:
 
 func refresh_rating_panel() -> void:
     if not rating_panel:return
-    var rating_key := "%d|%s|%d" % [remote_leaderboard.size(), player_name, int(Time.get_unix_time_from_system() / 60)]
-    if rating_key == _rating_ui_last_key and rating_panel.has_meta("rating_ui_built"):
-        return
-    _rating_ui_last_key = rating_key
     var list:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/Leaderboard") as VBoxContainer
     if not list:return
     var note:=rating_panel.get_node_or_null("ScrollContainer/RatingContent/RatingNote") as Label
@@ -2564,7 +2466,6 @@ func refresh_rating_panel() -> void:
         var empty := Label.new(); empty.text="Рейтинг пока пуст."; empty.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; empty.add_theme_font_size_override("font_size",19); list.add_child(empty); return
     for i in range(rows.size()):
         var row:=Label.new(); row.text="%d.  %s   •   %d" % [i+1,String(rows[i]["name"]),int(rows[i]["score"])] ; row.add_theme_font_size_override("font_size",20); row.modulate=GOLD if String(rows[i]["name"])==player_name else Color("#E0D4C6"); list.add_child(row)
-    rating_panel.set_meta("rating_ui_built", true)
 
 func build_return_bonus_panel() -> PanelContainer:
     var p:=build_info_menu_panel("ReturnBonusPanel",Vector2(970,620))
@@ -2596,7 +2497,6 @@ func build_live_systems_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     p.add_child(scroll)
@@ -2609,7 +2509,7 @@ func build_live_systems_panel() -> PanelContainer:
     var info := Label.new(); info.name="SystemsInfo"; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
     var ntitle := Label.new(); ntitle.text="🔔 УМНЫЕ УВЕДОМЛЕНИЯ"; ntitle.add_theme_font_size_override("font_size",21); ntitle.modulate=GOLD; v.add_child(ntitle)
     for item in [["notify_rewards_on","🎁 Награды"],["notify_streak_on","🔥 Серия входов"],["notify_events_on","🎪 События и сезон"],["notify_workshop_on","🔧 Мастерская"],["notify_chests_on","📦 Сундуки"]]:
-        var cb := CheckButton.new(); cb.text=String(item[1]); cb.button_pressed=bool(get(String(item[0]))); cb.add_theme_font_size_override("font_size",18); style_check_button_brown(cb); cb.toggled.connect(func(on: bool, key: String=String(item[0])): set(key,on); save_game(); cancel_background_notifications(); schedule_background_notifications(); refresh_live_systems_panel()); v.add_child(cb)
+        var cb := CheckButton.new(); cb.text=String(item[1]); cb.button_pressed=bool(get(String(item[0]))); cb.add_theme_font_size_override("font_size",18); cb.toggled.connect(func(on: bool, key: String=String(item[0])): set(key,on); save_game(); cancel_background_notifications(); schedule_background_notifications(); refresh_live_systems_panel()); v.add_child(cb)
     var return_title := Label.new(); return_title.text="🎁 БОНУС ЗА ВОЗВРАЩЕНИЕ"; return_title.add_theme_font_size_override("font_size",21); return_title.modulate=GOLD; v.add_child(return_title)
     var return_btn := Button.new(); return_btn.name="ReturnBonusButton"; return_btn.custom_minimum_size=Vector2(0,70); style_button(return_btn,Color("#76583F")); return_btn.add_theme_font_size_override("font_size",18); return_btn.pressed.connect(claim_return_bonus); v.add_child(return_btn)
     var job_title := Label.new(); job_title.text="🔧 ФОНОВАЯ РАБОТА МАСТЕРСКОЙ"; job_title.add_theme_font_size_override("font_size",21); job_title.modulate=GOLD; v.add_child(job_title)
@@ -2680,7 +2580,7 @@ func create_loading_screen() -> void:
     top_label.size = Vector2(940, 44)
     top_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     top_label.add_theme_font_size_override("font_size", 18)
-    top_label.modulate = Color("#D6A85D")
+    top_label.modulate = Color("#C9A982")
     loading_screen.add_child(top_label)
 
     var title := Label.new()
@@ -2690,7 +2590,7 @@ func create_loading_screen() -> void:
     title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     title.add_theme_font_size_override("font_size", 48)
-    title.add_theme_color_override("font_color", Color("#F0C36A"))
+    title.add_theme_color_override("font_color", Color("#E5C69D"))
     title.add_theme_color_override("font_shadow_color", Color("#3A2417"))
     title.add_theme_constant_override("shadow_offset_x", 2)
     title.add_theme_constant_override("shadow_offset_y", 3)
@@ -2702,11 +2602,11 @@ func create_loading_screen() -> void:
     subtitle.size = Vector2(920, 55)
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     subtitle.add_theme_font_size_override("font_size", 17)
-    subtitle.modulate = Color("#C8A98A")
+    subtitle.modulate = Color("#BCA996")
     loading_screen.add_child(subtitle)
 
     var divider := ColorRect.new()
-    divider.color = Color("#B07A4E")
+    divider.color = Color("#9A7653")
     divider.position = Vector2(270, 620)
     divider.size = Vector2(540, 3)
     loading_screen.add_child(divider)
@@ -2717,7 +2617,7 @@ func create_loading_screen() -> void:
     loading_status.size = Vector2(920, 52)
     loading_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     loading_status.add_theme_font_size_override("font_size", 22)
-    loading_status.modulate = Color("#E5B96B")
+    loading_status.modulate = Color("#E0C6A2")
     loading_screen.add_child(loading_status)
 
     loading_progress = ProgressBar.new()
@@ -2751,7 +2651,7 @@ func create_loading_screen() -> void:
     loading_percent.size = Vector2(920, 48)
     loading_percent.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     loading_percent.add_theme_font_size_override("font_size", 24)
-    loading_percent.modulate = Color("#E7B65F")
+    loading_percent.modulate = Color("#DDB47A")
     loading_screen.add_child(loading_percent)
 
     # Небольшой блок состояния вместо изображения: он заполняет центральную
@@ -2764,7 +2664,7 @@ func create_loading_screen() -> void:
     info.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     info.add_theme_font_size_override("font_size", 18)
-    info.modulate = Color("#C09B78")
+    info.modulate = Color("#A98E76")
     loading_screen.add_child(info)
 
     var tips_title := Label.new()
@@ -2773,7 +2673,7 @@ func create_loading_screen() -> void:
     tips_title.size = Vector2(920, 45)
     tips_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     tips_title.add_theme_font_size_override("font_size", 18)
-    tips_title.modulate = Color("#D6A85D")
+    tips_title.modulate = Color("#C9A982")
     loading_screen.add_child(tips_title)
 
     loading_stage = Label.new()
@@ -2782,7 +2682,7 @@ func create_loading_screen() -> void:
     loading_stage.size = Vector2(880, 40)
     loading_stage.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     loading_stage.add_theme_font_size_override("font_size", 15)
-    loading_stage.modulate = Color("#A8876D")
+    loading_stage.modulate = Color("#9E8975")
     loading_screen.add_child(loading_stage)
 
     loading_tip = Label.new()
@@ -2793,7 +2693,7 @@ func create_loading_screen() -> void:
     loading_tip.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
     loading_tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     loading_tip.add_theme_font_size_override("font_size", 17)
-    loading_tip.modulate = Color("#D6BE9C")
+    loading_tip.modulate = Color("#D8C3AA")
     loading_screen.add_child(loading_tip)
 
     var hint := Label.new()
@@ -2802,7 +2702,7 @@ func create_loading_screen() -> void:
     hint.size = Vector2(940, 55)
     hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     hint.add_theme_font_size_override("font_size", 20)
-    hint.modulate = Color("#B07A4E")
+    hint.modulate = Color("#9A7653")
     loading_screen.add_child(hint)
 
     var ready := Label.new()
@@ -2811,7 +2711,7 @@ func create_loading_screen() -> void:
     ready.size = Vector2(940, 60)
     ready.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     ready.add_theme_font_size_override("font_size", 22)
-    ready.modulate = Color("#D6A85D")
+    ready.modulate = Color("#C9A982")
     loading_screen.add_child(ready)
 
     var footer := Label.new()
@@ -2820,7 +2720,7 @@ func create_loading_screen() -> void:
     footer.size = Vector2(940, 55)
     footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     footer.add_theme_font_size_override("font_size", 17)
-    footer.modulate = Color("#A8876D")
+    footer.modulate = Color("#9E8975")
     loading_screen.add_child(footer)
 
     var version := Label.new()
@@ -2962,9 +2862,6 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
-    audit_achievement_source_state()
-    check_achievements()
-    save_game()
     _startup_write_phase("DONE")
     register_game_activity()
     if loading_screen and is_instance_valid(loading_screen):
@@ -2999,7 +2896,7 @@ func activate_extra_features_after_startup() -> void:
     if not remote_http or not is_instance_valid(remote_http):
         remote_http = HTTPRequest.new()
         remote_http.name = "RemoteGameHTTP"
-        remote_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
+        remote_http.timeout = 3.0
         add_child(remote_http)
         remote_http.request_completed.connect(_on_remote_http_completed)
     _ensure_connection_http()
@@ -4107,204 +4004,6 @@ func build_particles() -> void:
     # Неоновые частицы отключены: стиль автомата — дерево, металл и стекло.
     sparkle_particles = null
 
-func apply_global_brown_ui_theme() -> void:
-    # Глобальная тема применяется к КОРНЮ окна, чтобы стандартные Godot
-    # контролы, включая динамически создаваемые PopupMenu/OptionButton/
-    # CheckButton/ScrollBar/LineEdit, не откатывались к системному серому.
-    var theme := Theme.new()
-    var panel := make_style(Color("#241B16"), Color("#76583F"), 18, 2)
-    var panel_hover := make_style(Color("#3A2A20"), Color("#B98B5C"), 18, 2)
-    var panel_pressed := make_style(Color("#4A3022"), Color("#D1A35A"), 18, 3)
-    var panel_focus := make_style(Color("#30231B"), Color("#C09A70"), 18, 2)
-    # Все базовые интерактивные контролы используют одну тему. Разные акценты
-    # задаются локально через style_button(), а системные состояния остаются тёплыми.
-    for type_name in ["Button", "OptionButton", "CheckButton", "MenuButton"]:
-        theme.set_color("font_color", type_name, Color("#F1E5D6"))
-        theme.set_color("font_hover_color", type_name, Color("#FFF4E5"))
-        theme.set_color("font_pressed_color", type_name, Color("#FFFFFF"))
-        theme.set_color("font_focus_color", type_name, Color("#FFF4E5"))
-        theme.set_color("font_disabled_color", type_name, Color("#8F7B6B"))
-        theme.set_stylebox("normal", type_name, panel)
-        theme.set_stylebox("hover", type_name, panel_hover)
-        theme.set_stylebox("pressed", type_name, panel_pressed)
-        theme.set_stylebox("focus", type_name, panel_focus)
-    theme.set_stylebox("panel", "PopupMenu", make_style(Color("#241B16"), Color("#8A684C"), 12, 2))
-    theme.set_stylebox("hover", "PopupMenu", make_style(Color("#4A3022"), Color("#B98B5C"), 10, 2))
-    theme.set_color("font_color", "PopupMenu", Color("#F1E5D6"))
-    theme.set_color("font_hover_color", "PopupMenu", Color("#FFFFFF"))
-    theme.set_color("font_pressed_color", "PopupMenu", Color("#FFFFFF"))
-    theme.set_color("font_disabled_color", "PopupMenu", Color("#8F7B6B"))
-    theme.set_stylebox("normal", "LineEdit", make_style(Color("#17120F"), Color("#76583F"), 12, 2))
-    theme.set_stylebox("focus", "LineEdit", make_style(Color("#1F1712"), Color("#D1A35A"), 12, 2))
-    theme.set_color("font_color", "LineEdit", Color("#F1E5D6"))
-    theme.set_color("caret_color", "LineEdit", Color("#E6C786"))
-    theme.set_stylebox("slider", "HSlider", make_style(Color("#17120F"), Color("#6E4B33"), 8, 1))
-    theme.set_stylebox("grabber_area", "HSlider", make_style(Color("#5A3B29"), Color("#5A3B29"), 8, 1))
-    theme.set_stylebox("grabber_area_highlighted", "HSlider", make_style(Color("#8A684C"), Color("#D1A35A"), 8, 1))
-    theme.set_stylebox("scroll", "VScrollBar", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-    theme.set_stylebox("grabber", "VScrollBar", make_style(Color("#765238"), Color("#A96F43"), 6, 1))
-    theme.set_stylebox("grabber_highlighted", "VScrollBar", make_style(Color("#A96F43"), Color("#D1A35A"), 6, 1))
-    theme.set_stylebox("scroll", "HScrollBar", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-    theme.set_stylebox("grabber", "HScrollBar", make_style(Color("#765238"), Color("#A96F43"), 6, 1))
-    theme.set_stylebox("grabber_highlighted", "HScrollBar", make_style(Color("#A96F43"), Color("#D1A35A"), 6, 1))
-    theme.set_constant("scroll_bar_width", "VScrollBar", 5)
-    theme.set_constant("scroll_bar_width", "HScrollBar", 5)
-    theme.set_constant("scroll_bar_h_separation", "VScrollBar", 1)
-    theme.set_constant("scroll_bar_v_separation", "HScrollBar", 1)
-    theme.set_icon("unchecked", "CheckButton", load("res://assets/ui_toggle_off.svg"))
-    theme.set_icon("unchecked_disabled", "CheckButton", load("res://assets/ui_toggle_off.svg"))
-    theme.set_icon("checked", "CheckButton", load("res://assets/ui_toggle_on.svg"))
-    theme.set_icon("checked_disabled", "CheckButton", load("res://assets/ui_toggle_on.svg"))
-    for type_name in ["CheckBox"]:
-        theme.set_color("font_color", type_name, Color("#F1E5D6"))
-        theme.set_color("font_hover_color", type_name, Color("#FFF4E5"))
-        theme.set_color("font_pressed_color", type_name, Color("#FFFFFF"))
-        theme.set_color("font_focus_color", type_name, Color("#FFF4E5"))
-        theme.set_color("font_disabled_color", type_name, Color("#8F7B6B"))
-    if get_tree() and get_tree().root:
-        get_tree().root.theme = theme
-
-
-func style_option_button_brown(o: OptionButton) -> void:
-    o.add_theme_color_override("font_color", Color("#F1E5D6"))
-    o.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
-    o.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
-    o.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
-    o.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
-    o.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
-    o.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 18, 3))
-    o.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
-    o.add_theme_font_size_override("font_size", 20)
-    var pop := o.get_popup()
-    if pop:
-        pop.add_theme_color_override("font_color", Color("#F1E5D6"))
-        pop.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
-        pop.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
-        pop.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
-        pop.add_theme_stylebox_override("panel", make_style(Color("#241B16"), Color("#76583F"), 14, 2))
-        pop.add_theme_stylebox_override("hover", make_style(Color("#4A3022"), Color("#A3754D"), 10, 2))
-        pop.add_theme_stylebox_override("separator", make_style(UI_BROWN_DEEP, UI_BROWN_DEEP, 0, 1))
-        pop.add_theme_font_size_override("font_size", 19)
-
-func style_check_button_brown(c: CheckButton) -> void:
-    c.add_theme_color_override("font_color", Color("#F1E5D6"))
-    c.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
-    c.add_theme_color_override("font_pressed_color", Color("#FFFFFF"))
-    c.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
-    c.add_theme_color_override("font_disabled_color", Color("#8F7B6B"))
-    c.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 14, 1))
-    c.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 14, 2))
-    c.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 14, 2))
-    c.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 14, 1))
-    c.add_theme_font_size_override("font_size", 21)
-    var off := load("res://assets/ui_toggle_off.svg") as Texture2D
-    var on := load("res://assets/ui_toggle_on.svg") as Texture2D
-    if off:
-        c.add_theme_icon_override("unchecked", off)
-        c.add_theme_icon_override("unchecked_disabled", off)
-    if on:
-        c.add_theme_icon_override("checked", on)
-        c.add_theme_icon_override("checked_disabled", on)
-
-func style_slider_brown(slider: HSlider) -> void:
-    slider.add_theme_stylebox_override("slider", make_style(Color("#17120F"), Color("#6E4B33"), 8, 1))
-    slider.add_theme_stylebox_override("grabber_area", make_style(UI_BROWN_DEEP, UI_BROWN_DEEP, 8, 1))
-    slider.add_theme_stylebox_override("grabber_area_highlighted", make_style(Color("#8A684C"), Color("#8A684C"), 8, 1))
-    slider.add_theme_icon_override("grabber", load("res://assets/ui_slider_grabber.svg"))
-    slider.add_theme_icon_override("grabber_highlighted", load("res://assets/ui_slider_grabber_highlighted.svg"))
-
-func style_scroll_container_brown(scroll: ScrollContainer) -> void:
-    # Единая тонкая полоса для всех окон: 5px — в 2 раза уже прежних 10px.
-    # Один и тот же стиль применяется и к вертикальной, и к горизонтальной прокрутке.
-    scroll.add_theme_constant_override("scroll_bar_width", 5)
-    scroll.add_theme_constant_override("scroll_bar_h_separation", 1)
-    var vs := scroll.get_v_scroll_bar()
-    var hs := scroll.get_h_scroll_bar()
-    if vs:
-        vs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-        vs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
-        vs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
-    if hs:
-        hs.add_theme_stylebox_override("scroll", make_style(Color("#17120F"), Color("#3F2D22"), 6, 1))
-        hs.add_theme_stylebox_override("grabber", make_style(UI_BROWN, UI_COPPER, 6, 1))
-        hs.add_theme_stylebox_override("grabber_highlighted", make_style(UI_COPPER, UI_GOLD, 6, 1))
-
-func show_brown_modal(title_text: String, message_text: String, action: Callable, ok_text: String = "OK", cancel_text: String = "ОТМЕНА", large: bool = false) -> void:
-    # Не используем ConfirmationDialog/AcceptDialog: на Android их Window
-    # может получить системный серый фон. Это обычное игровое окно внутри
-    # menu_layer, поэтому оно всегда наследует нашу тему.
-    var overlay := ColorRect.new()
-    overlay.name = "BrownModalOverlay"
-    overlay.color = Color(0.03, 0.02, 0.015, 0.72)
-    overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    overlay.mouse_filter = Control.MOUSE_FILTER_STOP
-    overlay.z_index = 5000
-    menu_layer.add_child(overlay)
-
-    var center := CenterContainer.new()
-    center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    overlay.add_child(center)
-
-    var panel := PanelContainer.new()
-    panel.custom_minimum_size = Vector2(620, 320 if large else 280)
-    style_panel(panel, Color("#241B16"), Color("#8A684C"), 18, 2)
-    center.add_child(panel)
-
-    var box := VBoxContainer.new()
-    box.add_theme_constant_override("separation", 14)
-    panel.add_child(box)
-
-    var title := Label.new()
-    title.text = title_text
-    title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    title.add_theme_font_size_override("font_size", 24)
-    title.modulate = Color("#E1C29A")
-    box.add_child(title)
-
-    var message := Label.new()
-    message.text = message_text
-    message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-    message.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-    message.custom_minimum_size = Vector2(0, 100 if large else 80)
-    message.add_theme_font_size_override("font_size", 18)
-    message.modulate = Color("#F0E1CE")
-    box.add_child(message)
-
-    var buttons := HBoxContainer.new()
-    buttons.alignment = BoxContainer.ALIGNMENT_CENTER
-    buttons.add_theme_constant_override("separation", 12)
-    box.add_child(buttons)
-
-    var cancel := Button.new()
-    cancel.text = cancel_text
-    cancel.custom_minimum_size = Vector2(190, 58)
-    style_button(cancel, Color("#6E4B33"))
-    buttons.add_child(cancel)
-
-    var ok := Button.new()
-    ok.text = ok_text
-    ok.custom_minimum_size = Vector2(190, 58)
-    style_button(ok, Color("#A8754A"))
-    buttons.add_child(ok)
-
-    var close_modal := func() -> void:
-        if is_instance_valid(overlay):
-            overlay.queue_free()
-    cancel.pressed.connect(close_modal)
-    ok.pressed.connect(func():
-        close_modal.call()
-        if action.is_valid():
-            action.call()
-    )
-
-func style_standard_dialog(dialog: Window, large: bool = false) -> void:
-    # Оставлен только для совместимости со старыми вызовами. Новые модальные
-    # окна должны использовать show_brown_modal(), а не системный Window.
-    dialog.borderless = true
-    dialog.transparent_bg = true
-    dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
-
 func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 2) -> StyleBoxFlat:
     var st := StyleBoxFlat.new()
     st.bg_color = bg
@@ -4317,67 +4016,19 @@ func make_style(bg: Color, border: Color, radius: int = 18, border_width: int = 
     st.content_margin_bottom = 14.0
     return st
 
-func ui_accent(source: Color) -> Color:
-    # Основная UI-гамма остаётся коричневой, но акцент получает спокойный
-    # тематический оттенок. Насыщенность намеренно снижена, чтобы цвет не бил в глаза.
-    var h := source.h
-    var s := source.s
-    var v := source.v
-    if s < 0.12:
-        return UI_COPPER if v > 0.55 else UI_BROWN
-    # Тёплые акценты оставляем тёплыми; холодные переводим в приглушённые
-    # teal/olive/plum/blue-grey, сохраняя общий ретро-стиль интерфейса.
-    if h < 0.08 or h >= 0.95:
-        return Color("#B96B4A") # терракота
-    if h < 0.18:
-        return Color("#C18A4B") # латунь
-    if h < 0.30:
-        return Color("#B79A55") # оливковое золото
-    if h < 0.50:
-        return Color("#6F9A8A") # приглушённая патина
-    if h < 0.68:
-        return Color("#6F8799") # пыльный сине-серый
-    if h < 0.82:
-        return Color("#92758F") # приглушённая слива
-    return Color("#A8755A") # медь
-
-func semantic_ui_accent(b: Button, fallback: Color) -> Color:
-    # Если конкретной кнопке не задан цвет, выбираем мягкий акцент по её смыслу.
-    # Это даёт интерфейсу разные цвета, но не разрушает коричневую основу.
-    var t := (String(b.text) + " " + String(b.name)).to_lower()
-    if t.contains("сезон") or t.contains("event") or t.contains("событ"):
-        return Color("#92758F")
-    if t.contains("сундук") or t.contains("chest") or t.contains("награ") or t.contains("daily"):
-        return UI_GOLD
-    if t.contains("мастер") or t.contains("workshop") or t.contains("улучш"):
-        return Color("#6F9A8A")
-    if t.contains("профил") or t.contains("аватар") or t.contains("profile"):
-        return Color("#6F8799")
-    if t.contains("магаз") or t.contains("куп") or t.contains("shop") or t.contains("скин") or t.contains("claw"):
-        return Color("#B96B4A")
-    if t.contains("рейтинг") or t.contains("rating"):
-        return Color("#B79A55")
-    if t.contains("настрой") or t.contains("setting") or t.contains("язык"):
-        return Color("#A8755A")
-    if t.contains("назад") or t.contains("закры") or t.contains("отмен") or t.contains("close"):
-        return UI_BROWN
-    return ui_accent(fallback)
-
-func style_button(b: Button, accent: Color = UI_COPPER, large: bool = false) -> void:
+func style_button(b: Button, accent: Color = Color("#A8754A"), large: bool = false) -> void:
     if not b.has_meta("ui_sfx_bound"):
         b.set_meta("ui_sfx_bound", true)
         b.pressed.connect(func(): play_ui_sound("button"))
-    var ring := semantic_ui_accent(b, accent)
-    b.add_theme_color_override("font_color", UI_TEXT)
-    b.add_theme_color_override("font_hover_color", Color("#FFF4E5"))
+    b.add_theme_color_override("font_color", Color.WHITE)
+    b.add_theme_color_override("font_hover_color", Color.WHITE)
     b.add_theme_color_override("font_pressed_color", Color.WHITE)
-    b.add_theme_color_override("font_focus_color", Color("#FFF4E5"))
-    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 18, 2))
-    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.24), 18, 3))
-    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 18, 3))
-    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.16), 18, 2))
+    b.add_theme_color_override("font_focus_color", Color.WHITE)
+    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
+    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 18, 3))
+    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#B98B5C"), 18, 3))
+    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), Color("#8D6342"), 18, 2))
     b.add_theme_font_size_override("font_size", 30 if large else 22)
-
 func style_panel(p: PanelContainer, bg: Color = Color("#1D1612"), border: Color = Color("#76583F"), radius: int = 26, border_width: int = 3) -> void:
     p.add_theme_stylebox_override("panel", make_style(bg, border, radius, border_width))
 
@@ -4412,7 +4063,7 @@ func add_neon_header(parent: Control, title_text: String, subtitle_text: String 
         sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
         sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         sub.add_theme_font_size_override("font_size", 17)
-        sub.modulate = Color("#B9A28D")
+        sub.modulate = Color("#9FB8D9")
         parent.add_child(sub)
 
 func build_ui() -> void:
@@ -4506,7 +4157,7 @@ func build_ui() -> void:
     news_menu_button.pressed.connect(func(): open_panel("news"))
     menu_layer.add_child(news_menu_button); main_menu_controls.append(news_menu_button); decorate_main_menu_button(news_menu_button)
 
-    var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#76583F"))
+    var settings := make_menu_button("⚙  НАСТРОЙКИ", Vector2(right_x, y4), Vector2(col_w, row_h), Color("#5E554D"))
     settings.pressed.connect(func(): open_panel("settings"))
     menu_layer.add_child(settings); main_menu_controls.append(settings); decorate_main_menu_button(settings)
 
@@ -4539,13 +4190,11 @@ func build_ui() -> void:
 
     await set_loading_status("МАГАЗИН ГОТОВ...")
     shop_panel = build_shop_panel()
-    refresh_shop()
     await get_tree().process_frame
     await set_loading_progress(84.0, "МАГАЗИН ГОТОВ")
 
     await set_loading_status("КОЛЛЕКЦИЯ ГОТОВА...")
     collection_panel = build_collection_panel()
-    refresh_collection_panel()
     await get_tree().process_frame
     await set_loading_progress(85.0, "КОЛЛЕКЦИЯ ГОТОВА")
 
@@ -4553,13 +4202,11 @@ func build_ui() -> void:
     settings_panel = build_settings_panel()
     await get_tree().process_frame
     achievements_panel = build_achievements_panel()
-    refresh_achievements_panel()
     await get_tree().process_frame
     await set_loading_progress(86.0, "НАСТРОЙКИ И ДОСТИЖЕНИЯ ГОТОВЫ")
 
     await set_loading_status("ПРОФИЛЬ И ПОМОЩЬ ГОТОВЫ...")
     profile_panel = build_profile_panel()
-    refresh_profile_panel()
     await get_tree().process_frame
     help_panel = build_help_panel()
     await get_tree().process_frame
@@ -4567,46 +4214,36 @@ func build_ui() -> void:
 
     await set_loading_status("РЕФЕРАЛЫ И VIP ГОТОВЫ...")
     referral_panel = build_referral_panel()
-    refresh_referral_panel()
     await get_tree().process_frame
     vip_panel = build_vip_panel()
-    refresh_vip_panel()
     await get_tree().process_frame
     await set_loading_progress(88.0, "РЕФЕРАЛЫ И VIP ГОТОВЫ")
 
     await set_loading_status("СЕЗОНЫ И СУНДУКИ ГОТОВЫ...")
     seasons_panel = build_seasons_panel()
-    refresh_seasons_panel()
     await get_tree().process_frame
     chests_panel = build_chests_panel()
-    refresh_chests_panel()
     await get_tree().process_frame
     await set_loading_progress(89.0, "СЕЗОНЫ И СУНДУКИ ГОТОВЫ")
 
     await set_loading_status("МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ...")
     workshop_panel = build_workshop_panel()
-    refresh_workshop_panel()
     await get_tree().process_frame
     season_pass_panel = build_season_pass_panel()
-    refresh_season_pass_panel()
     await get_tree().process_frame
     await set_loading_progress(90.0, "МАСТЕРСКАЯ И ПРОПУСК ГОТОВЫ")
 
     await set_loading_status("ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ...")
     promo_panel = build_promo_panel()
-    refresh_promo_panel()
     await get_tree().process_frame
     news_panel = build_news_panel()
-    refresh_news_panel()
     await get_tree().process_frame
     await set_loading_progress(91.0, "ПРОМОКОДЫ И НОВОСТИ ГОТОВЫ")
 
     await set_loading_status("РЕЙТИНГ И БОНУС ГОТОВЫ...")
     rating_panel = build_rating_panel()
-    refresh_rating_panel()
     await get_tree().process_frame
     return_bonus_panel = build_return_bonus_panel()
-    refresh_return_bonus_panel()
     await get_tree().process_frame
     await set_loading_progress(92.0, "РЕЙТИНГ И БОНУС ГОТОВЫ")
     # Старый объединённый центр больше не показывается: его функции разобраны по разделам.
@@ -4650,7 +4287,7 @@ func build_ui() -> void:
 func setup_android_scrolls() -> void:
     # Единая настройка прокрутки для всех длинных окон под Android.
     # Вертикальные окна листаются обычным свайпом пальца, а полоска прокрутки
-    # остаётся узкой, но удобной для захвата пальцем.
+    # остаётся достаточно широкой для точного захвата.
     var stack: Array[Node] = [self]
     while not stack.is_empty():
         var current: Node = stack.pop_back()
@@ -4663,9 +4300,9 @@ func configure_android_scroll(scroll: ScrollContainer) -> void:
     if scroll.has_meta("android_scroll_configured"):
         return
     scroll.set_meta("android_scroll_configured", true)
-    scroll.follow_focus = false
+    scroll.follow_focus = true
     scroll.scroll_deadzone = 1
-    scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.add_theme_constant_override("scroll_bar_width", 20)
     scroll.add_theme_constant_override("scroll_bar_h_separation", 3)
     if scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
         scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
@@ -4836,25 +4473,12 @@ func _on_gameplay_modal_blocker_gui_input(event: InputEvent) -> void:
 # в момент НАЧАЛА касания и больше не ищем заново во время движения.
 # Поэтому палец может пройти поверх кнопок, текста, картинок и других пунктов
 # внутри окна — прокрутка не потеряется.
-var _ui_refresh_accum: float = 0.0
 var _free_scroll_touch_id: int = -1
 var _free_scroll_target: ScrollContainer = null
-var _free_scroll_axis: int = 0 # 1 = vertical, 2 = horizontal
-var _daily_ui_last_key: String = ""
-var _daily_ui_last_second: int = -1
-var _collection_ui_last_key: String = ""
-var _workshop_ui_last_key: String = ""
-var _seasons_ui_last_key: String = ""
-var _shop_ui_last_key: String = ""
-var _profile_ui_last_key: String = ""
-var _stats_ui_last_key: String = ""
-var _rating_ui_last_key: String = ""
-var _news_ui_built: bool = false
 
 func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
     # Ищем среди ВСЕХ видимых ScrollContainer, под которыми находится точка.
-    # Для горизонтальных списков (например, категории достижений) вертикальная
-    # прокрутка может быть отключена — поэтому учитываем оба направления.
+    # Не зависим от того, какой дочерний Label/Button оказался сверху.
     var best: ScrollContainer = null
     var best_area: float = INF
     var stack: Array[Node] = [node]
@@ -4862,12 +4486,12 @@ func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
         var current: Node = stack.pop_back()
         if current is ScrollContainer:
             var scroll := current as ScrollContainer
-            var can_vertical := scroll.visible and scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED
-            var can_horizontal := scroll.visible and scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED
-            if can_vertical or can_horizontal:
+            if scroll.visible and scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
                 if scroll.get_global_rect().has_point(point):
                     var size := scroll.size
                     var area := maxf(size.x * size.y, 1.0)
+                    # Из нескольких вложенных окон выбираем самое маленькое
+                    # подходящее — обычно это конкретное открытое окно.
                     if area < best_area:
                         best = scroll
                         best_area = area
@@ -4878,50 +4502,31 @@ func _find_scroll_container_at(node: Node, point: Vector2) -> ScrollContainer:
     return best
 
 func _handle_free_screen_scroll(event: InputEventScreenDrag) -> bool:
+    # Цель уже захвачена при первом касании. Неважно, куда палец
+    # переместился внутри окна и над каким Control он сейчас находится.
     if _free_scroll_target == null or not is_instance_valid(_free_scroll_target):
         return false
     var scroll := _free_scroll_target
-    var vs := scroll.get_v_scroll_bar()
-    var hs := scroll.get_h_scroll_bar()
-    var can_vertical := scroll.vertical_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED and vs and vs.max_value > 0.0
-    var can_horizontal := scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED and hs and hs.max_value > 0.0
-    if not can_vertical and not can_horizontal:
+    var bar := scroll.get_v_scroll_bar()
+    var max_scroll := maxf(bar.max_value, 0.0)
+    if max_scroll <= 0.0:
         return false
-
-    # Выбираем направление по фактическому движению пальца. Для одностороннего
-    # списка направление фиксировано. Это не даёт горизонтальному списку
-    # "залипнуть" на вертикальной обработке.
-    if _free_scroll_axis == 0:
-        if can_horizontal and not can_vertical:
-            _free_scroll_axis = 2
-        elif can_vertical and not can_horizontal:
-            _free_scroll_axis = 1
-        elif absf(event.relative.x) > absf(event.relative.y):
-            _free_scroll_axis = 2
-        else:
-            _free_scroll_axis = 1
-
-    if _free_scroll_axis == 2 and can_horizontal:
-        scroll.scroll_horizontal = clampi(scroll.scroll_horizontal - int(round(event.relative.x)), 0, int(hs.max_value))
-        return true
-    if _free_scroll_axis == 1 and can_vertical:
-        scroll.scroll_vertical = clampi(scroll.scroll_vertical - int(round(event.relative.y)), 0, int(vs.max_value))
-        return true
-    return false
+    # 1:1 со скоростью пальца, с защитой от выхода за границы.
+    scroll.scroll_vertical = clampf(scroll.scroll_vertical - event.relative.y, 0.0, max_scroll)
+    return true
 
 func _input(event: InputEvent) -> void:
-    # Свободный скроллинг работает как настоящий свайп: окно захватывается
-    # один раз при начале касания и не теряется при проходе над кнопками/Label.
+    # Свободный скроллинг работает как настоящий свайп: сначала захватываем
+    # окно, затем листаем его до отпускания пальца. Кнопки и пункты внутри
+    # окна не мешают прокрутке.
     if event is InputEventScreenTouch:
         var touch := event as InputEventScreenTouch
         if touch.pressed:
             _free_scroll_touch_id = touch.index
             _free_scroll_target = _find_scroll_container_at(self, touch.position)
-            _free_scroll_axis = 0
         elif touch.index == _free_scroll_touch_id:
             _free_scroll_touch_id = -1
             _free_scroll_target = null
-            _free_scroll_axis = 0
         return
 
     if event is InputEventScreenDrag:
@@ -4965,18 +4570,28 @@ func build_extra_hud() -> void:
     # ЛЕВАЯ ВЕРТИКАЛЬ: сезоны/праздники + сундуки + мастерская.
     # Эти кнопки находятся только на игровом экране и НЕ добавляются в главное меню.
     var season_icon := get_current_season_icon()
-    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), UI_BRASS)
+    var seasons_btn := make_menu_circle_button(season_icon, "СЕЗОНЫ И ПРАЗДНИКИ", Vector2(20, 185), Color("#4D8068"))
     seasons_btn.name = "SeasonsCircleButton"
     seasons_btn.pressed.connect(func(): open_panel("seasons"))
     hud_layer.add_child(seasons_btn)
 
+    var season_caption := Label.new()
+    season_caption.name = "SeasonCircleCaption"
+    season_caption.position = Vector2(8, 263)
+    season_caption.size = Vector2(102, 28)
+    season_caption.text = get_current_season_short_name()
+    season_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+    season_caption.add_theme_font_size_override("font_size", 11)
+    season_caption.modulate = Color("#E1C29A")
+    hud_layer.add_child(season_caption)
+
     # Возвращаем сундуки и мастерскую на главный экран: это НЕ пункты меню.
-    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), UI_GOLD)
+    var chests_btn := make_menu_circle_button("🎁", "СУНДУКИ", Vector2(20, 280), Color("#7A5A42"))
     chests_btn.name = "ChestsCircleButton"
     chests_btn.pressed.connect(func(): open_panel("chests"))
     hud_layer.add_child(chests_btn)
 
-    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), UI_COPPER)
+    var workshop_btn := make_menu_circle_button("🛠", "МАСТЕРСКАЯ", Vector2(20, 375), Color("#536B82"))
     workshop_btn.name = "WorkshopCircleButton"
     workshop_btn.pressed.connect(func(): open_panel("workshop"))
     hud_layer.add_child(workshop_btn)
@@ -4985,10 +4600,10 @@ func build_extra_hud() -> void:
     daily_btn.text = "🎯"
     daily_btn.position = Vector2(948, 185)
     daily_btn.size = Vector2(82, 82)
-    style_button(daily_btn, UI_GOLD)
-    daily_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_BRASS, 41, 3))
-    daily_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_GOLD, 41, 4))
-    daily_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
+    style_button(daily_btn, Color("#9A7653"))
+    daily_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#9A7653"), 41, 3))
+    daily_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#C09A70"), 41, 4))
+    daily_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
     daily_btn.add_theme_font_size_override("font_size", 28)
     daily_btn.tooltip_text = "Миссия дня"
     daily_btn.pressed.connect(toggle_daily_mission)
@@ -4998,10 +4613,10 @@ func build_extra_hud() -> void:
     weekly_btn.text = "🏆"
     weekly_btn.position = Vector2(948, 280)
     weekly_btn.size = Vector2(82, 82)
-    style_button(weekly_btn, UI_BRASS)
-    weekly_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_BROWN, 41, 3))
-    weekly_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_COPPER, 41, 4))
-    weekly_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
+    style_button(weekly_btn, Color("#76583F"))
+    weekly_btn.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#76583F"), 41, 3))
+    weekly_btn.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#A3754D"), 41, 4))
+    weekly_btn.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
     weekly_btn.add_theme_font_size_override("font_size", 28)
     weekly_btn.tooltip_text = "Недельная миссия"
     weekly_btn.pressed.connect(toggle_weekly_mission)
@@ -5011,8 +4626,8 @@ func build_extra_hud() -> void:
     daily_claim_button.text = "🎁"
     daily_claim_button.position = Vector2(948, 375)
     daily_claim_button.size = Vector2(82, 82)
-    style_button(daily_claim_button, UI_GOLD_LIGHT)
-    daily_claim_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_GOLD, 41, 3))
+    style_button(daily_claim_button, Color("#C09A70"))
+    daily_claim_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#C09A70"), 41, 3))
     daily_claim_button.add_theme_font_size_override("font_size", 28)
     daily_claim_button.tooltip_text = "Ежедневная серия"
     daily_claim_button.pressed.connect(toggle_daily_login)
@@ -5023,10 +4638,10 @@ func build_extra_hud() -> void:
     event_button.text = "⚡"
     event_button.position = Vector2(948, 470)
     event_button.size = Vector2(82, 82)
-    style_button(event_button, UI_COPPER)
-    event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_COPPER, 41, 3))
-    event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), UI_GOLD, 41, 4))
-    event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 41, 4))
+    style_button(event_button, Color("#8A684C"))
+    event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#8A684C"), 41, 3))
+    event_button.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), Color("#C09A70"), 41, 4))
+    event_button.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color("#E1C29A"), 41, 4))
     event_button.add_theme_font_size_override("font_size", 28)
     event_button.tooltip_text = "НЕДЕЛЬНЫЕ СОБЫТИЯ"
     event_button.pressed.connect(toggle_event_panel)
@@ -5325,58 +4940,49 @@ func build_daily_login_panel() -> void:
     v.add_child(hint)
 
 func update_daily_login_ui() -> void:
-    if not daily_claim_button:
-        return
+    if not daily_claim_button: return
     if daily_claim_available:
         daily_claim_button.modulate.a = 0.65 + 0.35 * (0.5 + 0.5 * sin(time_alive * 5.0))
     else:
         daily_claim_button.modulate.a = 0.65
 
-    if not daily_login_panel or not daily_login_panel.visible:
-        return
+    if daily_login_panel and daily_login_panel.visible:
+        var detail := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginText") as Label
+        var current_day := mini(login_streak + (1 if daily_claim_available else 0), 7)
+        var reward := 20 + current_day * 5
+        if detail:
+            detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
+        var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
+        var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
+        if daily_timer:
+            daily_timer.visible = false
+            if not daily_claim_available:
+                daily_timer.text = "СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
+                daily_timer.visible = true
+        if daily_hint:
+            daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен —\nжди новый"
+            daily_hint.visible = daily_timer == null or not daily_timer.visible
 
-    # Не перестраиваем 7 кнопок и тексты каждый кадр. Обновление состояния
-    # выполняется только при изменении серии/доступности или раз в секунду для таймера.
-    var now_second := int(Time.get_unix_time_from_system())
-    var current_day := mini(login_streak + (1 if daily_claim_available else 0), 7)
-    var state_key := "%d|%d|%s" % [login_streak, int(daily_claim_available), str(current_day)]
-    if state_key == _daily_ui_last_key and now_second == _daily_ui_last_second:
-        return
-    _daily_ui_last_key = state_key
-    _daily_ui_last_second = now_second
-
-    var detail := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginText") as Label
-    var reward := 20 + current_day * 5
-    if detail:
-        detail.text = "Серия: %d дней   •   День %d из 7\nСегодняшняя награда: +%d ₽" % [login_streak, current_day, reward]
-    var daily_hint := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginHint") as Label
-    var daily_timer := daily_login_panel.get_node_or_null("VBoxContainer/DailyLoginTimer") as Label
-    if daily_timer:
-        daily_timer.visible = false
-        if not daily_claim_available:
-            daily_timer.text = "СЛЕДУЮЩИЙ ДЕНЬ %s" % _format_reset_timer(_seconds_to_next_day())
-            daily_timer.visible = true
-    if daily_hint:
-        daily_hint.text = "Нажми на доступный день" if daily_claim_available else "День уже получен —\nжди новый"
-        daily_hint.visible = daily_timer == null or not daily_timer.visible
-
-    for i in range(daily_day_buttons.size()):
-        var day := i + 1
-        var btn := daily_day_buttons[i]
-        var claimed := day <= login_streak
-        var available := daily_claim_available and day == current_day
-        btn.disabled = false
-        if claimed:
-            btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ\nПОЛУЧЕН" % day
-            btn.tooltip_text = "Приз за этот день уже получен"
-            style_button(btn, Color("#76583F"))
-        elif available:
-            btn.text = "🎁 ДЕНЬ %d\n+%d ₽\nЗАБРАТЬ" % [day, 20 + day * 5]
-            btn.tooltip_text = "Забрать приз за сегодняшний день"
-            style_button(btn, Color("#C09A70"))
-        else:
-            btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
-            style_button(btn, Color("#4A3022"))
+        for i in range(daily_day_buttons.size()):
+            var day := i + 1
+            var btn := daily_day_buttons[i]
+            var claimed := day <= login_streak
+            var available := daily_claim_available and day == current_day
+            # Не блокируем кнопки через disabled: на некоторых Android-сборках
+            # отключённая кнопка визуально выглядит доступной, но не получает touch.
+            # Обработчик сам проверяет, можно ли забрать этот день.
+            btn.disabled = false
+            if claimed:
+                btn.text = "✓ ДЕНЬ %d\n🎁 ПРИЗ\nПОЛУЧЕН" % day
+                btn.tooltip_text = "Приз за этот день уже получен"
+                style_button(btn, Color("#5FBF72"))
+            elif available:
+                btn.text = "🎁 ДЕНЬ %d\n+%d ₽\nЗАБРАТЬ" % [day, 20 + day * 5]
+                btn.tooltip_text = "Забрать приз за сегодняшний день"
+                style_button(btn, Color("#C09A70"))
+            else:
+                btn.text = "🔒 ДЕНЬ %d\n+%d ₽" % [day, 20 + day * 5]
+                style_button(btn, Color("#5B5B66"))
 
 func toggle_daily_login() -> void:
     if not daily_login_panel:
@@ -5449,7 +5055,6 @@ func claim_login_reward_for_day(day: int) -> void:
     daily_series_claimed_at = int(Time.get_unix_time_from_system())
     current_result = "🎁 ЕЖЕДНЕВНАЯ НАГРАДА • ДЕНЬ %d • +%d ₽" % [login_streak, reward]
     save_game()
-    check_achievements()
     update_ui()
     update_daily_login_ui()
     if toast_label:
@@ -5516,7 +5121,7 @@ func activate_calendar_event() -> void:
         update_event_panel()
     if event_button:
         event_button.tooltip_text = "НЕДЕЛЬНЫЕ СОБЫТИЯ"
-        event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), UI_COPPER, 41, 3))
+        event_button.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#8A684C"), 41, 3))
     save_game()
     if notifications_on:
         schedule_background_notifications()
@@ -5696,17 +5301,15 @@ func make_menu_circle_button(icon_text: String, tooltip_text: String, pos: Vecto
     b.position = pos
     b.size = Vector2(78, 78)
     b.tooltip_text = tooltip_text
-    b.add_theme_color_override("font_color", UI_TEXT)
+    b.add_theme_color_override("font_color", Color.WHITE)
     b.add_theme_color_override("font_hover_color", Color.WHITE)
     b.add_theme_color_override("font_pressed_color", Color.WHITE)
     b.add_theme_color_override("font_focus_color", Color.WHITE)
     b.add_theme_font_size_override("font_size", 30)
-    # Важные круглые пункты получают разные, но близкие тёплые оттенки.
-    var ring := ui_accent(accent)
-    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), ring, 39, 4))
-    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), ring.lightened(0.24), 39, 5))
-    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), UI_GOLD_LIGHT, 39, 4))
-    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), ring.lightened(0.16), 39, 4))
+    b.add_theme_stylebox_override("normal", make_style(Color("#241B16"), accent, 39, 3))
+    b.add_theme_stylebox_override("hover", make_style(Color("#3A2A20"), accent.lightened(0.18), 39, 4))
+    b.add_theme_stylebox_override("pressed", make_style(Color("#4A3022"), Color.WHITE, 39, 4))
+    b.add_theme_stylebox_override("focus", make_style(Color("#30231B"), accent, 39, 3))
     return b
 
 func make_menu_button(text_value: String, pos: Vector2, size_value: Vector2, accent: Color = CYAN, large: bool = false) -> Button:
@@ -5805,7 +5408,7 @@ func build_hud() -> void:
     xp_bar.custom_minimum_size = Vector2(118, 7)
     xp_bar.show_percentage = false
     xp_bar.add_theme_stylebox_override("background", make_style(Color("#120F0D"), Color("#4B392B"), 6, 1))
-    xp_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 6, 1))
+    xp_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
     xp_bar.value = 0.0
     level_box.add_child(xp_bar)
 
@@ -5884,59 +5487,45 @@ func build_hud() -> void:
 func build_achievement_strip() -> void:
     achievement_strip = PanelContainer.new()
     achievement_strip.name = "AchievementStrip"
-    # Лёгкая строка строго по центру между вторыми боковыми кружками.
-    # Размер будет рассчитан под конкретный текст при показе.
-    achievement_strip.position = Vector2(190, 286)
-    achievement_strip.size = Vector2(360, 52)
+    achievement_strip.position = Vector2(225, 145)
+    achievement_strip.size = Vector2(630, 68)
     achievement_strip.visible = false
     achievement_strip.z_index = 650
-    style_panel(achievement_strip, Color("#241B16"), Color("#9A704B"), 14, 2)
+    style_panel(achievement_strip, Color("#241B16"), Color("#8A684C"), 18, 2)
     hud_layer.add_child(achievement_strip)
     achievement_strip_label = Label.new()
     achievement_strip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     achievement_strip_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_OFF
-    achievement_strip_label.clip_text = false
-    achievement_strip_label.add_theme_font_size_override("font_size", 16)
-    achievement_strip_label.modulate = Color("#E8C58E")
-    achievement_strip_label.add_theme_color_override("font_outline_color", Color("#120E0A"))
-    achievement_strip_label.add_theme_constant_override("outline_size", 2)
-    achievement_strip_label.custom_minimum_size = Vector2(0, 48)
+    achievement_strip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+    achievement_strip_label.add_theme_font_size_override("font_size", 17)
+    achievement_strip_label.modulate = Color("#E1C29A")
     achievement_strip.add_child(achievement_strip_label)
-
-func _achievement_strip_short_name(value: String) -> String:
-    return value.replace("\n", " • ").strip_edges()
 
 func show_achievement_strip() -> void:
     if not achievement_strip or not achievement_strip_label:
         return
-    if pending_new_achievements.is_empty():
+    if pending_achievement_rewards_text.is_empty() and pending_new_achievements.is_empty():
         return
-
-    # Одно уведомление = одно достижение. Показываем их строго по очереди.
-    var total := pending_new_achievements.size()
-    achievement_strip_batch_index = clampi(achievement_strip_batch_index, 0, total - 1)
-    var achievement_name := _achievement_strip_short_name(
-        String(pending_new_achievements[achievement_strip_batch_index])
-    )
-
-    achievement_strip_label.text = "🏆  " + achievement_name
-    # Подгоняем ширину панели под фактическую строку. Есть разумные пределы,
-    # чтобы очень длинное название не закрыло боковые элементы HUD.
-    var text_width := achievement_strip_label.get_minimum_size().x + 34.0
-    var strip_width := clampf(text_width, 280.0, 780.0)
-    achievement_strip.size = Vector2(strip_width, 52)
-    achievement_strip.position = Vector2((1080.0 - strip_width) * 0.5, 286)
-    achievement_strip_timer = 2.8
+    var lines: Array[String] = []
+    for i in range(pending_achievement_rewards_text.size()):
+        var text := String(pending_achievement_rewards_text[i]).replace("\n", " • ")
+        lines.append(text)
+    if lines.is_empty():
+        for name in pending_new_achievements:
+            lines.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % String(name))
+    else:
+        var cleaned: Array[String] = []
+        for line in lines:
+            cleaned.append("🏆 НОВОЕ ДОСТИЖЕНИЕ: " + line.trim_prefix("🏆 "))
+        lines = cleaned
+    achievement_strip_label.text = "\n".join(lines)
+    achievement_strip_timer = 5.0
     achievement_strip.visible = true
 
 func hide_achievement_strip() -> void:
     achievement_strip_timer = 0.0
     if achievement_strip and is_instance_valid(achievement_strip):
         achievement_strip.visible = false
-    achievement_strip_batch_index = 0
-    pending_new_achievements.clear()
-    pending_achievement_rewards_text.clear()
 
 func make_control_button(text_value: String, pos: Vector2) -> Button:
     var b := Button.new()
@@ -5967,7 +5556,7 @@ func build_result_popup() -> void:
     popup_name_label = Label.new()
     popup_name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     popup_name_label.add_theme_font_size_override("font_size", 42)
-    popup_name_label.modulate = Color("#DDB47A")
+    popup_name_label.modulate = Color("#F39C32")
     v.add_child(popup_name_label)
     popup_info_label = Label.new()
     popup_info_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -6015,14 +5604,14 @@ func build_shop_panel() -> PanelContainer:
     subtitle.text = "КЛЕШНЯ • МОДУЛИ • СКИНЫ • АППАРАТ"
     subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     subtitle.add_theme_font_size_override("font_size", 16)
-    subtitle.modulate = Color("#D8C3AA")
+    subtitle.modulate = Color("#D7C9E8")
     root.add_child(subtitle)
     var vip_button := Button.new()
-    vip_button.text = "💎  VIP МАГАЗИН — СКОРО..."
+    vip_button.text = "💎  VIP МАГАЗИН — ЭКСКЛЮЗИВЫ"
     vip_button.custom_minimum_size = Vector2(0, 68)
-    style_button(vip_button, Color("#8A684C"))
+    style_button(vip_button, Color("#C69A35"))
     vip_button.add_theme_font_size_override("font_size", 20)
-    vip_button.disabled = true
+    vip_button.pressed.connect(func(): shop_panel.visible = false; vip_panel.visible = true; refresh_vip_panel(); update_android_navigation())
     root.add_child(vip_button)
 
     var tabs := HBoxContainer.new()
@@ -6059,7 +5648,6 @@ func build_shop_panel() -> PanelContainer:
     root.add_child(shop_feedback_label)
 
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     root.add_child(scroll)
     shop_content = VBoxContainer.new()
@@ -6108,10 +5696,6 @@ func show_shop_feedback(message: String, seconds: float = 2.4) -> void:
 
 func refresh_shop() -> void:
     if not shop_content: return
-    var shop_key := "%s|%d|%s|%s|%s|%s|%s" % [shop_category, coins, str(upgrade_levels), str(owned_claw_skins), str(owned_toy_skins), str(owned_machine_skins), str([selected_claw_skin, selected_toy_skin, selected_machine_skin])]
-    if shop_key == _shop_ui_last_key and shop_content.has_meta("shop_ui_built"):
-        return
-    _shop_ui_last_key = shop_key
     for child in shop_content.get_children(): child.queue_free()
     var wallet := shop_panel.get_node_or_null("VBoxContainer/ShopWallet")
     if wallet: wallet.text = "💰  БАЛАНС: %d ₽" % coins
@@ -6125,7 +5709,6 @@ func refresh_shop() -> void:
         "claw_skins": build_shop_claw_skins()
         "toy_skins": build_shop_toy_skins()
         "machine_skins": build_shop_machine_skins()
-    shop_content.set_meta("shop_ui_built", true)
 
 func shop_section(title: String, desc: String) -> void:
     var h := Label.new()
@@ -6137,7 +5720,7 @@ func shop_section(title: String, desc: String) -> void:
     d.text = desc
     d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     d.add_theme_font_size_override("font_size", 16)
-    d.modulate = Color("#D8C3AA")
+    d.modulate = Color("#D7C9E8")
     shop_content.add_child(d)
 
 func shop_item_button(title: String, desc: String, state: String, accent: Color, action: Callable) -> void:
@@ -6251,7 +5834,6 @@ func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], sele
         update_ui()
         return selected
     save_game()
-    check_achievements()
     apply_shop_visuals()
     update_ui()
     return selected
@@ -6265,7 +5847,6 @@ func buy_claw_skin(index: int) -> void:
         selected_claw_skin = 0
         apply_shop_visuals()
         save_game()
-        check_achievements()
         return
     selected_claw_skin = buy_cosmetic(index, claw_skin_specs, owned_claw_skins, selected_claw_skin)
     # После покупки/выбора ещё раз фиксируем именно нажатый индекс.
@@ -6281,7 +5862,6 @@ func buy_toy_skin(index: int) -> void:
         apply_shop_visuals()
         build_prizes()
         save_game()
-        check_achievements()
         return
     selected_toy_skin = buy_cosmetic(index, toy_skin_specs, owned_toy_skins, selected_toy_skin)
     if index < owned_toy_skins.size() and owned_toy_skins[index]:
@@ -6296,7 +5876,6 @@ func buy_machine_skin(index: int) -> void:
         selected_machine_skin = 0
         apply_shop_visuals()
         save_game()
-        check_achievements()
         return
     selected_machine_skin = buy_cosmetic(index, machine_skin_specs, owned_machine_skins, selected_machine_skin)
     if index < owned_machine_skins.size() and owned_machine_skins[index]:
@@ -6346,7 +5925,6 @@ func build_vip_panel() -> PanelContainer:
     var p := PanelContainer.new(); p.position = Vector2(35, 145); p.size = Vector2(1010, 1580); p.visible = false
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3); menu_layer.add_child(p)
     var scroll := ScrollContainer.new(); p.add_child(scroll)
-    style_scroll_container_brown(scroll)
     var v := VBoxContainer.new(); v.add_theme_constant_override("separation", 12); v.custom_minimum_size = Vector2(930, 0); scroll.add_child(v)
     var title := Label.new(); title.text = "💎  VIP МАГАЗИН"; title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; title.add_theme_font_size_override("font_size", 40); title.modulate = Color("#FFE58A"); v.add_child(title)
     var sub := Label.new(); sub.text = "Эксклюзивные предметы и постоянные бонусы"; sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER; sub.add_theme_font_size_override("font_size", 19); v.add_child(sub)
@@ -6367,7 +5945,7 @@ func refresh_vip_panel() -> void:
         var owned := i < vip_owned.size() and vip_owned[i]
         var b := Button.new(); b.custom_minimum_size = Vector2(0, 105); b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
         b.text = ("✓  " if owned else "💎  ") + String(item["name"]) + "\n" + String(item["desc"]) + "\n" + ("ПОЛУЧЕНО" if owned else "%d ₽" % int(item["price"]))
-        style_button(b, Color("#8A684C")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
+        style_button(b, Color("#C69A35")); b.add_theme_font_size_override("font_size", 18); b.pressed.connect(func(idx: int = i): buy_vip(idx)); list.add_child(b)
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
@@ -6385,7 +5963,7 @@ func buy_vip(index: int) -> void:
         if item.has("toy"): selected_toy_skin = clampi(int(item["toy"]), 0, toy_skin_specs.size()-1); owned_toy_skins[selected_toy_skin] = true
         apply_shop_visuals(); build_prizes(); current_result = "💎 VIP ПРЕДМЕТ ПОЛУЧЕН"
     else: current_result = "НЕДОСТАТОЧНО РУБЛЕЙ"
-    save_game(); check_achievements(); update_ui(); refresh_vip_panel()
+    save_game(); update_ui(); refresh_vip_panel()
 
 func get_current_season() -> Dictionary:
     var month := int(Time.get_datetime_dict_from_system().get("month", 1))
@@ -6402,6 +5980,15 @@ func get_current_season_icon() -> String:
         "autumn": return "🍂"
     return "🌎"
 
+func get_current_season_short_name() -> String:
+    var season := get_current_season()
+    match String(season.get("id", "autumn")):
+        "winter": return "ЗИМА"
+        "spring": return "ВЕСНА"
+        "summer": return "ЛЕТО"
+        "autumn": return "ОСЕНЬ"
+    return "СЕЗОН"
+
 func build_seasons_panel() -> PanelContainer:
     var p := PanelContainer.new()
     p.name = "SeasonsPanel"
@@ -6412,10 +5999,9 @@ func build_seasons_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.name = "SeasonsScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.add_theme_constant_override("scroll_bar_width", 12)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -6495,7 +6081,7 @@ func build_seasons_panel() -> PanelContainer:
     note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     note.add_theme_font_size_override("font_size", 15)
-    note.modulate = Color("#BCA996")
+    note.modulate = Color("#C9D9D0")
     v.add_child(note)
 
     var close := Button.new()
@@ -6514,10 +6100,6 @@ func refresh_seasons_panel() -> void:
         return
 
     var season := get_current_season()
-    var seasons_key := "%s|%s|%d" % [String(season.get("id", "")), Time.get_date_string_from_system(), holiday_calendar.size()]
-    if seasons_key == _seasons_ui_last_key and seasons_panel.has_meta("seasons_ui_built"):
-        return
-    _seasons_ui_last_key = seasons_key
     active_season_id = String(season.get("id", ""))
     var today_event := get_today_event()
     var profile := get_event_profile(today_event)
@@ -6601,7 +6183,8 @@ func refresh_seasons_panel() -> void:
             item.add_theme_font_size_override("font_size", 17)
             item.modulate = Color("#E0D4C6")
             upcoming_list.add_child(item)
-    seasons_panel.set_meta("seasons_ui_built", true)
+
+    save_game()
 
 func chest_rarity_for_win(rarity: String) -> String:
     var r := randf()
@@ -6711,7 +6294,6 @@ func open_chest(kind: String, skip_confirmation: bool = false) -> void:
     current_result = "🎁 %s: %s" % [kind.to_upper(), reward_text]
     chest_opening = false
     save_game()
-    check_achievements()
     update_ui()
     refresh_chests_panel()
 
@@ -6762,10 +6344,9 @@ func build_chests_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.name = "ChestScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    scroll.add_theme_constant_override("scroll_bar_width", 5)
+    scroll.add_theme_constant_override("scroll_bar_width", 12)
     p.add_child(scroll)
 
     var v := VBoxContainer.new()
@@ -6867,7 +6448,7 @@ func workshop_upgrade(stat: String) -> void:
     set("workshop_" + stat, level + 1)
     workshop_level = maxi(workshop_level, 1 + int(total_workshop_levels() / 3))
     current_result = "🛠 МОДУЛЬ УЛУЧШЕН: %s %d/%d" % [stat.to_upper(), level + 1, max_level]
-    save_game(); check_achievements(); update_ui(); refresh_workshop_panel()
+    save_game(); update_ui(); refresh_workshop_panel()
 
 func workshop_blueprint_bonus(stat: String) -> float:
     var tier := String(workshop_blueprints.get(stat, "none"))
@@ -6902,7 +6483,7 @@ func workshop_buy_blueprint(stat: String, tier: String) -> void:
     workshop_blueprints[stat] = tier
     workshop_level = maxi(workshop_level, 5 + int(total_workshop_levels() / 4))
     current_result = "📐 ЧЕРТЁЖ УСТАНОВЛЕН: %s — %s" % [stat.to_upper(), tier.to_upper()]
-    save_game(); check_achievements(); update_ui(); refresh_workshop_panel()
+    save_game(); update_ui(); refresh_workshop_panel()
 
 func workshop_calibrate() -> void:
     if SERVER_AUTHORITATIVE:
@@ -6921,7 +6502,6 @@ func workshop_calibrate() -> void:
         workshop_calibration += 1
         current_result = "🎯 КАЛИБРОВКА УРОВЕНЬ %d/5" % workshop_calibration
         save_game()
-        check_achievements()
     refresh_workshop_panel()
 
 func workshop_toggle_overclock() -> void:
@@ -6941,17 +6521,12 @@ func workshop_toggle_overclock() -> void:
         workshop_overclock_games = 5
         current_result = "⚡ ОВЕРКЛОК АКТИВИРОВАН НА 5 ИГР"
         save_game()
-        check_achievements()
     else:
         current_result = "НУЖЕН 10 УРОВЕНЬ МАСТЕРСКОЙ И 100 ДЕТАЛЕЙ"
     refresh_workshop_panel()
 
 func refresh_workshop_panel() -> void:
     if not workshop_panel: return
-    var workshop_key := "%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%s|%d" % [workshop_parts, workshop_level, workshop_claw_power, workshop_speed, workshop_precision, workshop_luck, workshop_motor, workshop_servo, workshop_cable, workshop_damper, workshop_cooling, workshop_controller, workshop_calibration, workshop_overclock_games, str(workshop_blueprints), int(workshop_job_active)]
-    if workshop_key == _workshop_ui_last_key and workshop_panel.has_meta("workshop_ui_built"):
-        return
-    _workshop_ui_last_key = workshop_key
     var info := workshop_panel.get_node_or_null("ScrollContainer/VBoxContainer/WorkshopInfo") as Label
     if info:
         info.text = "Детали: %d   •   Уровень мастерской: %d   •   Всего уровней: %d\n🏭 %d/10  •  📚 %d/10  •  🔑 %d/10  •  🎁 %d/10\n⚙ Мотор %d/15  •  Сервопривод %d/15  •  Трос %d/15\n🛡 Демпфер %d/15  •  ❄ Охлаждение %d/15  •  🧠 Контроллер %d/15  •  🎯 Калибровка %d/5" % [workshop_parts, workshop_level, total_workshop_levels(), workshop_claw_power, workshop_speed, workshop_precision, workshop_luck, workshop_motor, workshop_servo, workshop_cable, workshop_damper, workshop_cooling, workshop_controller, workshop_calibration]
@@ -6996,7 +6571,7 @@ func refresh_workshop_panel() -> void:
         module_bar.max_value = max_level
         module_bar.value = level
         module_bar.add_theme_stylebox_override("background", make_style(Color("#17120F"), Color("#4B392B"), 5, 1))
-        module_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 5, 1))
+        module_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 5, 1))
         text_box.add_child(module_bar)
 
         var upgrade := Button.new()
@@ -7064,7 +6639,6 @@ func refresh_workshop_panel() -> void:
     desc.add_theme_font_size_override("font_size", 14)
     desc.modulate = Color("#CDBBA7")
     list.add_child(desc)
-    workshop_panel.set_meta("workshop_ui_built", true)
 
 func workshop_module_effect_text(stat: String, level: int) -> String:
     var effects := {"claw_power":"+1.5% к шансу захвата за уровень", "speed":"+0.8% к скорости движения клешни", "precision":"+1.0% к шансу захвата и лучше учитывает наведение", "luck":"+0.6% к шансу успешного захвата", "motor":"+1.5% к скорости движения клешни", "servo":"ускоряет закрытие и открытие клешни", "cable":"+0.3% к стабильности захвата за уровень", "damper":"+0.3% к стабильности и меньше срывов", "cooling":"усиливает эффект оверклока", "controller":"+0.4% к шансу захвата и точности"}
@@ -7091,7 +6665,6 @@ func build_workshop_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.name = "ScrollContainer"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.offset_left = 8
@@ -7137,9 +6710,6 @@ func build_workshop_panel() -> PanelContainer:
     close.add_theme_font_size_override("font_size", 20)
     close.pressed.connect(close_gameplay_overlay)
     v.add_child(close)
-    # Строим тяжёлые строки один раз во время загрузки, чтобы первый вход
-    # в мастерскую не создавал десятки Control-узлов в одном кадре.
-    refresh_workshop_panel()
     return p
 
 func build_collection_panel() -> PanelContainer:
@@ -7150,7 +6720,6 @@ func build_collection_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -7236,7 +6805,6 @@ func build_achievements_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -7269,7 +6837,6 @@ func build_achievements_panel() -> PanelContainer:
     category_scroll.custom_minimum_size = Vector2(0, 92)
     category_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
     category_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-    style_scroll_container_brown(category_scroll)
     v.add_child(category_scroll)
 
     var categories := HBoxContainer.new()
@@ -7279,7 +6846,7 @@ func build_achievements_panel() -> PanelContainer:
 
     var category_names := [
         "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
-        "ПРОГРЕСС", "ЭКОНОМИКА", "УЛУЧШЕНИЯ",
+        "ПРОГРЕСС", "ЭКОНОМИКА", "КЛЕШНИ", "УЛУЧШЕНИЯ",
         "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
     ]
     for category in category_names:
@@ -7303,17 +6870,12 @@ func build_achievements_panel() -> PanelContainer:
     style_button(close, Color("#8A684C"))
     close.pressed.connect(func(): show_main_menu())
     v.add_child(close)
-    # Список достижений создаётся во время загрузки, а при открытии окна
-    # только обновляются тексты/видимость. Это убирает главный рывок Android.
-    refresh_achievements_panel()
     return p
 
 func refresh_achievements_panel() -> void:
-    if not achievements_panel:
-        return
+    if not achievements_panel: return
     var root := achievements_panel.get_child(0)
-    if not root:
-        return
+    if not root: return
     var v := root.get_child(0)
     var summary: Label = v.get_node("AchievementSummary")
     var list: VBoxContainer = v.get_node("AchievementList")
@@ -7323,58 +6885,34 @@ func refresh_achievements_panel() -> void:
         if achievement_matches_category(spec, selected_achievement_category):
             visible_count += 1
     summary.text = "ОТКРЫТО: %d / %d    •    ПОКАЗАНО: %d" % [done, achievement_specs.size(), visible_count]
-
-    var category_names := [
-        "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
-        "ПРОГРЕСС", "ЭКОНОМИКА", "УЛУЧШЕНИЯ",
-        "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
-    ]
     for i in range(achievement_category_buttons.size()):
         var cb := achievement_category_buttons[i]
-        var cat: String = String(category_names[i])
+        var cat: String = str([
+            "ВСЕ", "ИГРЫ", "ИГРУШКИ", "РЕДКОСТЬ", "КОЛЛЕКЦИИ",
+            "ПРОГРЕСС", "ЭКОНОМИКА", "КЛЕШНИ", "УЛУЧШЕНИЯ",
+            "СУНДУКИ", "МАСТЕРСКАЯ", "СКИНЫ", "СЕРИИ", "ОСОБЫЕ"
+        ][i])
         if cat == selected_achievement_category:
             cb.add_theme_stylebox_override("normal", make_style(Color("#4A3022"), Color("#C19A70"), 18, 3))
         else:
             cb.add_theme_stylebox_override("normal", make_style(Color("#241B16"), Color("#6E4B33"), 18, 2))
-
-    # Первый вызов создаёт строки. Все последующие вызовы только обновляют
-    # существующие узлы — без queue_free/add_child и без массового GC-фриза.
-    if not achievements_panel.has_meta("achievement_rows_built"):
-        for spec in achievement_specs:
-            var row := PanelContainer.new()
-            row.set_meta("achievement_id", String(spec["id"]))
-            style_panel(row, Color("#3A271D"), Color("#76583F"), 18, 2)
-            row.custom_minimum_size = Vector2(0, 76)
-            var label := Label.new()
-            label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-            label.add_theme_font_size_override("font_size", 18)
-            row.add_child(label)
-            list.add_child(row)
-        achievements_panel.set_meta("achievement_rows_built", true)
-
-    var spec_by_id: Dictionary = {}
+    for child in list.get_children(): child.queue_free()
     for spec in achievement_specs:
-        spec_by_id[String(spec.get("id", ""))] = spec
-    var rows := list.get_children()
-    for row_node in rows:
-        var row := row_node as PanelContainer
-        if not row:
+        if not achievement_matches_category(spec, selected_achievement_category):
             continue
-        var id := String(row.get_meta("achievement_id", ""))
-        var spec_match: Dictionary = spec_by_id.get(id, {})
-        var label := row.get_child(0) as Label
-        if spec_match.is_empty() or not label:
-            row.visible = false
-            continue
-        var visible := achievement_matches_category(spec_match, selected_achievement_category)
-        row.visible = visible
-        if not visible:
-            continue
-        var unlocked := unlocked_achievements.has(id)
-        var target := int(spec_match.get("value", 1))
-        var progress_value := target if unlocked else mini(achievement_value(spec_match), target)
-        label.text = ("✓  " if unlocked else "○  ") + String(spec_match["name"]) + "\n     " + String(spec_match["desc"]) + "\n     Прогресс: %d / %d\n     🎁 %s" % [progress_value, target, achievement_reward_text(spec_match)]
+        var row := PanelContainer.new()
+        style_panel(row, Color("#3A271D"), Color("#76583F"), 18, 2)
+        row.custom_minimum_size = Vector2(0, 76)
+        var label := Label.new()
+        var unlocked := unlocked_achievements.has(String(spec["id"]))
+        var target := int(spec.get("value", 1))
+        var progress_value := mini(achievement_value(spec), target)
+        label.text = ("✓  " if unlocked else "○  ") + String(spec["name"]) + "\n     " + String(spec["desc"]) + "\n     Прогресс: %d / %d\n     🎁 %s" % [progress_value, target, achievement_reward_text(spec)]
+        label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+        label.add_theme_font_size_override("font_size", 18)
         label.modulate = Color("#E8D2B5") if unlocked else Color("#A58D76")
+        row.add_child(label)
+        list.add_child(row)
 
 func _on_achievement_category_pressed(category: String) -> void:
     selected_achievement_category = category
@@ -7397,12 +6935,14 @@ func achievement_matches_category(spec: Dictionary, category: String) -> bool:
             return kind == "level" or kind == "xp"
         "ЭКОНОМИКА":
             return kind == "rubles" or kind == "max_reward"
+        "КЛЕШНИ":
+            return kind == "claws" or kind == "calibration"
         "УЛУЧШЕНИЯ":
             return kind == "upgrades"
         "СУНДУКИ":
             return kind == "chests_opened" or kind == "keys_earned" or kind == "exclusive"
         "МАСТЕРСКАЯ":
-            return kind == "workshop_level" or kind == "parts" or kind == "calibration" or kind == "overclock"
+            return kind == "workshop_level"
         "СКИНЫ":
             return kind == "claw_skins" or kind == "toy_skins" or kind == "machine_skins"
         "СЕРИИ":
@@ -7444,7 +6984,6 @@ func build_profile_panel() -> PanelContainer:
     hud_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.name = "ProfileScroll"
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     scroll.offset_left = 10
@@ -7541,7 +7080,7 @@ func build_profile_panel() -> PanelContainer:
     xp_bar.custom_minimum_size = Vector2(0, 9)
     xp_bar.show_percentage = false
     xp_bar.add_theme_stylebox_override("background", make_style(Color("#120F0D"), Color("#4B392B"), 6, 1))
-    xp_bar.add_theme_stylebox_override("fill", make_style(UI_COPPER, UI_GOLD, 6, 1))
+    xp_bar.add_theme_stylebox_override("fill", make_style(Color("#9A7653"), Color("#C09A70"), 6, 1))
     xp_bar.max_value = maxi(1, xp_to_next)
     xp_bar.value = clampi(player_xp, 0, xp_to_next)
     identity_info.add_child(xp_bar)
@@ -7785,10 +7324,6 @@ func copy_profile_value(value: String, title: String, button: Button = null) -> 
 
 func refresh_profile_panel() -> void:
     if not profile_panel: return
-    var profile_key := "%s|%d|%d|%d|%d|%d|%d|%d|%d|%d" % [player_name, player_avatar_index, coins, total_games, total_prizes_won, player_level, player_xp, unlocked_achievements.size(), completed_collections.size(), workshop_parts]
-    if profile_key == _profile_ui_last_key and profile_panel.has_meta("profile_ui_built"):
-        return
-    _profile_ui_last_key = profile_key
     var scroll := profile_panel.get_node_or_null("ProfileScroll") as ScrollContainer
     if not scroll: return
     var v := scroll.get_node_or_null("ProfileVBox") as VBoxContainer
@@ -7895,7 +7430,6 @@ func refresh_profile_panel() -> void:
         val.add_theme_font_size_override("font_size", 15)
         val.modulate = Color("#E7D8C6")
         row_box.add_child(val)
-    profile_panel.set_meta("profile_ui_built", true)
 
 func get_player_title() -> String:
     if total_prizes_won >= 500: return "ЛЕГЕНДА"
@@ -7913,7 +7447,6 @@ func build_stats_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -7940,10 +7473,6 @@ func build_stats_panel() -> PanelContainer:
 
 func refresh_stats_panel() -> void:
     if not stats_panel: return
-    var stats_key := "%d|%d|%d|%d|%d|%d|%d|%d" % [coins, total_games, total_prizes_won, player_level, player_xp, unlocked_achievements.size(), completed_collections.size(), workshop_parts]
-    if stats_key == _stats_ui_last_key and stats_panel.has_meta("stats_ui_built"):
-        return
-    _stats_ui_last_key = stats_key
     var list: VBoxContainer = stats_panel.get_node("ScrollContainer/VBoxContainer/StatsList") if stats_panel.has_node("ScrollContainer/VBoxContainer/StatsList") else null
     if not list: return
     for child in list.get_children(): child.queue_free()
@@ -7998,16 +7527,12 @@ func refresh_stats_panel() -> void:
             label.modulate = Color("#F0E1CE")
             row.add_child(label)
             list.add_child(row)
-    stats_panel.set_meta("stats_ui_built", true)
 
 func count_owned_claws() -> int:
-    var seen: Dictionary = {}
-    for i in range(mini(owned_claws.size(), claw_specs.size())):
-        if owned_claws[i]: seen[i] = true
-    for raw_id in owned_claw_ids:
-        var idx := int(String(raw_id).trim_prefix("claw_")) - 1
-        if idx >= 0 and idx < claw_specs.size(): seen[idx] = true
-    return seen.size()
+    var count := 0
+    for owned in owned_claws:
+        if owned: count += 1
+    return count
 
 func total_upgrade_levels() -> int:
     var count := 0
@@ -8062,7 +7587,6 @@ func build_referral_panel() -> PanelContainer:
     style_panel(p, Color("#241B16"), Color("#76583F"), 26, 3)
     menu_layer.add_child(p)
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     p.add_child(scroll)
     var v := VBoxContainer.new()
     v.custom_minimum_size = Vector2(880, 0)
@@ -8190,7 +7714,6 @@ func claim_referral_code(code: String) -> void:
     referral_status_label.text = "Подарок получен: +%d ₽" % referral_welcome_reward
     current_result = "🎁 ПОДАРОК ЗА ПРИГЛАШЕНИЕ • +%d ₽" % referral_welcome_reward
     save_game()
-    check_achievements()
     update_ui()
 
 func build_settings_panel() -> PanelContainer:
@@ -8202,7 +7725,6 @@ func build_settings_panel() -> PanelContainer:
     menu_layer.add_child(p)
 
     var scroll := ScrollContainer.new()
-    style_scroll_container_brown(scroll)
     scroll.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     p.add_child(scroll)
     var v := VBoxContainer.new()
@@ -8215,10 +7737,8 @@ func build_settings_panel() -> PanelContainer:
 
     var sep1 := Label.new(); sep1.text = "ЗВУК"; sep1.add_theme_font_size_override("font_size", 22); sep1.modulate = GOLD; v.add_child(sep1)
     var music := CheckButton.new(); music.text = "Фоновая музыка"; music.button_pressed = music_on; music.add_theme_font_size_override("font_size", 21)
-    style_check_button_brown(music)
     music.toggled.connect(func(on: bool): music_on = on; apply_music_settings(); save_game()); v.add_child(music)
     var music_vol := HSlider.new(); music_vol.min_value = -30; music_vol.max_value = 3; music_vol.step = 1; music_vol.value = music_volume_db; music_vol.custom_minimum_size = Vector2(0, 42)
-    style_slider_brown(music_vol)
     music_vol.value_changed.connect(func(value: float): music_volume_db = value; apply_music_settings(); save_game()); v.add_child(make_labeled_control("Громкость музыки", music_vol))
     var music_track := OptionButton.new()
     music_track.name = "MusicTrackOption"
@@ -8226,54 +7746,41 @@ func build_settings_panel() -> PanelContainer:
     for name in music_names: music_track.add_item(name)
     music_track.selected = clampi(music_track_index, 0, music_names.size() - 1)
     music_track.custom_minimum_size = Vector2(0, 54)
-    style_option_button_brown(music_track)
     music_track.item_selected.connect(func(idx:int): select_music_track(idx))
     v.add_child(make_labeled_control("Фоновая мелодия", music_track))
     var sfx := CheckButton.new(); sfx.text = "Звуки игры и интерфейса"; sfx.button_pressed = sfx_on; sfx.add_theme_font_size_override("font_size", 21)
-    style_check_button_brown(sfx)
     sfx.toggled.connect(func(on: bool): sfx_on = on; apply_sfx_volume_settings(); save_game()); v.add_child(sfx)
     var volume := HSlider.new(); volume.min_value = -24; volume.max_value = 3; volume.step = 1; volume.value = sfx_volume_db; volume.custom_minimum_size = Vector2(0, 42)
-    style_slider_brown(volume)
     volume.value_changed.connect(func(value: float): sfx_volume_db = value; apply_sfx_volume_settings(); save_game()); v.add_child(make_labeled_control("Громкость эффектов", volume))
 
     var sep2 := Label.new(); sep2.text = "ГРАФИКА"; sep2.add_theme_font_size_override("font_size", 22); sep2.modulate = GOLD; v.add_child(sep2)
     quality_option = OptionButton.new(); ["ПЛОХО","НИЗКО","СРЕДНЕ","ВЫСОКО","УЛЬТРА"].map(func(x): quality_option.add_item(x))
     quality_option.selected = clampi(quality_level,0,4); quality_option.custom_minimum_size = Vector2(0, 54)
-    style_option_button_brown(quality_option)
     quality_option.item_selected.connect(func(idx: int): quality_level = clampi(idx,0,4); apply_quality_settings(); save_game(); update_quality_info()); v.add_child(make_labeled_control("Качество", quality_option))
     var fps := OptionButton.new(); [30,60,90,120].map(func(x): fps.add_item("%d FPS" % x))
     fps.selected = 1 if fps_limit == 60 else (0 if fps_limit == 30 else (2 if fps_limit == 90 else 3)); fps.custom_minimum_size = Vector2(0,54)
-    style_option_button_brown(fps)
     fps.item_selected.connect(func(idx:int): fps_limit = [30,60,90,120][idx]; Engine.max_fps = fps_limit; save_game()); v.add_child(make_labeled_control("Ограничение кадров", fps))
     var energy := CheckButton.new(); energy.text = "Энергосбережение"; energy.button_pressed = energy_saving_on; energy.add_theme_font_size_override("font_size",21)
-    style_check_button_brown(energy)
     energy.toggled.connect(func(on:bool): energy_saving_on = on; Engine.max_fps = 30 if on else fps_limit; save_game()); v.add_child(energy)
 
     var sep3 := Label.new(); sep3.text = "УПРАВЛЕНИЕ"; sep3.add_theme_font_size_override("font_size",22); sep3.modulate = GOLD; v.add_child(sep3)
     var sens := HSlider.new(); sens.min_value=0.5; sens.max_value=1.5; sens.step=0.05; sens.value=joystick_sensitivity; sens.custom_minimum_size=Vector2(0,42)
-    style_slider_brown(sens)
     sens.value_changed.connect(func(x:float): joystick_sensitivity=clampf(x, 0.5, 1.5); save_game()); v.add_child(make_labeled_control("Чувствительность управления", sens))
     var grab := HSlider.new(); grab.min_value=0.8; grab.max_value=1.3; grab.step=0.05; grab.value=grab_button_scale; grab.custom_minimum_size=Vector2(0,42)
-    style_slider_brown(grab)
     grab.value_changed.connect(func(x:float): grab_button_scale=x; save_game(); apply_grab_button_scale()); v.add_child(make_labeled_control("Размер кнопки «ЗАХВАТ»", grab))
     var vibration := CheckButton.new(); vibration.text="Вибрация при захвате"; vibration.button_pressed=vibration_on; vibration.add_theme_font_size_override("font_size",21)
-    style_check_button_brown(vibration)
     vibration.toggled.connect(func(on:bool): vibration_on=on; save_game()); v.add_child(vibration)
 
     var sep4 := Label.new(); sep4.text="ИГРА"; sep4.add_theme_font_size_override("font_size",22); sep4.modulate=GOLD; v.add_child(sep4)
     var tips := CheckButton.new(); tips.text="Автоматические подсказки"; tips.button_pressed=auto_tips_on; tips.add_theme_font_size_override("font_size",21)
-    style_check_button_brown(tips)
     tips.toggled.connect(func(on:bool): auto_tips_on=on; if not on and waiting_overlay: waiting_overlay.visible=false; save_game()); v.add_child(tips)
     var purchases := CheckButton.new(); purchases.text="Подтверждать покупки"; purchases.button_pressed=confirm_purchases_on; purchases.add_theme_font_size_override("font_size",21)
-    style_check_button_brown(purchases)
     purchases.toggled.connect(func(on:bool): confirm_purchases_on=on; save_game()); v.add_child(purchases)
     var rare := CheckButton.new(); rare.text="Подтверждать открытие редких сундуков"; rare.button_pressed=confirm_rare_chests_on; rare.add_theme_font_size_override("font_size",21)
-    style_check_button_brown(rare)
     rare.toggled.connect(func(on:bool): confirm_rare_chests_on=on; save_game()); v.add_child(rare)
 
     var sep_notifications := Label.new(); sep_notifications.text="УВЕДОМЛЕНИЯ"; sep_notifications.add_theme_font_size_override("font_size",22); sep_notifications.modulate=GOLD; v.add_child(sep_notifications)
     var notifications := CheckButton.new(); notifications.text="Уведомления игры"; notifications.button_pressed=notifications_on; notifications.add_theme_font_size_override("font_size",21)
-    style_check_button_brown(notifications)
     notifications.toggled.connect(func(on:bool): notifications_on=on; save_game(); cancel_background_notifications(); if on: schedule_background_notifications(); update_ui()); v.add_child(notifications)
     var notify_items := [["notify_rewards_on","🎁 Награды"],["notify_streak_on","🔥 Серия входов"],["notify_events_on","🎪 События и сезон"],["notify_workshop_on","🔧 Мастерская"],["notify_chests_on","📦 Сундуки"]]
     for item in notify_items:
@@ -8281,7 +7788,6 @@ func build_settings_panel() -> PanelContainer:
         ncb.text = String(item[1])
         ncb.button_pressed = bool(get(String(item[0])))
         ncb.add_theme_font_size_override("font_size", 18)
-        style_check_button_brown(ncb)
         ncb.toggled.connect(func(on: bool, key: String=String(item[0])): set(key, on); save_game(); cancel_background_notifications(); schedule_background_notifications())
         v.add_child(ncb)
     var test_notification := Button.new(); test_notification.text="🔔  ОТПРАВИТЬ ТЕСТОВОЕ УВЕДОМЛЕНИЕ"; test_notification.custom_minimum_size=Vector2(0,64); style_button(test_notification,Color("#76583F")); test_notification.add_theme_font_size_override("font_size",18); test_notification.pressed.connect(func(): test_game_notification()); v.add_child(test_notification)
@@ -8289,7 +7795,6 @@ func build_settings_panel() -> PanelContainer:
 
     var sep5 := Label.new(); sep5.text="ЯЗЫК"; sep5.add_theme_font_size_override("font_size",22); sep5.modulate=GOLD; v.add_child(sep5)
     language_option=OptionButton.new(); language_option.add_item("Русский"); language_option.add_item("English"); language_option.selected=0 if language=="ru" else 1; language_option.custom_minimum_size=Vector2(0,54)
-    style_option_button_brown(language_option)
     language_option.item_selected.connect(func(idx:int): language="ru" if idx==0 else "en"; apply_language(); save_game()); v.add_child(language_option)
 
     var info := Label.new(); info.name="SettingsInfo"; info.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER; info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART; info.add_theme_font_size_override("font_size",18); info.modulate=Color("#D8C3AA"); v.add_child(info)
@@ -8345,10 +7850,26 @@ func reset_settings_defaults() -> void:
         settings_panel.visible = true
 
 func confirm_reset_settings() -> void:
-    show_brown_modal("Настройки по умолчанию", "Вернуть звук, графику и управление к исходным значениям? Прогресс игры не будет затронут.", Callable(self, "reset_settings_defaults"), "ВОССТАНОВИТЬ", "ОТМЕНА")
+    var dialog := ConfirmationDialog.new()
+    dialog.title = "Настройки по умолчанию"
+    dialog.dialog_text = "Вернуть звук, графику и управление к исходным значениям? Прогресс игры не будет затронут."
+    dialog.ok_button_text = "ВОССТАНОВИТЬ"
+    dialog.cancel_button_text = "ОТМЕНА"
+    menu_layer.add_child(dialog)
+    dialog.confirmed.connect(func(): reset_settings_defaults(); dialog.queue_free())
+    dialog.canceled.connect(func(): dialog.queue_free())
+    dialog.popup_centered()
 
 func confirm_reset_progress() -> void:
-    show_brown_modal("Сброс прогресса", "Весь прогресс, покупки и коллекция будут удалены. Продолжить?", Callable(self, "reset_progress"), "СБРОСИТЬ", "ОТМЕНА", true)
+    var dialog := ConfirmationDialog.new()
+    dialog.title = "Сброс прогресса"
+    dialog.dialog_text = "Весь прогресс, покупки и коллекция будут удалены. Продолжить?"
+    dialog.ok_button_text = "СБРОСИТЬ"
+    dialog.cancel_button_text = "ОТМЕНА"
+    menu_layer.add_child(dialog)
+    dialog.confirmed.connect(func(): reset_progress(); dialog.queue_free())
+    dialog.canceled.connect(func(): dialog.queue_free())
+    dialog.popup_centered()
 
 func quality_name() -> String:
     var names := ["ПЛОХО", "НИЗКО", "СРЕДНЕ", "ВЫСОКО", "УЛЬТРА"]
@@ -8547,7 +8068,7 @@ func build_help_panel() -> PanelContainer:
     var vk := Button.new()
     vk.text = "◉  VK  ВКонтакте"
     vk.custom_minimum_size = Vector2(300, 62)
-    style_button(vk, Color("#76583F"))
+    style_button(vk, Color("#526F8E"))
     vk.add_theme_font_size_override("font_size", 18)
     vk.pressed.connect(func():
         OS.shell_open("https://vk.ru/simulator_khvataika")
@@ -8568,7 +8089,7 @@ func build_help_panel() -> PanelContainer:
     var max_btn := Button.new()
     max_btn.text = "◆  MAX"
     max_btn.custom_minimum_size = Vector2(300, 62)
-    style_button(max_btn, Color("#76583F"))
+    style_button(max_btn, Color("#7A5D91"))
     max_btn.add_theme_font_size_override("font_size", 18)
     max_btn.pressed.connect(func():
         OS.shell_open("https://max.ru/channel_simulator_khvataika")
@@ -8591,7 +8112,11 @@ func start_game() -> void:
         register_player_remote()
         return
     if online_maintenance:
-        show_brown_modal("Технические работы", online_announcement if online_announcement != "" else "Игра временно недоступна. Попробуйте позже.", Callable(), "ЗАКРЫТЬ", "")
+        var dialog := AcceptDialog.new()
+        dialog.title = "Технические работы"
+        dialog.dialog_text = online_announcement if online_announcement != "" else "Игра временно недоступна. Попробуйте позже."
+        menu_layer.add_child(dialog)
+        dialog.popup_centered()
         return
     close_all_panels()
     register_game_activity()
@@ -8745,17 +8270,6 @@ func update_ui() -> void:
     if news_menu_button and is_instance_valid(news_menu_button):
         news_menu_button.text = "📰  НОВОСТИ"
 
-func _gameplay_simulation_active() -> bool:
-    # Когда открыто любое меню/полноэкранное окно, не тратим кадры на 3D-симуляцию
-    # автомата. Это не меняет содержимое окон, но резко снижает нагрузку на Android.
-    if not game_initialized:
-        return false
-    if not hud_layer or not hud_layer.visible:
-        return false
-    if gameplay_modal_blocker and is_instance_valid(gameplay_modal_blocker) and gameplay_modal_blocker.visible:
-        return false
-    return true
-
 func _process(delta: float) -> void:
     time_alive += delta
     # Таймер не участвует в старте: после запуска проверяем его максимум раз в секунду.
@@ -8763,11 +8277,6 @@ func _process(delta: float) -> void:
     if game_initialized and mission_timer_ui_accum >= 1.0:
         mission_timer_ui_accum = 0.0
         update_mission_timers_light()
-    if game_initialized:
-        achievement_check_timer -= delta
-        if achievement_check_timer <= 0.0:
-            achievement_check_timer = 0.5
-            check_achievements()
     if notification_permission_waiting and OS.has_feature("android") and fmod(time_alive, 1.0) < delta:
         if _android_notification_permission_granted():
             notification_permission_waiting = false
@@ -8794,8 +8303,7 @@ func _process(delta: float) -> void:
         if _server_action("settings_update", {"settings":settings_payload}):
             server_settings_dirty = false
             server_settings_sync_timer = 30.0
-    # Статус соединения не меняется каждый кадр: обновляем его только при
-    # изменении/проверке соединения, чтобы не перерисовывать Label 60 раз/с.
+    update_connection_status_ui()
     remote_auth_retry_timer -= delta
     if _server_ready() and player_token == "" and remote_request_kind == "":
         if remote_auth_retry_timer <= 0.0:
@@ -8803,7 +8311,7 @@ func _process(delta: float) -> void:
             register_player_remote()
     remote_sync_timer -= delta
     if remote_sync_timer <= 0.0 and _server_ready() and player_token != "":
-        remote_sync_timer = clampf(float(ProjectSettings.get_setting("application/config/online_sync_interval", 20.0)), 10.0, 120.0)
+        remote_sync_timer = 10.0
         sync_player_to_server()
     remote_notification_timer -= delta
     if remote_notification_timer <= 0.0 and _server_ready():
@@ -8834,38 +8342,28 @@ func _process(delta: float) -> void:
                 loading_tip_index = next_tip
                 loading_tip.text = tips[loading_tip_index]
         return
-    var gameplay_simulation_active := _gameplay_simulation_active()
     if aim_marker and is_instance_valid(aim_marker):
-        if gameplay_simulation_active:
-            aim_marker.position.x = claw_pos.x
-            aim_marker.position.z = claw_pos.z
-            aim_marker.position.y = 3.08
-            aim_marker.visible = drop_state == 0
-            aim_marker.scale = Vector3.ONE * (1.0 + sin(time_alive * 3.0) * 0.05)
-        else:
-            aim_marker.visible = false
-    if gameplay_simulation_active:
-        animate_camera(delta)
-        animate_machine_lights()
-        process_claw(delta)
+        aim_marker.position.x = claw_pos.x
+        aim_marker.position.z = claw_pos.z
+        aim_marker.position.y = 3.08
+        aim_marker.visible = hud_layer.visible and drop_state == 0
+        aim_marker.scale = Vector3.ONE * (1.0 + sin(time_alive * 3.0) * 0.05)
+    animate_camera(delta)
+    animate_machine_lights()
+    process_claw(delta)
     if start_button and menu_layer.visible:
         start_button.modulate.a = 0.72 + 0.28 * (0.5 + 0.5 * sin(time_alive * 3.8))
-    # Игровая анимация остаётся покадровой, а тяжёлые обновления окон выполняются
-    # раз в секунду. Это заметно снижает нагрузку, когда открыто длинное окно.
     update_daily_login_ui()
     process_workshop_job()
-    _ui_refresh_accum += delta
-    if _ui_refresh_accum >= 1.0:
-        _ui_refresh_accum = 0.0
-        update_return_bonus_state()
-        if season_pass_panel and season_pass_panel.visible:
-            refresh_season_pass_panel()
-        if promo_panel and promo_panel.visible:
-            refresh_promo_panel()
-        if rating_panel and rating_panel.visible:
-            refresh_rating_panel()
-        if return_bonus_panel and return_bonus_panel.visible:
-            refresh_return_bonus_panel()
+    update_return_bonus_state()
+    if season_pass_panel and season_pass_panel.visible:
+        refresh_season_pass_panel()
+    if promo_panel and promo_panel.visible:
+        refresh_promo_panel()
+    if rating_panel and rating_panel.visible:
+        refresh_rating_panel()
+    if return_bonus_panel and return_bonus_panel.visible:
+        refresh_return_bonus_panel()
     if not android_touch_hint_shown and hud_layer and hud_layer.visible:
         android_touch_hint_shown = true
         if toast_label:
@@ -8874,7 +8372,7 @@ func _process(delta: float) -> void:
             get_tree().create_timer(3.0).timeout.connect(func():
                 if is_instance_valid(toast_label): toast_label.visible = false
             )
-    if event_button and gameplay_simulation_active:
+    if event_button and hud_layer and hud_layer.visible:
         if active_event_end_unix <= int(Time.get_unix_time_from_system()):
             activate_calendar_event()
             if prize_bodies.size() < TARGET_PRIZE_COUNT:
@@ -8884,7 +8382,7 @@ func _process(delta: float) -> void:
         if event_ui_update_timer <= 0.0:
             event_ui_update_timer = 0.5
             update_event_panel()
-    if gameplay_simulation_active and drop_state == 0:
+    if hud_layer and hud_layer.visible and drop_state == 0:
         waiting_idle_time += delta
         if waiting_idle_time > 8.0:
             show_waiting_screen()
@@ -8921,12 +8419,7 @@ func _process(delta: float) -> void:
     if achievement_strip_timer > 0.0:
         achievement_strip_timer -= delta
         if achievement_strip_timer <= 0.0:
-            var total_pending := pending_new_achievements.size()
-            if achievement_strip_batch_index + 1 < total_pending:
-                achievement_strip_batch_index += 1
-                show_achievement_strip()
-            else:
-                hide_achievement_strip()
+            hide_achievement_strip()
     if popup_timer > 0.0:
         popup_timer -= delta
         if popup_timer <= 0.0 and result_popup:
@@ -8938,7 +8431,7 @@ func _process(delta: float) -> void:
         collection_completion_popup_timer -= delta
         if collection_completion_popup_timer <= 0.0 and collection_completion_popup and is_instance_valid(collection_completion_popup):
             collection_completion_popup.visible = false
-    if gameplay_simulation_active and drop_state == 0:
+    if drop_state == 0 and hud_layer.visible:
         # Движение не прыгает между точками: кнопка задаёт цель, а каретка
         # плавно догоняет её с инерцией. Клавиатура также работает плавно.
         var keyboard_speed := 2.6
@@ -9648,7 +9141,7 @@ func build_collection_completion_popup() -> void:
     name.name = "CollectionName"
     name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     name.add_theme_font_size_override("font_size", 38)
-    name.modulate = Color("#DDB47A")
+    name.modulate = Color("#F39C32")
     v.add_child(name)
     var info := Label.new()
     info.name = "Info"
@@ -9703,272 +9196,56 @@ func hide_collection_completion_popup() -> void:
     if collection_completion_popup and is_instance_valid(collection_completion_popup):
         collection_completion_popup.visible = false
 
-func _canonical_claw_id(raw_id: Variant) -> String:
-    var sid := String(raw_id).strip_edges()
-    if sid.begins_with("claw_") and not sid.begins_with("claw_skin_"):
-        var idx := int(sid.trim_prefix("claw_")) - 1
-        if idx >= 0 and idx < claw_specs.size():
-            return "claw_%d" % (idx + 1)
-    return ""
-
-func recover_claw_ownership_from_saved_sources(data: Dictionary) -> bool:
-    # Единый неизменяемый журнал владения клешнями. Объединяем ВСЕ
-    # подтверждённые источники и никогда не уменьшаем уже известное владение.
-    var changed := false
-    var ids: Array[String] = []
-    for raw_id in owned_claw_ids:
-        var cid := _canonical_claw_id(raw_id)
-        if cid != "" and not ids.has(cid): ids.append(cid)
-
-    for i in range(mini(owned_claws.size(), claw_specs.size())):
-        if owned_claws[i]:
-            var cid := "claw_%d" % (i + 1)
-            if not ids.has(cid): ids.append(cid)
-
-    # Flat legacy/server sources.
-    for field in ["owned_items", "purchases", "purchase_history", "shop_purchases", "owned_claw_ids"]:
-        var raw: Variant = data.get(field, null)
-        if raw is Array:
-            for entry in raw:
-                var value: Variant = entry.get("item_id", entry.get("id", "")) if entry is Dictionary else entry
-                var cid := _canonical_claw_id(value)
-                if cid != "" and not ids.has(cid): ids.append(cid)
-        elif raw is Dictionary:
-            for key in raw.keys():
-                if bool(raw[key]):
-                    var cid := _canonical_claw_id(key)
-                    if cid != "" and not ids.has(cid): ids.append(cid)
-
-    # Some snapshots nest ownership inside inventory.
-    var inv: Variant = data.get("inventory", null)
-    if inv is Dictionary:
-        for field in ["owned_items", "owned_claws", "claw_ids"]:
-            var raw_inv: Variant = inv.get(field, null)
-            if raw_inv is Array:
-                for entry in raw_inv:
-                    var value: Variant = entry.get("item_id", entry.get("id", "")) if entry is Dictionary else entry
-                    var cid := _canonical_claw_id(value)
-                    if cid != "" and not ids.has(cid): ids.append(cid)
-            elif raw_inv is Dictionary:
-                for key in raw_inv.keys():
-                    if bool(raw_inv[key]):
-                        var cid := _canonical_claw_id(key)
-                        if cid != "" and not ids.has(cid): ids.append(cid)
-
-    if not ids.has("claw_1"): ids.push_front("claw_1")
-    var normalized: Array[bool] = []
-    normalized.resize(claw_specs.size())
-    for i in range(normalized.size()): normalized[i] = false
-    for sid in ids:
-        var idx := int(String(sid).trim_prefix("claw_")) - 1
-        if idx >= 0 and idx < normalized.size(): normalized[idx] = true
-    if owned_claws != normalized:
-        owned_claws = normalized
-        changed = true
-    if owned_claw_ids != ids:
-        owned_claw_ids = ids
-        changed = true
-    return changed
-
-func synchronize_achievement_ownership() -> bool:
-    # Единый слой владения для всех покупаемых предметов. Он намеренно не
-    # уменьшает уже подтверждённое владение и синхронизирует массивы магазина
-    # с ID-журналами достижений.
-    var changed := false
-
-    # Клешни: owned_claws <-> owned_claw_ids.
-    var ids: Array[String] = []
-    for raw_id in owned_claw_ids:
-        var cid := _canonical_claw_id(raw_id)
-        if cid != "" and not ids.has(cid):
-            ids.append(cid)
-    for i in range(mini(owned_claws.size(), claw_specs.size())):
-        if owned_claws[i]:
-            var cid := "claw_%d" % (i + 1)
-            if not ids.has(cid):
-                ids.append(cid)
-    if not ids.has("claw_1"):
-        ids.push_front("claw_1")
-    var normalized: Array[bool] = []
-    normalized.resize(claw_specs.size())
-    for i in range(normalized.size()): normalized[i] = false
-    for cid in ids:
-        var idx := int(cid.trim_prefix("claw_")) - 1
-        if idx >= 0 and idx < normalized.size(): normalized[idx] = true
-    if owned_claws != normalized:
-        owned_claws = normalized
-        changed = true
-    if owned_claw_ids != ids:
-        owned_claw_ids = ids
-        changed = true
-
-    # Косметика: факт выбранного скина подтверждает, что он был приобретён.
-    if selected_claw_skin >= 0 and selected_claw_skin < owned_claw_skins.size() and not owned_claw_skins[selected_claw_skin]:
-        owned_claw_skins[selected_claw_skin] = true
-        changed = true
-    if selected_toy_skin >= 0 and selected_toy_skin < owned_toy_skins.size() and not owned_toy_skins[selected_toy_skin]:
-        owned_toy_skins[selected_toy_skin] = true
-        changed = true
-    if selected_machine_skin >= 0 and selected_machine_skin < owned_machine_skins.size() and not owned_machine_skins[selected_machine_skin]:
-        owned_machine_skins[selected_machine_skin] = true
-        changed = true
-
-    return changed
-
-func update_achievement_historical_values() -> bool:
-    # Только показатели, которые по смыслу являются накопительными или
-    # историческими. Ежедневные/недельные текущие задания сюда не входят.
-    var changed := false
-    var historical_kinds := ["toys", "games", "rarity", "collections", "level", "rubles", "claws", "upgrades", "best_streak", "perfect", "heavy", "lucky", "xp", "max_reward", "chests_opened", "keys_earned", "exclusive", "workshop_level", "parts", "calibration", "overclock", "claw_skins", "toy_skins", "machine_skins", "referrals"]
-    for spec in achievement_specs:
-        var kind := String(spec.get("kind", ""))
-        if not historical_kinds.has(kind):
-            continue
-        var id := String(spec.get("id", ""))
-        var current := achievement_value(spec)
-        var old := int(achievement_historical_values.get(id, 0))
-        if current > old:
-            achievement_historical_values[id] = current
-            changed = true
-    return changed
-
-func audit_achievement_source_state() -> void:
-    # Единая проверка источников достижений. Важно запускать её после загрузки
-    # сохранения: старые версии могли сохранить инвентарь, но не заполнить
-    # completed_collections/некоторые счётчики достижений.
-    sync_collection_from_inventory()
-
-    synchronize_achievement_ownership()
-
-    # Восстанавливаем факт завершённых коллекций из реального инвентаря.
-    # Это делает достижения за коллекции ретроактивными.
-    for collection_name in get_collection_names():
-        var needed := 0
-        var got := 0
-        for toy in toys:
-            if String(toy.get("collection", "")) != collection_name:
-                continue
-            needed += 1
-            var toy_name := String(toy.get("name", ""))
-            if int(toy_inventory_counts.get(toy_name, 0)) > 0 or collection.has(toy_name):
-                got += 1
-        if needed > 0 and got >= needed:
-            completed_collections[collection_name] = true
-
-    # Старые сохранения могли иметь инвентарь, но устаревший total_prizes_won.
-    var inventory_total := 0
-    var derived_rarity: Dictionary = {}
-    for toy in toys:
-        var toy_name := String(toy.get("name", ""))
-        var count := maxi(0, int(toy_inventory_counts.get(toy_name, 0)))
-        inventory_total += count
-        if count > 0:
-            var rarity := String(toy.get("rarity", "ОБЫЧНАЯ"))
-            derived_rarity[rarity] = int(derived_rarity.get(rarity, 0)) + count
-            if float(toy.get("weight", 0.0)) >= 80.0:
-                heavy_toy_wins = maxi(heavy_toy_wins, count)
-    total_prizes_won = maxi(total_prizes_won, inventory_total)
-    # Ретроактивно восстанавливаем минимально подтверждённое число призов
-    # каждой редкости из фактического инвентаря. Уже сохранённые исторические
-    # счётчики никогда не уменьшаем.
-    for rarity in derived_rarity.keys():
-        rarity_wins[rarity] = maxi(int(rarity_wins.get(rarity, 0)), int(derived_rarity[rarity]))
-    # Одна успешная выдача игрушки не может произойти без игры.
-    total_games = maxi(total_games, total_prizes_won)
-
-    # Нормализуем владение предметами перед проверкой достижений. Это особенно
-    # важно для старых сохранений, где массивы были короче актуального списка.
-    owned_claws = migrate_bool_array(owned_claws, claw_specs.size(), owned_claws)
-    owned_claws[0] = true
-    recover_claw_ownership_from_saved_sources({"owned_claws": owned_claws, "owned_claw_ids": owned_claw_ids})
-    # Выбранная клешня/скин не может быть "не открыта": сам факт выбора из
-    # сохранённого состояния подтверждает владение.
-    if selected_claw >= 0 and selected_claw < owned_claws.size():
-        owned_claws[selected_claw] = true
-        var selected_id := "claw_%d" % (selected_claw + 1)
-        if not owned_claw_ids.has(selected_id):
-            owned_claw_ids.append(selected_id)
-    owned_claw_skins = migrate_bool_array(owned_claw_skins, claw_skin_specs.size(), owned_claw_skins)
-    owned_toy_skins = migrate_bool_array(owned_toy_skins, toy_skin_specs.size(), owned_toy_skins)
-    owned_machine_skins = migrate_bool_array(owned_machine_skins, machine_skin_specs.size(), owned_machine_skins)
-    if selected_claw_skin >= 0 and selected_claw_skin < owned_claw_skins.size():
-        owned_claw_skins[selected_claw_skin] = true
-    if selected_toy_skin >= 0 and selected_toy_skin < owned_toy_skins.size():
-        owned_toy_skins[selected_toy_skin] = true
-    if selected_machine_skin >= 0 and selected_machine_skin < owned_machine_skins.size():
-        owned_machine_skins[selected_machine_skin] = true
-
-    # «Накопите X ₽» означает когда-либо достигнутый баланс, а не деньги,
-    # которые игрок обязан держать после последующей покупки.
-    highest_balance_rubles = maxi(highest_balance_rubles, coins)
-    var history_changed := update_achievement_historical_values()
-    if history_changed:
-        save_game()
-
-func get_owned_claw_count() -> int:
-    # Считаем уникальные реально открытые клешни из обоих источников.
-    # Это защищает прогресс достижения от рассинхронизации bool-массива и
-    # журнала ID после покупки или загрузки старого сохранения.
-    var owned_ids: Dictionary = {}
-    for i in range(mini(owned_claws.size(), claw_specs.size())):
-        if owned_claws[i]:
-            owned_ids[i] = true
-    for raw_id in owned_claw_ids:
-        var cid := _canonical_claw_id(raw_id)
-        if cid == "":
-            continue
-        var idx := int(cid.trim_prefix("claw_")) - 1
-        if idx >= 0 and idx < claw_specs.size():
-            owned_ids[idx] = true
-    # Стартовая клешня всегда принадлежит игроку.
-    if claw_specs.size() > 0:
-        owned_ids[0] = true
-    return owned_ids.size()
-
 func achievement_value(spec: Dictionary) -> int:
-    var current := 0
     match String(spec.get("kind", "")):
-        "toys": current = total_prizes_won
-        "games": current = total_games
-        "rarity": current = int(rarity_wins.get(String(spec.get("rarity", "")), 0))
-        "collections": current = completed_collections.size()
-        "level": current = player_level
-        "rubles": current = maxi(coins, highest_balance_rubles)
+        "toys": return total_prizes_won
+        "games": return total_games
+        "rarity": return int(rarity_wins.get(String(spec.get("rarity", "")), 0))
+        "collections": return completed_collections.size()
+        "level": return player_level
+        "rubles": return coins
         "claws":
-            current = get_owned_claw_count()
+            var count := 0
+            for owned in owned_claws:
+                if owned: count += 1
+            return count
         "upgrades":
-            for lvl in upgrade_levels: current += lvl
-        "best_streak": current = best_win_streak
-        "perfect": current = perfect_grabs
-        "heavy": current = heavy_toy_wins
-        "lucky": current = lucky_toy_wins
-        "xp": current = total_xp_earned
-        "max_reward": current = highest_reward_rubles
-        "chests_opened": current = total_chests_opened
-        "keys_earned": current = total_keys_earned
-        "exclusive": current = chest_exclusive_reward_count
-        "workshop_level": current = workshop_level
-        "parts": current = workshop_parts
-        "calibration": current = workshop_calibration
-        "overclock": current = 1 if workshop_overclock_games > 0 or workshop_overclock else 0
+            var total := 0
+            for lvl in upgrade_levels: total += lvl
+            return total
+        "best_streak": return best_win_streak
+        "perfect": return perfect_grabs
+        "heavy": return heavy_toy_wins
+        "lucky": return lucky_toy_wins
+        "xp": return total_xp_earned
+        "max_reward": return highest_reward_rubles
+        "chests_opened": return total_chests_opened
+        "keys_earned": return total_keys_earned
+        "exclusive": return chest_exclusive_reward_count
+        "workshop_level": return workshop_level
+        "parts": return workshop_parts
+        "calibration": return workshop_calibration
+        "overclock": return 1 if workshop_overclock_games > 0 or workshop_overclock else 0
         "claw_skins":
+            var count_claw_skins := 0
             for owned in owned_claw_skins:
-                if owned: current += 1
+                if owned: count_claw_skins += 1
+            return count_claw_skins
         "toy_skins":
+            var count_toy_skins := 0
             for owned in owned_toy_skins:
-                if owned: current += 1
+                if owned: count_toy_skins += 1
+            return count_toy_skins
         "machine_skins":
+            var count_machine_skins := 0
             for owned in owned_machine_skins:
-                if owned: current += 1
-        "login_streak": current = login_streak
-        "daily_claims": current = total_daily_claims
-        "weekly_claims": current = total_weekly_claims
-        "referrals": current = referral_invites
-    var kind := String(spec.get("kind", ""))
-    var historical_kinds := ["toys", "games", "rarity", "collections", "level", "rubles", "claws", "upgrades", "best_streak", "perfect", "heavy", "lucky", "xp", "max_reward", "chests_opened", "keys_earned", "exclusive", "workshop_level", "parts", "calibration", "overclock", "claw_skins", "toy_skins", "machine_skins", "referrals"]
-    if historical_kinds.has(kind):
-        current = maxi(current, int(achievement_historical_values.get(String(spec.get("id", "")), 0)))
-    return current
+                if owned: count_machine_skins += 1
+            return count_machine_skins
+        "login_streak": return login_streak
+        "daily_claims": return total_daily_claims
+        "weekly_claims": return total_weekly_claims
+        "referrals": return referral_invites
+    return 0
 
 func achievement_reward(spec: Dictionary) -> Dictionary:
     if spec.has("reward") and spec["reward"] is Dictionary:
@@ -10004,33 +9281,7 @@ func achievement_reward(spec: Dictionary) -> Dictionary:
         "best_streak":
             rubles = 30 if value <= 5 else 60
         "perfect":
-            rubles = 35 if value <= 5 else (70 if value <= 25 else 120)
-        "heavy":
-            rubles = 30 if value <= 10 else (60 if value <= 50 else 100)
-        "lucky":
-            rubles = 35 if value <= 5 else (70 if value <= 25 else 120)
-        "xp":
-            rubles = 25 if value <= 1000 else (50 if value <= 10000 else 100)
-        "max_reward":
-            rubles = 30 if value <= 100 else (60 if value <= 500 else 100)
-        "chests_opened":
-            rubles = 25 if value <= 1 else (50 if value <= 10 else (90 if value <= 50 else 150))
-        "keys_earned":
-            keys = 1 if value <= 25 else 2
-        "exclusive":
-            rubles = 50 if value <= 1 else 100
-        "workshop_level":
-            rubles = 30 if value <= 5 else (60 if value <= 10 else 100)
-        "parts":
-            rubles = 25 if value <= 100 else (50 if value <= 500 else 100)
-        "calibration":
-            parts = 25 if value < 5 else 50
-        "overclock":
-            rubles = 50
-        "claw_skins", "toy_skins", "machine_skins":
-            rubles = 40 if value <= 3 else 80
-        "login_streak":
-            rubles = 30 if value <= 3 else 60
+            rubles = 35 if value <= 5 else 70
         "daily_claims", "weekly_claims":
             keys = 1 if value >= 7 else 0
             rubles = 25 if keys == 0 else 0
@@ -10054,8 +9305,6 @@ func grant_achievement_reward(spec: Dictionary) -> void:
     total_keys_earned += int(r.get("keys", 0))
 
 func check_achievements() -> void:
-    var before_unlock_count := unlocked_achievements.size()
-    audit_achievement_source_state()
     var unlocked_now: Array[String] = []
     for spec in achievement_specs:
         var id := String(spec["id"])
@@ -10068,19 +9317,8 @@ func check_achievements() -> void:
             grant_achievement_reward(spec)
             pending_achievement_rewards_text.append("🏆 %s\n   %s" % [String(spec["name"]), achievement_reward_text(spec)])
     if not unlocked_now.is_empty():
-        if not achievement_strip or not achievement_strip.visible:
-            achievement_strip_batch_index = 0
-        # Сохраняем сразу после фактического открытия достижения: его награда
-        # и статус не должны потеряться при закрытии игры до следующего autosave.
-        save_game()
-        refresh_achievements_panel()
         current_result = "🏆 НОВОЕ ДОСТИЖЕНИЕ: %s" % unlocked_now[0]
         show_achievement_strip()
-    elif before_unlock_count != unlocked_achievements.size():
-        save_game()
-        refresh_achievements_panel()
-    elif achievements_panel and achievements_panel.visible:
-        refresh_achievements_panel()
 
 func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, reward_rubles: int = 0, rating_gain: int = 0) -> void:
     if not result_popup: return
@@ -10099,8 +9337,8 @@ func show_prize_popup(toy_name: String, cname: String, rarity: String, xp: int, 
         popup_xp_label.text = "ДУБЛЬ • ПРОДАТЬ ЗА %d ₽?" % sale_price
         popup_achievement_label.text = "Игрушка уже есть в коллекции. Выберите: продать дубль или оставить его."
     result_popup.visible = true
-    # Не очищаем очередь достижений: уведомление должно показаться
-    # отдельной компактной строкой даже после окна получения игрушки.
+    pending_new_achievements.clear()
+    pending_achievement_rewards_text.clear()
 
 func show_achievement_popup() -> void:
     # Старое отдельное окно достижений больше не используется:
@@ -10116,7 +9354,54 @@ func rarity_reward(rarity: String) -> int:
     return 5
 
 func confirm_purchase(title_text: String, message_text: String, action: Callable, ok_text: String = "КУПИТЬ", chest_style: bool = false) -> void:
-    show_brown_modal(title_text, message_text, action, ok_text, "ОТМЕНА", chest_style)
+    var dialog := ConfirmationDialog.new()
+    dialog.title = title_text
+    dialog.dialog_text = message_text
+    dialog.ok_button_text = ok_text
+    dialog.cancel_button_text = "ОТМЕНА"
+
+    # Для сундуков оставляем штатный надёжный ConfirmationDialog,
+    # но убираем серую системную рамку/заголовок и оформляем содержимое
+    # полностью в фирменной коричневой гамме игры.
+    if chest_style:
+        dialog.borderless = true
+        dialog.transparent_bg = true
+        var panel_style := make_style(Color("#241B16"), Color("#8A684C"), 18, 2)
+        panel_style.content_margin_left = 28.0
+        panel_style.content_margin_right = 28.0
+        panel_style.content_margin_top = 22.0
+        panel_style.content_margin_bottom = 22.0
+        dialog.add_theme_stylebox_override("panel", panel_style)
+        dialog.add_theme_color_override("font_color", Color("#F1E5D6"))
+        dialog.add_theme_color_override("font_hover_color", Color("#FFFFFF"))
+        dialog.add_theme_font_size_override("font_size", 27)
+
+        var chest_label := dialog.get_label()
+        if chest_label:
+            chest_label.add_theme_color_override("font_color", Color("#F1E5D6"))
+            chest_label.add_theme_font_size_override("font_size", 27)
+            chest_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+            chest_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+            chest_label.custom_minimum_size = Vector2(620, 210)
+
+        var ok := dialog.get_ok_button()
+        var cancel := dialog.get_cancel_button()
+        style_button(ok, Color("#A8754A"))
+        style_button(cancel, Color("#6E4B33"))
+        ok.custom_minimum_size = Vector2(220, 62)
+        cancel.custom_minimum_size = Vector2(220, 62)
+        ok.add_theme_font_size_override("font_size", 20)
+        cancel.add_theme_font_size_override("font_size", 20)
+
+    menu_layer.add_child(dialog)
+    dialog.confirmed.connect(action)
+    dialog.confirmed.connect(func(): dialog.queue_free())
+    dialog.canceled.connect(func(): dialog.queue_free())
+    dialog.close_requested.connect(func(): dialog.queue_free())
+    if chest_style:
+        dialog.popup_centered(Vector2(700, 390))
+    else:
+        dialog.popup_centered(Vector2(700, 320))
 
 func buy_claw(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= claw_specs.size(): return
@@ -10139,16 +9424,10 @@ func buy_claw(index: int, skip_confirmation: bool = false) -> void:
         return
     if owned_claws[index]:
         selected_claw = index
-        if not owned_claw_ids.has("claw_%d" % (index + 1)):
-            owned_claw_ids.append("claw_%d" % (index + 1))
         current_result = "УСТАНОВЛЕНА: %s" % String(claw_specs[index]["name"])
-        check_achievements()
-        save_game()
     elif coins >= int(claw_specs[index]["price"]):
         coins -= int(claw_specs[index]["price"])
         owned_claws[index] = true
-        if not owned_claw_ids.has("claw_%d" % (index + 1)):
-            owned_claw_ids.append("claw_%d" % (index + 1))
         selected_claw = index
         current_result = "КУПЛЕНА: %s" % String(claw_specs[index]["name"])
         check_achievements()
@@ -10267,7 +9546,6 @@ func reset_progress() -> void:
     coins = 120
     selected_claw = 0
     owned_claws = [true, false, false, false, false, false, false, false, false, false]
-    owned_claw_ids = ["claw_1"]
     collection.clear()
     toy_inventory_counts.clear()
     completed_collections.clear()
@@ -10457,7 +9735,6 @@ func complete_daily_mission_if_ready() -> void:
         daily_mission_claimed = true
         daily_mission_completed_at = int(Time.get_unix_time_from_system())
         total_daily_claims += 1
-        check_achievements()
         current_result = "🎯 МИССИЯ ДНЯ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(daily_mission_reward)
         notify_phone("🎯 Хватайка", "Ежедневная миссия выполнена. Награда +50 ₽ уже получена!")
 
@@ -10471,7 +9748,6 @@ func complete_weekly_mission_if_ready() -> void:
         weekly_mission_claimed = true
         weekly_mission_completed_at = int(Time.get_unix_time_from_system())
         total_weekly_claims += 1
-        check_achievements()
         current_result = "🏆 НЕДЕЛЬНОЕ ЗАДАНИЕ ВЫПОЛНЕНА • +%d ₽" % server_reward_amount(weekly_mission_reward)
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
 
@@ -10488,7 +9764,6 @@ func claim_daily_bonus() -> void:
 
     coins += server_reward_amount(daily_bonus_amount)
     last_daily_bonus_date = today
-    check_achievements()
     save_game()
 
     if toast_label:
@@ -10577,7 +9852,6 @@ func save_game() -> void:
     if f:
         f.store_string(JSON.stringify({
             "coins": coins,
-            "highest_balance_rubles": highest_balance_rubles,
             "player_name": player_name,
             "player_avatar_index": player_avatar_index,
             "music": music_on,
@@ -10619,7 +9893,6 @@ func save_game() -> void:
             "engineering_parts": engineering_parts,
             "claw": selected_claw,
             "owned_claws": owned_claws,
-            "owned_claw_ids": owned_claw_ids,
             "owned_claw_skins": owned_claw_skins,
             "owned_toy_skins": owned_toy_skins,
             "owned_machine_skins": owned_machine_skins,
@@ -10665,7 +9938,6 @@ func save_game() -> void:
             "total_prizes_won": total_prizes_won,
             "rarity_wins": rarity_wins,
             "achievements": unlocked_achievements,
-            "achievement_historical_values": achievement_historical_values,
             "last_daily_bonus_date": last_daily_bonus_date,
             "login_streak": login_streak,
             "last_login_claim_date": last_login_claim_date,
@@ -10701,17 +9973,6 @@ func save_game() -> void:
         }))
         f.close()
 
-func migrate_bool_array(value: Variant, target_size: int, fallback: Array[bool]) -> Array[bool]:
-    var result: Array[bool] = []
-    result.resize(target_size)
-    for i in range(target_size):
-        result[i] = fallback[i] if i < fallback.size() else false
-    if value is Array:
-        var src: Array = value
-        for i in range(mini(src.size(), target_size)):
-            result[i] = bool(src[i])
-    return result
-
 func load_save() -> void:
     if not FileAccess.file_exists(SAVE_PATH): return
     var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
@@ -10729,7 +9990,6 @@ func load_save() -> void:
     bonus_keys = int(data.get("bonus_keys", 0))
     engineering_parts = int(data.get("engineering_parts", 0))
     coins = maxi(0, int(data.get("coins", 120)))
-    highest_balance_rubles = maxi(coins, int(data.get("highest_balance_rubles", coins)))
     selected_claw = clampi(int(data.get("claw", 0)), 0, claw_specs.size() - 1)
     music_on = bool(data.get("music", true))
     sfx_on = bool(data.get("sfx", true))
@@ -10764,15 +10024,10 @@ func load_save() -> void:
     season_pass_level = clampi(int(data.get("season_pass_level", 1)), 1, SEASON_PASS_MAX_LEVEL)
     var saved_codes: Variant = data.get("promo_codes_used", {})
     if saved_codes is Dictionary: promo_codes_used = saved_codes
-    # Online 2.0.0 uses the packaged endpoint as the canonical server address.
-    # A saved token may be reused for a short period; a 401 automatically
-    # triggers re-registration. The endpoint itself is never taken from an old save.
-    if ONLINE_ENABLED and not OFFLINE_MODE:
-        server_url = String(ProjectSettings.get_setting("application/config/online_server_url", "http://135.106.209.40:8080")).strip_edges().trim_suffix("/")
-        player_token = String(data.get("player_token", player_token))
-    else:
-        server_url = ""
-        player_token = ""
+    # Offline build: never restore a previous online endpoint from an old save.
+    # This prevents an old 1.12/1.13 save from silently changing the local mode.
+    server_url = ""
+    player_token = ""
     player_id = String(data.get("player_id", ""))
     quality_level = clampi(int(data.get("quality_level", 2)), 0, 4)
     var saved_upgrades: Variant = data.get("upgrades", upgrade_levels)
@@ -10781,23 +10036,24 @@ func load_save() -> void:
         for i in range(upgrade_specs.size()):
             var value: Variant = saved_upgrades[i] if i < saved_upgrades.size() else 0
             upgrade_levels.append(clampi(int(value), 0, 5))
-    # Миграция массивов владения: старые сохранения могли содержать только
-    # первые 3/4/6 предметов. Раньше такие массивы полностью игнорировались,
-    # из-за чего уже купленные клешни/скины возвращались в состояние "не куплено".
-    owned_claws = migrate_bool_array(data.get("owned_claws", owned_claws), claw_specs.size(), owned_claws)
-    var saved_claw_ids: Variant = data.get("owned_claw_ids", owned_claw_ids)
-    if saved_claw_ids is Array:
-        owned_claw_ids = []
-        for raw_id in saved_claw_ids:
-            owned_claw_ids.append(String(raw_id))
-    recover_claw_ownership_from_saved_sources(data)
+    var saved_owned: Variant = data.get("owned_claws", owned_claws)
+    if saved_owned is Array and saved_owned.size() == claw_specs.size():
+        owned_claws = []
+        for value in saved_owned:
+            owned_claws.append(bool(value))
     owned_claws[0] = true
     var saved_claw_skins: Variant = data.get("owned_claw_skins", owned_claw_skins)
-    owned_claw_skins = migrate_bool_array(saved_claw_skins, claw_skin_specs.size(), owned_claw_skins)
+    if saved_claw_skins is Array and saved_claw_skins.size() == claw_skin_specs.size():
+        owned_claw_skins = []
+        for value in saved_claw_skins: owned_claw_skins.append(bool(value))
     var saved_toy_skins: Variant = data.get("owned_toy_skins", owned_toy_skins)
-    owned_toy_skins = migrate_bool_array(saved_toy_skins, toy_skin_specs.size(), owned_toy_skins)
+    if saved_toy_skins is Array and saved_toy_skins.size() == toy_skin_specs.size():
+        owned_toy_skins = []
+        for value in saved_toy_skins: owned_toy_skins.append(bool(value))
     var saved_machine_skins: Variant = data.get("owned_machine_skins", owned_machine_skins)
-    owned_machine_skins = migrate_bool_array(saved_machine_skins, machine_skin_specs.size(), owned_machine_skins)
+    if saved_machine_skins is Array and saved_machine_skins.size() == machine_skin_specs.size():
+        owned_machine_skins = []
+        for value in saved_machine_skins: owned_machine_skins.append(bool(value))
     # Индекс 0 всегда означает стартовый скин. Индексы 1+ — магазинные скины
     # (уровни 2+). Это сохраняет совместимость со старыми сохранениями и серверными ID.
     if not owned_claw_skins.is_empty(): owned_claw_skins[0] = true
@@ -10857,8 +10113,6 @@ func load_save() -> void:
     if saved_rarity is Dictionary: rarity_wins = saved_rarity
     var saved_ach: Variant = data.get("achievements", {})
     if saved_ach is Dictionary: unlocked_achievements = saved_ach
-    var saved_ach_hist: Variant = data.get("achievement_historical_values", {})
-    if saved_ach_hist is Dictionary: achievement_historical_values = saved_ach_hist
     last_daily_bonus_date = String(data.get("last_daily_bonus_date", ""))
     login_streak = maxi(0, int(data.get("login_streak", 0)))
     last_login_claim_date = String(data.get("last_login_claim_date", ""))
