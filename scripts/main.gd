@@ -7,13 +7,13 @@ extends Node3D
 
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
-var ONLINE_ENABLED: bool = false
+const ONLINE_ENABLED: bool = true
 const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
 # 2.0.0 production online mode: the server is authoritative for economy,
 # progress and game outcomes. Local UI/physics continue to run without blocking
 # on HTTP; network operations are asynchronous and retried in the background.
-var OFFLINE_MODE: bool = true
-var SERVER_AUTHORITATIVE: bool = false
+const OFFLINE_MODE: bool = false
+var SERVER_AUTHORITATIVE: bool = true
 # Local-first UX: gameplay/progress updates happen immediately on device;
 # the existing server is used quietly for persistence, account identity and rating.
 var LOCAL_FIRST_MODE: bool = true
@@ -231,7 +231,7 @@ var news_items: Array[Dictionary] = []
 var news_unread: int = 0
 
 # Онлайн-сервер и удалённая конфигурация. Сервер необязателен: при пустом URL игра работает локально.
-const DEFAULT_SERVER_URL: String = "http://135.106.209.40:8080"
+const DEFAULT_SERVER_URL: String = "https://135.106.209.40"
 # CONTROL TEST: keep the five recently added feature groups out of startup.
 # Their code remains in the project; this switch only isolates the startup path.
 const STARTUP_CONTROL_TEST: bool = false
@@ -1207,7 +1207,7 @@ func update_return_bonus_state() -> void:
         return_bonus_button.visible = return_bonus_available and hud_layer != null and hud_layer.visible
 
 func claim_return_bonus() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("return_bonus"):
@@ -1230,7 +1230,7 @@ func claim_return_bonus() -> void:
     update_ui()
 
 func start_workshop_job() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_job_start", {}):
@@ -1255,7 +1255,7 @@ func start_workshop_job() -> void:
     refresh_live_systems_panel()
 
 func process_workshop_job() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not workshop_job_active:
             return
         if int(Time.get_unix_time_from_system()) < workshop_job_end_unix:
@@ -1350,44 +1350,34 @@ func _normalized_server_url() -> String:
     return server_url.strip_edges().trim_suffix("/")
 
 func _server_ready() -> bool:
+    return SERVER_AUTHORITATIVE and remote_http != null and _normalized_server_url() != "" and server_connection_ok and player_token != ""
+
+func _network_configured() -> bool:
     return SERVER_AUTHORITATIVE and remote_http != null and _normalized_server_url() != ""
 
+func _server_authoritative_online() -> bool:
+    return _server_ready()
+
 func _server_persistence_ready() -> bool:
-    return SERVER_AUTHORITATIVE and remote_http != null and _normalized_server_url() != "" and player_token != ""
+    return _server_ready()
 
 func _local_progress_exists() -> bool:
-    return coins != 120 or player_level > 1 or player_xp > 0 or total_games > 0 or total_prizes_won > 0 or not collection.is_empty() or not completed_collections.is_empty() or owned_claw_ids.size() > 1 or owned_claw_skins.slice(1).any(func(v): return bool(v)) or owned_toy_skins.slice(1).any(func(v): return bool(v)) or owned_machine_skins.slice(1).any(func(v): return bool(v)) or upgrade_levels.any(func(v): return int(v) > 0)
+    # На чистой установке starter claw_1 уже принадлежит игроку, поэтому
+    # само наличие owned_claw_ids не должно считаться прогрессом. Иначе
+    # существующий серверный профиль никогда не импортируется на новый телефон.
+    var has_nonstarter_claw := false
+    for claw_id in owned_claw_ids:
+        if String(claw_id) != "claw_1":
+            has_nonstarter_claw = true
+            break
+    return coins != 120 or player_level > 1 or player_xp > 0 or total_games > 0 or total_prizes_won > 0 or not collection.is_empty() or not completed_collections.is_empty() or has_nonstarter_claw or upgrade_levels.any(func(v): return int(v) > 0)
 
 func get_server_game_state() -> Dictionary:
-    # Server stores inventory by stable toy IDs. The game UI uses toy names, so
-    # convert the local name-based cache to the canonical server form here.
-    var server_toys: Dictionary = {}
-    for toy in toys:
-        if not (toy is Dictionary):
-            continue
-        var tid := String(toy.get("id", ""))
-        var tname := String(toy.get("name", ""))
-        if tid == "" or tname == "":
-            continue
-        var count := int(toy_inventory_counts.get(tname, 0))
-        if count > 0:
-            server_toys[tid] = count
-    var server_inventory := {
-        "toys": server_toys,
-        "upgrade_levels": upgrade_levels.duplicate(),
-        "chest_keys": chest_keys,
-        "parts": workshop_parts,
-        "bonus_keys": bonus_keys,
-        "total_keys_earned": total_keys_earned,
-        "chests_opened": total_chests_opened,
-        "chests": chest_inventory.duplicate(true)
-    }
     return {
         "save_schema": SAVE_SCHEMA_VERSION,
         "sync_version": server_sync_version,
             "offline_mode": OFFLINE_MODE,
             "coins": coins, "player_name": player_name, "player_avatar_index": player_avatar_index,
-        "inventory": server_inventory,
         "bonus_keys": bonus_keys, "engineering_parts": engineering_parts, "chest_inventory": chest_inventory,
         "chest_keys": chest_keys, "chest_exclusive_toys": chest_exclusive_toys, "chest_exclusive_skins": chest_exclusive_skins,
         "chest_exclusive_reward_count": chest_exclusive_reward_count, "total_chests_opened": total_chests_opened,
@@ -1777,7 +1767,7 @@ func _remote_headers() -> PackedStringArray:
     return h
 
 func _server_action(action_name: String, payload: Dictionary = {}) -> bool:
-    if not _server_ready() or player_token == "" or LOCAL_FIRST_MODE:
+    if not _server_ready() or player_token == "":
         return false
     # HTTPRequest допускает только один активный запрос. Поэтому фоновые
     # запросы никогда не отменяем перед покупкой: действие ставится в короткую
@@ -1849,7 +1839,7 @@ func _ensure_connection_http() -> void:
     connection_http.request_completed.connect(_on_connection_http_completed)
 
 func _check_server_connection() -> void:
-    if not _server_ready() or not connection_http or not is_instance_valid(connection_http):
+    if not _network_configured() or not connection_http or not is_instance_valid(connection_http):
         return
     if connection_http.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
         return
@@ -1865,6 +1855,10 @@ func _on_connection_http_completed(result: int, response_code: int, _headers: Pa
     server_connection_ok = internet_connection_ok and response_code >= 200 and response_code < 300
     if server_connection_ok:
         remote_sync_status = "СЕРВЕР ПОДКЛЮЧЕН"
+        if player_token != "" and remote_request_kind == "":
+            call_deferred("request_bootstrap_remote")
+        elif player_token == "" and remote_request_kind == "":
+            call_deferred("register_player_remote")
     elif internet_connection_ok:
         remote_sync_status = "ИНТЕРНЕТ ЕСТЬ • СЕРВЕР НЕДОСТУПЕН"
     else:
@@ -1906,7 +1900,7 @@ func poll_server_notifications() -> void:
         remote_sync_status = "ОШИБКА УВЕДОМЛЕНИЙ"
 
 func register_player_remote() -> void:
-    if not _server_ready():
+    if not _network_configured():
         remote_sync_status = "СЕРВЕР НЕ НАСТРОЕН"
         return
     if remote_request_kind != "":
@@ -1920,8 +1914,20 @@ func register_player_remote() -> void:
         remote_request_kind = ""
         remote_sync_status = "ОШИБКА РЕГИСТРАЦИИ"
 
+func request_bootstrap_remote() -> void:
+    # Bootstrap is intentionally requested only after register/auth succeeds and
+    # after the first playable frame. It is one compact server snapshot; it is
+    # never part of the heavy scene/physics startup path.
+    if not _server_ready() or remote_request_kind != "":
+        return
+    remote_request_kind = "bootstrap"
+    var err := remote_http.request(_normalized_server_url() + "/api/player/bootstrap", _remote_headers())
+    if err != OK:
+        remote_request_kind = ""
+        remote_sync_status = "ОШИБКА BOOTSTRAP"
+
 func sync_remote_config() -> void:
-    if not _server_ready():
+    if not _network_configured():
         remote_sync_status = "СЕРВЕР НЕ НАСТРОЕН"
         return
     if remote_request_kind != "":
@@ -2165,6 +2171,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
     # This prevents the recurring "Parse JSON failed" noise and, more importantly,
     # keeps the game state machine alive when the server is temporarily unavailable.
     if result != HTTPRequest.RESULT_SUCCESS:
+        internet_connection_ok = false
+        server_connection_ok = false
+        update_connection_status_ui()
         remote_sync_retry_count = mini(remote_sync_retry_count + 1, 10)
         remote_sync_status = "СЕРВЕР НЕДОСТУПЕН • ПОВТОРНОЕ ПОДКЛЮЧЕНИЕ"
         if kind.begins_with("action:"):
@@ -2179,6 +2188,8 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         return
 
     if response_code < 200 or response_code >= 300:
+        internet_connection_ok = true
+        server_connection_ok = true
         if response_code == 401 and kind != "register":
             # Session expired/server restarted: obtain a fresh player token automatically.
             player_token = ""
@@ -2239,10 +2250,20 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
     if data.has("token") and String(data.get("token", "")) != "":
         player_token = String(data.get("token"))
         save_game()
+        if kind == "register":
+            call_deferred("request_bootstrap_remote")
     # Конфигурация/каталог применяется до состояния игрока, чтобы новые
     # названия игрушек и характеристики использовались при разборе инвентаря.
     if data.has("config") and data["config"] is Dictionary:
         _apply_remote_config(data["config"])
+    if kind == "bootstrap":
+        remote_sync_status = "СЕРВЕР ПОДКЛЮЧЕН"
+        if data.has("game_state") and data["game_state"] is Dictionary and not _local_progress_exists():
+            apply_server_game_state(data["game_state"])
+            save_game()
+            update_ui()
+        return
+
     if kind.begins_with("action:"):
         remote_action_name = ""
         if kind == "action:settings_update": server_settings_dirty = false
@@ -2255,8 +2276,11 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             if kind == "sync" and String(data.get("conflict", "")) == "server_newer":
                 apply_server_game_state(data["game_state"])
                 update_ui()
-            elif not LOCAL_FIRST_MODE or not _local_progress_exists():
+            elif _server_authoritative_online() or not _local_progress_exists():
+                # While the server is healthy, typed server actions are the
+                # source of truth. Offline mode never reaches this branch.
                 apply_server_game_state(data["game_state"])
+                update_ui()
         if bool(data.get("ok", false)) and data.has("achievements") and data["achievements"] is Array:
             pending_new_achievements.clear()
             for achievement in data["achievements"]:
@@ -2422,23 +2446,10 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
             referral_code = String(server_player.get("referral_code", referral_code))
         if server_player.has("referral_invites"):
             referral_invites = maxi(0, int(server_player.get("referral_invites", referral_invites)))
-        if kind == "register" and server_player.has("sync_version"):
-            var local_known_version := server_sync_version
-            var remote_version := maxi(0, int(server_player.get("sync_version", 0)))
-            if remote_version > local_known_version:
-                # Admin/server changed the account since this device last synced.
-                # Pull the newer server state instead of overwriting it.
-                if data.has("game_state") and data["game_state"] is Dictionary:
-                    apply_server_game_state(data["game_state"])
-                    register_pulled_server_state = true
-                else:
-                    server_sync_version = remote_version
-            else:
-                # Server is at the same/older revision. Keep local-first data and
-                # let the normal background sync persist it.
-                server_sync_version = local_known_version
-        elif server_player.has("sync_version"):
+        if server_player.has("sync_version"):
             server_sync_version = maxi(0, int(server_player.get("sync_version", server_sync_version)))
+        if kind == "sync" and server_player.has("coins") and String(data.get("conflict", "")) != "server_newer":
+            coins = maxi(0, int(server_player.get("coins", coins)))
         save_game()
     if data.has("leaderboard") and data["leaderboard"] is Array:
         remote_leaderboard.clear()
@@ -2454,12 +2465,9 @@ func _on_remote_http_completed(result: int, response_code: int, headers: PackedS
         remote_auth_retry_timer = 10.0
     if kind == "register":
         remote_sync_pending = false
-        if register_pulled_server_state:
-            remote_sync_pending = false
         # Registration already returns the authoritative player snapshot and
         # full catalog/config. Do not immediately download the same payload again.
-        if not register_pulled_server_state:
-            call_deferred("sync_player_to_server")
+        call_deferred("sync_player_to_server")
     elif kind == "config":
         remote_sync_pending = false
         if pending_incoming_referral != "":
@@ -3187,8 +3195,9 @@ func initialize_game_async() -> void:
     await get_tree().process_frame
 
     game_initialized = true
-    audit_achievement_source_state()
-    check_achievements()
+    # Do not spend the last critical startup slice on the full achievement
+    # audit. The player can already see and control the game; the audit runs
+    # one or two frames later and then refreshes the HUD.
     save_game()
     _startup_write_phase("DONE")
     register_game_activity()
@@ -3205,28 +3214,18 @@ func initialize_game_async() -> void:
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.queue_free()
     loading_screen = null
-    # Сервер включается только после того, как игровой экран уже показан.
-    # Это сохраняет быстрый запуск как в рабочей офлайн-версии.
+    call_deferred("post_startup_progress_audit")
     call_deferred("activate_extra_features_after_startup")
-    get_tree().create_timer(3.0).timeout.connect(_enable_online_after_startup)
 
 
-func _enable_online_after_startup() -> void:
-    if not game_initialized:
-        return
-    ONLINE_ENABLED = true
-    OFFLINE_MODE = false
-    SERVER_AUTHORITATIVE = true
-    ensure_player_id()
-    if not remote_http or not is_instance_valid(remote_http):
-        remote_http = HTTPRequest.new()
-        remote_http.name = "RemoteGameHTTP"
-        remote_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
-        add_child(remote_http)
-        remote_http.request_completed.connect(_on_remote_http_completed)
-    _ensure_connection_http()
-    call_deferred("register_player_remote")
-    call_deferred("sync_remote_config")
+func post_startup_progress_audit() -> void:
+    await get_tree().process_frame
+    audit_achievement_source_state()
+    await get_tree().process_frame
+    check_achievements()
+    save_game()
+    update_ui()
+
 
 func activate_extra_features_after_startup() -> void:
     await get_tree().process_frame
@@ -5700,7 +5699,7 @@ func claim_login_reward() -> void:
     claim_login_reward_for_day(current_day)
 
 func claim_login_reward_for_day(day: int) -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if day < 1 or day > 7: return
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
@@ -6516,10 +6515,10 @@ func build_shop_machine_skins() -> void:
 
 func buy_cosmetic(index: int, specs: Array[Dictionary], owned: Array[bool], selected: int, skip_confirmation: bool = false) -> int:
     if index < 0 or index >= specs.size(): return selected
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and not skip_confirmation and confirm_purchases_on and not owned[index]:
+    if _server_authoritative_online() and not skip_confirmation and confirm_purchases_on and not owned[index]:
         confirm_purchase("Покупка скина", "Купить «%s» за %d ₽?" % [String(specs[index]["name"]), int(specs[index]["price"])], func(): buy_cosmetic(index, specs, owned, selected, true))
         return selected
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
             show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
@@ -6669,7 +6668,7 @@ func refresh_vip_panel() -> void:
 
 func buy_vip(index: int) -> void:
     if index < 0 or index >= vip_specs.size(): return
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         _server_action("vip_buy", {"index":index}); return
     if index >= vip_owned.size(): vip_owned.resize(vip_specs.size())
@@ -7146,7 +7145,7 @@ func refresh_chests_panel() -> void:
             b.disabled = chest_opening or amount <= 0 or chest_keys < need
 
 func workshop_upgrade(stat: String) -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_upgrade", {"stat":stat}):
@@ -7184,7 +7183,7 @@ func workshop_blueprint_cost(tier: String) -> int:
     return {"basic":250, "advanced":650, "elite":1400}.get(tier, 999999)
 
 func workshop_buy_blueprint(stat: String, tier: String) -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_blueprint", {"stat":stat,"tier":tier}):
@@ -7203,7 +7202,7 @@ func workshop_buy_blueprint(stat: String, tier: String) -> void:
     save_game(); check_achievements(); update_ui(); refresh_workshop_panel()
 
 func workshop_calibrate() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_calibrate", {}):
@@ -7223,7 +7222,7 @@ func workshop_calibrate() -> void:
     refresh_workshop_panel()
 
 func workshop_toggle_overclock() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; refresh_workshop_panel(); return
         if _server_action("workshop_overclock", {}):
@@ -8037,7 +8036,7 @@ func build_profile_panel() -> PanelContainer:
 
 func select_profile_avatar(index: int) -> void:
     player_avatar_index = clampi(index, 0, AVATAR_OPTIONS.size() - 1)
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and _server_ready() and player_token != "":
+    if _server_authoritative_online() and _server_ready() and player_token != "":
         _server_action("profile_update", {"avatar_index":player_avatar_index})
     refresh_profile_panel()
 
@@ -8050,7 +8049,7 @@ func save_profile_changes() -> void:
         var clean := input.text.strip_edges()
         if clean == "": clean = "ИГРОК"
         player_name = clean.substr(0, 20)
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "ПРОФИЛЬ НЕ СОХРАНЁН: НЕТ СЕРВЕРА"; update_ui(); return
         _server_action("profile_update", {"name":player_name,"avatar_index":player_avatar_index})
@@ -8883,7 +8882,7 @@ func build_help_panel() -> PanelContainer:
     return p
 
 func start_game() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and (not _server_ready() or player_token == ""):
+    if _server_authoritative_online() and (not _server_ready() or player_token == ""):
         current_result = "ПОДКЛЮЧЕНИЕ К СЕРВЕРУ НЕ УСТАНОВЛЕНО — ИГРА ЗАБЛОКИРОВАНА"
         update_ui()
         register_player_remote()
@@ -9118,7 +9117,7 @@ func _process(delta: float) -> void:
         sync_remote_config()
     remote_sync_timer -= delta
     if game_initialized and remote_sync_timer <= 0.0 and _server_persistence_ready():
-        remote_sync_timer = clampf(float(ProjectSettings.get_setting("application/config/online_sync_interval", 5.0)), 5.0, 60.0)
+        remote_sync_timer = clampf(float(ProjectSettings.get_setting("application/config/online_sync_interval", 20.0)), 10.0, 120.0)
         sync_player_to_server()
     remote_notification_timer -= delta
     if game_initialized and remote_notification_timer <= 0.0 and _server_ready():
@@ -9324,7 +9323,7 @@ func process_claw(delta: float) -> void:
             if grabbed:
                 drop_state = 3
             else:
-                if _server_ready() and player_token != "" and not LOCAL_FIRST_MODE:
+                if _server_ready() and player_token != "":
                     _server_action("game_finish", {"success": false})
                 # Если клешня ничего не взяла, никаких лишних движений к отверстию:
                 # сразу плавно возвращаем её в верхнюю парковочную точку над отверстием.
@@ -9347,7 +9346,7 @@ func process_claw(delta: float) -> void:
             # Иногда игрушка соскальзывает после подъёма. В этом случае она
             # остаётся обычным призом и НЕ засчитывается игроку.
             if grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
-                if _server_ready() and player_token != "" and not LOCAL_FIRST_MODE:
+                if _server_ready() and player_token != "":
                     _server_action("game_finish")
                 grabbed_toy.freeze = false
                 grabbed_toy.sleeping = false
@@ -9522,7 +9521,7 @@ func drop_claw() -> void:
         return
     play_upgrade_sound("grab")
     register_game_activity()
-    if _server_ready() and player_token != "" and not LOCAL_FIRST_MODE:
+    if _server_ready() and player_token != "":
         # Только фоновая фиксация начала попытки. Игровой цикл от ответа не зависит.
         server_attempt_ready = false
         server_attempt_success = false
@@ -9620,7 +9619,7 @@ func resolve_grab() -> bool:
     return true
 
 func finalize_delivered_prize() -> void:
-    if _server_ready() and not LOCAL_FIRST_MODE:
+    if _server_ready():
         if player_token == "":
             current_result = "НЕТ АВТОРИЗАЦИИ СЕРВЕРА"
             pending_prize_data.clear()
@@ -9839,7 +9838,7 @@ func award_toy_xp(rarity: String) -> int:
     return gained
 
 func check_collection_completion(collection_name: String) -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         return
     if completed_collections.has(collection_name):
         return
@@ -10307,7 +10306,7 @@ func grant_achievement_reward(spec: Dictionary) -> void:
     total_keys_earned += int(r.get("keys", 0))
 
 func check_achievements() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         # В онлайне достижения и их награды выдаёт только сервер. Клиент
         # лишь отображает подтверждённый snapshot, чтобы не было двойных выплат.
         refresh_achievements_panel()
@@ -10378,10 +10377,10 @@ func confirm_purchase(title_text: String, message_text: String, action: Callable
 
 func buy_claw(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= claw_specs.size(): return
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and not skip_confirmation and confirm_purchases_on and not (index < owned_claws.size() and owned_claws[index]):
+    if _server_authoritative_online() and not skip_confirmation and confirm_purchases_on and not (index < owned_claws.size() and owned_claws[index]):
         confirm_purchase("Покупка клешни", "Купить «%s» за %d ₽?" % [String(claw_specs[index]["name"]), int(claw_specs[index]["price"])], func(): buy_claw(index, true))
         return
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
             show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
@@ -10419,13 +10418,13 @@ func buy_claw(index: int, skip_confirmation: bool = false) -> void:
 
 func buy_upgrade(index: int, skip_confirmation: bool = false) -> void:
     if index < 0 or index >= upgrade_specs.size(): return
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE and not skip_confirmation and confirm_purchases_on:
+    if _server_authoritative_online() and not skip_confirmation and confirm_purchases_on:
         var level := int(upgrade_levels[index])
         var price := int(upgrade_specs[index]["base_price"]) * (level + 1)
         if level < 5:
             confirm_purchase("Покупка улучшения", "Улучшить «%s» до уровня %d за %d ₽?" % [String(upgrade_specs[index]["name"]), level + 1, price], func(): buy_upgrade(index, true))
             return
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "":
             current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"
             show_shop_feedback("⚠ НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ")
@@ -10498,7 +10497,7 @@ func show_sale_offer() -> void:
 
 func sell_duplicate() -> void:
     if not sale_available: return
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("sell_duplicate", {"toy_name":sale_name,"amount":sale_price}):
             sale_available = false
@@ -10662,10 +10661,10 @@ func setup_daily_systems() -> void:
 
 func register_game_activity() -> void:
     last_game_activity = time_alive
-    # Network sync is timer-driven. Do not send an HTTP request on every
-    # joystick movement/activity event; local gameplay must remain instant.
-    if _server_persistence_ready():
-        remote_sync_timer = minf(remote_sync_timer, 3.0)
+    # Не отправляем полный save на сервер при каждом движении джойстика
+    # или обычном игровом событии. Синхронизация выполняется отдельным
+    # лёгким таймером и после серверных действий. Это исключает сетевую
+    # очередь во время активной игры и не создаёт нагрузку на запуск.
     waiting_idle_time = 0.0
     if waiting_overlay:
         waiting_overlay.visible = false
@@ -10737,7 +10736,7 @@ func complete_weekly_mission_if_ready() -> void:
         notify_phone("🏆 Хватайка", "Недельное задание выполнено. Награда +180 ₽ уже получена!")
 
 func claim_daily_bonus() -> void:
-    if SERVER_AUTHORITATIVE and not LOCAL_FIRST_MODE:
+    if _server_authoritative_online():
         if not _server_ready() or player_token == "": current_result = "НЕТ ПОДКЛЮЧЕНИЯ К СЕРВЕРУ"; update_ui(); return
         if _server_action("claim_daily"):
             return
@@ -11031,7 +11030,7 @@ func load_save() -> void:
     # A saved token may be reused for a short period; a 401 automatically
     # triggers re-registration. The endpoint itself is never taken from an old save.
     if ONLINE_ENABLED and not OFFLINE_MODE:
-        server_url = String(ProjectSettings.get_setting("application/config/online_server_url", "http://135.106.209.40:8080")).strip_edges().trim_suffix("/")
+        server_url = String(ProjectSettings.get_setting("application/config/online_server_url", "https://135.106.209.40")).strip_edges().trim_suffix("/")
         player_token = String(data.get("player_token", player_token))
     else:
         server_url = ""
@@ -11162,7 +11161,10 @@ func load_save() -> void:
         collection = saved_collection
     var loaded_prizes: Variant = data.get("prizes", [])
     if loaded_prizes is Array:
-        saved_prizes = loaded_prizes
+        # Защита старого/повреждённого save: игровой автомат рассчитан максимум
+        # на TARGET_PRIZE_COUNT объектов. Никогда не строим сотни/тысячи игрушек
+        # во время запуска из некорректного локального файла.
+        saved_prizes = loaded_prizes.slice(0, TARGET_PRIZE_COUNT)
         var toy_counts: Dictionary = {}
         var unique_toys := {}
         for saved in saved_prizes:
