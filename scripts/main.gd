@@ -7,13 +7,13 @@ extends Node3D
 
 const SAVE_PATH: String = "user://claw_save.json"
 const SAVE_SCHEMA_VERSION: int = 2
-const ONLINE_ENABLED: bool = true
+var ONLINE_ENABLED: bool = false
 const STARTUP_DIAGNOSTIC_PATH: String = "user://startup_diagnostic.txt"
 # 2.0.0 production online mode: the server is authoritative for economy,
 # progress and game outcomes. Local UI/physics continue to run without blocking
 # on HTTP; network operations are asynchronous and retried in the background.
-const OFFLINE_MODE: bool = false
-var SERVER_AUTHORITATIVE: bool = true
+var OFFLINE_MODE: bool = true
+var SERVER_AUTHORITATIVE: bool = false
 # Local-first UX: gameplay/progress updates happen immediately on device;
 # the existing server is used quietly for persistence, account identity and rating.
 var LOCAL_FIRST_MODE: bool = true
@@ -898,11 +898,22 @@ func _ready() -> void:
     var network_manager := get_node_or_null("/root/NetworkManager")
     if network_manager != null and network_manager.has_method("configure_player"):
         network_manager.configure_player(player_id, player_name)
-    # Сетевой слой намеренно НЕ создаём во время _ready/тяжёлого старта.
-    # HTTPRequest и Android API поднимаются только после первого полноценного
-    # игрового кадра, чтобы сервер/интернет никогда не мог задержать запуск.
     if not STARTUP_CONTROL_TEST and SERVER_AUTHORITATIVE:
         ensure_player_id()
+        remote_http = HTTPRequest.new()
+        remote_http.name = "RemoteGameHTTP"
+        remote_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
+        add_child(remote_http)
+        remote_http.request_completed.connect(_on_remote_http_completed)
+        _ensure_connection_http()
+        if get_tree().has_signal("on_request_permissions_result"):
+            var permission_callable := Callable(self, "_on_notification_permission_result")
+            if not get_tree().is_connected("on_request_permissions_result", permission_callable):
+                get_tree().connect("on_request_permissions_result", permission_callable)
+        # Онлайн-слой НЕ запускаем во время тяжёлого старта.
+        # Регистрация, конфиг и уведомления подключаются только после того,
+        # как первый игровой кадр уже показан и игрок получил управление.
+        update_return_bonus_state()
     call_deferred("initialize_game_async")
     if not STARTUP_CONTROL_TEST:
         call_deferred("build_upgrade_sound_system")
@@ -3194,8 +3205,28 @@ func initialize_game_async() -> void:
     if loading_screen and is_instance_valid(loading_screen):
         loading_screen.queue_free()
     loading_screen = null
+    # Сервер включается только после того, как игровой экран уже показан.
+    # Это сохраняет быстрый запуск как в рабочей офлайн-версии.
     call_deferred("activate_extra_features_after_startup")
+    get_tree().create_timer(3.0).timeout.connect(_enable_online_after_startup)
 
+
+func _enable_online_after_startup() -> void:
+    if not game_initialized:
+        return
+    ONLINE_ENABLED = true
+    OFFLINE_MODE = false
+    SERVER_AUTHORITATIVE = true
+    ensure_player_id()
+    if not remote_http or not is_instance_valid(remote_http):
+        remote_http = HTTPRequest.new()
+        remote_http.name = "RemoteGameHTTP"
+        remote_http.timeout = clampf(float(ProjectSettings.get_setting("application/config/online_timeout", 3.0)), 1.0, 5.0)
+        add_child(remote_http)
+        remote_http.request_completed.connect(_on_remote_http_completed)
+    _ensure_connection_http()
+    call_deferred("register_player_remote")
+    call_deferred("sync_remote_config")
 
 func activate_extra_features_after_startup() -> void:
     await get_tree().process_frame
@@ -3204,8 +3235,8 @@ func activate_extra_features_after_startup() -> void:
     # не должен конкурировать с созданием мира и игрушек на старте.
     if ONLINE_ENABLED and not OFFLINE_MODE and SERVER_AUTHORITATIVE:
         await get_tree().process_frame
-        # Уведомления не являются частью критического пути синхронизации.
-        # Подключаем их после регистрации, чтобы Android API не мог задержать запуск.
+        setup_android_notifications()
+        await get_tree().process_frame
         register_player_remote()
         await get_tree().process_frame
         sync_remote_config()
