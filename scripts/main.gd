@@ -9413,10 +9413,16 @@ func finalize_delivered_prize() -> void:
             pending_prize_data.clear()
             update_ui()
             return
-        # Сервер получает локальный итог в фоне. Локальная выдача продолжается
-        # ниже без ожидания HTTP, поэтому клешня и награда не блокируются сетью.
-        var local_finish := {"success": true, "toy_id": String(pending_prize_data.get("id", ""))}
-        _server_action("game_finish", local_finish)
+        # В серверном режиме клиент НЕ изменяет экономику и прогресс локально.
+        # Раньше здесь сначала выдавалась локальная награда, а затем ответ
+        # сервера/sync возвращал старый snapshot (например, 120 ₽), из-за чего
+        # награда визуально появлялась и тут же отменялась. Теперь единственный
+        # источник истины — ответ game_finish от сервера.
+        var server_finish := {"success": true, "toy_id": String(pending_prize_data.get("id", ""))}
+        if not _server_action("game_finish", server_finish):
+            current_result = "СЕРВЕР ЗАНЯТ — НАГРАДА БУДЕТ ПОДТВЕРЖДЕНА ПОСЛЕ ОТВЕТА"
+            update_ui()
+        return
     if pending_prize_data.is_empty():
         return
     var d: Dictionary = pending_prize_data
