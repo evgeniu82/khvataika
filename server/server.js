@@ -427,7 +427,7 @@ async function handle(req,res){
   if(pth==='/api/notifications/poll'&&req.method==='GET'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});const pid=p.player_id;const cursor=Number(u.searchParams.get('cursor')||p.notification_cursor);const items=state.notifications.filter(n=>Number(n.id_num||0)>cursor&&(n.target==='all'||n.target===p.player_id)&&(!n.deliver_at||Date.parse(n.deliver_at)<=now())&&!n.cancelled).sort((a,b)=>(a.id_num||0)-(b.id_num||0)).slice(0,50);if(items.length){p.notification_cursor=Math.max(cursor,...items.map(x=>Number(x.id_num||0)));for(const n of items){state.notification_history.push({notification_id:n.id,player_id:p.player_id,status:'delivered',delivered_at:iso()});}state.notification_history=state.notification_history.slice(-5000);}saveState();return json(res,200,{ok:true,notifications:items,next_cursor:p.notification_cursor,server_time:Math.floor(now()/1000)});}
   if(pth==='/api/device/register'&&req.method==='POST'){const p=requirePlayer(req);if(!p)return json(res,401,{ok:false,message:'Требуется авторизация игрока'});return json(res,200,{ok:true,player_id:p.player_id});}
   if(pth==='/api/admin/login'&&req.method==='POST'){if(!ADMIN_PASSWORD)return json(res,503,{ok:false,message:'ADMIN_PASSWORD не задан на сервере'});const b=await body(req);if(String(b.password||'')!==ADMIN_PASSWORD)return json(res,401,{ok:false,message:'Неверный пароль'});const t=crypto.randomBytes(32).toString('hex');sessions.set(t,{kind:'admin',admin:'admin',expires:now()+ADMIN_SESSION_TTL});return json(res,200,{ok:true,token:t});}
-  if(pth.startsWith('/api/admin/'))return adminHandle(req,res,pth);
+  if(pth.startsWith('/api/admin/'))return adminHandle(req,res,pth,u);
   if(pth==='/admin/notification-thumbnail.png'){
     const file=path.join(__dirname,'..','addons','khvataika_background_notifications','notification_thumbnail.png');
     if(!fs.existsSync(file))return json(res,404,{ok:false,message:'thumbnail not found'});
@@ -436,7 +436,7 @@ async function handle(req,res){
   if(pth==='/'||pth==='/index.html'){const html=fs.readFileSync(path.join(__dirname,'public','index.html'));res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});return res.end(html);}
   return json(res,404,{ok:false,message:'Not found'});
 }
-async function adminHandle(req,res,pth){
+async function adminHandle(req,res,pth,u){
   const adm=requireAdmin(req);if(!adm)return json(res,401,{ok:false,message:'Требуется вход администратора'});if(!rateLimit('admin:'+adm.admin,300,60000))return json(res,429,{ok:false,message:'Слишком много запросов'});
   if(pth==='/api/admin/state'&&req.method==='GET')return json(res,200,{ok:true,state});
   if(pth==='/api/admin/dashboard'&&req.method==='GET'){const ps=Object.values(state.players);return json(res,200,{ok:true,stats:{players:ps.length,online:ps.filter(p=>now()-Date.parse(p.last_seen)<300000).length,banned:ps.filter(p=>p.banned).length,coins:ps.reduce((s,p)=>s+p.coins,0),games:ps.reduce((s,p)=>s+p.games,0),prizes:ps.reduce((s,p)=>s+p.prizes,0),parts:ps.reduce((s,p)=>s+Number(p.workshop_parts||p.inventory?.parts||0),0),keys:ps.reduce((s,p)=>s+Number(p.inventory?.chest_keys||0),0)},recent_audit:state.audit.slice(0,50),notifications:state.notifications.slice(-20).reverse()});}
