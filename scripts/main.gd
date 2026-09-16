@@ -9315,8 +9315,27 @@ func process_claw(delta: float) -> void:
         drop_time += delta
         animate_grip(clampf(drop_time / claw_grip_close_time(), 0.0, 1.0))
         if drop_time >= claw_grip_close_time():
-            # Игровой цикл никогда не ждёт HTTP. Результат захвата считается
-            # локально, а сервер получает попытку и её итог в фоне.
+            # В онлайн-режиме результат game_start является авторитетным.
+            # Не бросаем второй локальный random и не отправляем game_finish,
+            # пока сервер не вернул зарезервированный исход попытки.
+            if _server_ready() and player_token != "" and not server_attempt_ready:
+                claw_server_wait_timer += delta
+                current_result = "ПОЛУЧАЕМ РЕЗУЛЬТАТ СЕРВЕРА..."
+                update_ui()
+                # Если сервер не ответил за несколько секунд, отменяем только
+                # текущую попытку. Она уже учтена сервером как сыгранная.
+                if claw_server_wait_timer >= 6.0:
+                    _server_action("game_cancel")
+                    claw_server_wait_timer = 0.0
+                    drop_time = 0.0
+                    claw_move_target = CLAW_HOME
+                    claw_target = CLAW_HOME
+                    drop_state = 8
+                    current_result = "СЕРВЕР НЕ ОТВЕТИЛ • ПОВТОРИТЕ ИГРУ"
+                    animate_grip(0.0)
+                    save_game()
+                    update_ui()
+                return
             var grabbed := resolve_grab()
             claw_server_wait_timer = 0.0
             drop_time = 0.0
@@ -9345,7 +9364,7 @@ func process_claw(delta: float) -> void:
         if claw_pos.y >= CLAW_HOME.y - 0.03:
             # Иногда игрушка соскальзывает после подъёма. В этом случае она
             # остаётся обычным призом и НЕ засчитывается игроку.
-            if grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
+            if not (_server_ready() and player_token != "") and grabbed_toy and is_instance_valid(grabbed_toy) and String(pending_prize_data.get("kind", "toy")) == "toy" and randf() < clampf(GRAB_SLIP_CHANCE + (0.10 if bool(grabbed_toy.get_meta("slippery", false)) else 0.0) + clampf((float(grabbed_toy.get_meta("toy_weight", 38.0)) - 35.0) / 220.0, 0.0, 0.18) - (0.10 if int(pending_prize_data.get("index", -1)) == lucky_toy_index else 0.0), 0.05, 0.55):
                 if _server_ready() and player_token != "":
                     _server_action("game_finish")
                 grabbed_toy.freeze = false
@@ -9540,7 +9559,8 @@ func drop_claw() -> void:
             current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
             update_ui()
             return
-    total_games += 1
+    if not (_server_ready() and player_token != ""):
+        total_games += 1
     if vibration_on:
         Input.vibrate_handheld(55, 0.35)
     save_game()
@@ -9553,8 +9573,52 @@ func drop_claw() -> void:
     update_ui()
 
 func resolve_grab() -> bool:
-    # Захват всегда рассчитывается локально. Сервер получает результат
-    # асинхронно и не блокирует физику, анимацию или управление.
+    # В онлайн-режиме результат уже рассчитан сервером в game_start.
+    # Клиент только подбирает соответствующее тело игрушки и воспроизводит
+    # авторитетный исход. Это исключает рассинхрон двух random-расчётов.
+    if _server_ready() and player_token != "":
+        if not server_attempt_ready:
+            current_result = "ОЖИДАНИЕ РЕЗУЛЬТАТА СЕРВЕРА..."
+            update_ui()
+            return false
+        if not server_attempt_success:
+            current_result = "НЕ УДЕРЖАЛА 😅 • РЕЗУЛЬТАТ СЕРВЕРА"
+            play_upgrade_sound("fail")
+            current_win_streak = 0
+            update_ui()
+            return false
+        var server_chosen := -1
+        for i in range(prize_data.size()):
+            if String(prize_data[i].get("id", "")) == server_attempt_toy_id:
+                server_chosen = i
+                break
+        if server_chosen < 0 or server_chosen >= prize_bodies.size():
+            current_result = "ИГРУШКА НЕ НАЙДЕНА • ПОВТОРИТЕ ИГРУ"
+            update_ui()
+            return false
+        var selected_body := prize_bodies[server_chosen]
+        if not selected_body or not is_instance_valid(selected_body):
+            current_result = "ИГРУШКА НЕДОСТУПНА • ПОВТОРИТЕ ИГРУ"
+            update_ui()
+            return false
+        grabbed_index = server_chosen
+        if selected_body and claw_pos.distance_to(selected_body.global_position) < 0.75:
+            perfect_grabs += 1
+        grabbed_toy = selected_body
+        grabbed_toy.freeze = true
+        grabbed_toy.sleeping = true
+        pending_prize_data = prize_data[server_chosen].duplicate(true)
+        pending_prize_data["weight"] = float(selected_body.get_meta("toy_weight", 38.0))
+        last_reward_rubles = int(server_attempt_reward.get("amount", 0)) if server_attempt_reward is Dictionary else 0
+        last_prize_xp = 0
+        last_prize_name = String(pending_prize_data.get("name", "Приз"))
+        last_prize_collection = String(pending_prize_data.get("collection", ""))
+        last_prize_rarity = String(pending_prize_data.get("rarity", ""))
+        current_result = "ЗАХВАТ: %s • ПОДТВЕРЖДЕНО СЕРВЕРОМ" % last_prize_name
+        update_ui()
+        return true
+
+    # Полностью локальный режим сохраняет прежнюю механику вероятности захвата.
     var bonus: float = float(claw_specs[selected_claw]["bonus"])
     var success_chance: float = 0.28 + bonus
     success_chance += float(shop_upgrade_level(0)) * 0.035
