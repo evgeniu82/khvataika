@@ -10,12 +10,12 @@ run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 # Stage 1 online connection: background health/auth only. Gameplay remains offline/local.
 config/online_stage1_enabled=false
-config/online_stage1_server_url="http://135.106.209.40:8080"
+config/online_stage1_server_url="https://135.106.209.40"
 config/online_stage1_timeout=3.0
 # Production 2.0.0 online runtime.
 config/online_enabled=true
 config/online_authoritative=true
-config/online_server_url="http://135.106.209.40:8080"
+config/online_server_url="https://135.106.209.40"
 config/online_timeout=3.0
 config/online_sync_interval=20.0
 config/online_notification_interval=30.0
