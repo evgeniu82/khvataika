@@ -1,0 +1,10 @@
+# Public HTTPS reverse proxy for the current VDS IP.
+# The certificate/key are issued by Let's Encrypt as short-lived IP certificates.
+# Keep Node.js bound to 127.0.0.1:8080; expose only 80/443 publicly.
+
+135.106.209.40 {
+    tls /etc/letsencrypt/live/135.106.209.40/fullchain.pem /etc/letsencrypt/live/135.106.209.40/privkey.pem
+
+    encode gzip
+    reverse_proxy 127.0.0.1:8080
+}

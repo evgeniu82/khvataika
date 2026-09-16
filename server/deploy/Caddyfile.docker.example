@@ -1,0 +1,5 @@
+# Replace api.example.com with the real domain and point its A/AAAA record to the VDS.
+api.example.com {
+    encode gzip
+    reverse_proxy api:8080
+}
