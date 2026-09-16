@@ -16,7 +16,7 @@ const OFFLINE_MODE: bool = false
 var SERVER_AUTHORITATIVE: bool = true
 # Local-first UX: gameplay/progress updates happen immediately on device;
 # the existing server is used quietly for persistence, account identity and rating.
-var LOCAL_FIRST_MODE: bool = true
+var LOCAL_FIRST_MODE: bool = false
 const PLAY_COST: int = 0
 const MACHINE_CENTER := Vector3(0.0, 3.35, 0.0)
 const PRIZE_HOLE := Vector3(2.35, 3.02, 1.55)
@@ -1340,10 +1340,17 @@ func server_reward_amount(value: int) -> int:
 func ensure_player_id() -> void:
     if player_id != "":
         return
-    var seed_text := "%s_%s_%s" % [Time.get_unix_time_from_system(), randi(), OS.get_unique_id()]
-    player_id = "%x" % seed_text.hash()
-    if player_id.begins_with("-"):
-        player_id = player_id.substr(1)
+    # Stable identity: do not derive player_id from time/random values.
+    # App updates/reinstalls may remove user://save.json; the device identifier
+    # lets the server reconnect the same player instead of creating a new account.
+    var device_uid := OS.get_unique_id().strip_edges()
+    if device_uid != "":
+        player_id = "device_%x" % device_uid.hash()
+    else:
+        var seed_text := "%s_%s" % [Time.get_unix_time_from_system(), randi()]
+        player_id = "%x" % seed_text.hash()
+        if player_id.begins_with("-"):
+            player_id = player_id.substr(1)
     save_game()
 
 func _normalized_server_url() -> String:
@@ -1907,7 +1914,10 @@ func register_player_remote() -> void:
         remote_sync_pending = true
         return
     remote_request_kind = "register"
-    var payload := {"player_id": player_id, "name": player_name}
+    var device_uid := OS.get_unique_id().strip_edges()
+    if device_uid == "":
+        device_uid = player_id
+    var payload := {"player_id": player_id, "name": player_name, "device_id": device_uid}
     var headers := _remote_headers()
     var err := remote_http.request(_normalized_server_url() + "/api/player/register", headers, HTTPClient.METHOD_POST, JSON.stringify(payload))
     if err != OK:
@@ -9324,14 +9334,17 @@ func process_claw(delta: float) -> void:
                 update_ui()
                 # Если сервер не ответил за несколько секунд, отменяем только
                 # текущую попытку. Она уже учтена сервером как сыгранная.
-                if claw_server_wait_timer >= 6.0:
+                if claw_server_wait_timer >= 2.0:
+                    # A player must never watch the claw frozen at the bottom.
+                    # Cancel the unfinished server attempt in the background and
+                    # immediately return the claw to its normal parking position.
                     _server_action("game_cancel")
                     claw_server_wait_timer = 0.0
                     drop_time = 0.0
                     claw_move_target = CLAW_HOME
                     claw_target = CLAW_HOME
                     drop_state = 8
-                    current_result = "СЕРВЕР НЕ ОТВЕТИЛ • ПОВТОРИТЕ ИГРУ"
+                    current_result = "КЛЕШНЬ ВОЗВРАЩАЕТСЯ"
                     animate_grip(0.0)
                     save_game()
                     update_ui()
@@ -9556,7 +9569,7 @@ func drop_claw() -> void:
                 target_distance = Vector2(claw_pos.x - target_body.global_position.x, claw_pos.z - target_body.global_position.z).length()
         if not _server_action("game_start", {"target_toy_id":target_toy_id, "target_distance":target_distance}):
             claw_server_wait_timer = 0.0
-            current_result = "СЕРВЕР ЗАНЯТ — ПОВТОРИТЕ"
+            current_result = "ПОПРОБУЙТЕ ЕЩЁ РАЗ"
             update_ui()
             return
     if not (_server_ready() and player_token != ""):
